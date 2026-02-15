@@ -77,3 +77,66 @@
         </div>
     {% endwith %}
 {% endblock %}
+{% block include_js %}
+    {# Drag-and-drop library used to reorder module list items #}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5sortable/0.13.3/html5sortable.min.js"></script>
+{% endblock %}
+
+{% block domready %}
+    // Base fetch options for sending reorder updates to Django.
+    // same-origin keeps request within this site context.
+    var options = {
+        method: 'POST',
+        mode: 'same-origin'
+    };
+
+    // Django endpoint that receives module order updates.
+    const moduleOrderUrl = '{% url "module_order" %}';
+
+    // Enable drag-and-drop sorting on the #modules list.
+    sortable('#modules', {
+        forcePlaceholderSize: true,      // keep placeholder size stable while dragging
+        placeholderClass: 'placeholder'  // CSS class for the drop placeholder
+    })[0].addEventListener('sortupdate', function (e) {
+
+        // Will store new order as: {module_id: new_index}
+        let modulesOrder = {};
+
+        // Read all module <li> items in their NEW visual order.
+        var modules = document.querySelectorAll('#modules li');
+
+        modules.forEach(function (module, index) {
+            // Save each module's new position.
+            // module.dataset.id comes from data-id="{{ m.id }}" in HTML.
+            modulesOrder[module.dataset.id] = index;
+
+            // Update the visible order number in UI immediately.
+            module.querySelector('.order').innerHTML = index + 1;
+        });
+
+        // Attach JSON payload to request.
+        options.body = JSON.stringify(modulesOrder);
+
+        // Send POST request to persist new order on the server.
+        fetch(moduleOrderUrl, options);
+    });
+
+
+    const contentOrderUrl = '{% url "content_order" %}';
+    sortable('#module-contents', {
+        forcePlaceholderSize: true,
+        placeholderClass: 'placeholder'
+    })[0].addEventListener('sortupdate', function(e) {
+        contentOrder = {};
+        var contents = document.querySlectorAll('#module-contents div');
+        contents.forEach(function (content, index) {
+            //update content index
+            contentOrder[content.dataset.id] = index;
+        });
+        // add new order to the HTTP request options
+        options['body'] = JSON.stringify(contentOrder);
+
+        // send HTTP request
+        fetch(contentOrderUrl, options)
+    });
+{% endblock %}
