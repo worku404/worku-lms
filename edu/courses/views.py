@@ -182,7 +182,7 @@ class ContentDeleteView(View):
         content = get_object_or_404(
             Content,
             id=id,
-            module_course_owner = request.user
+            module__course__owner = request.user
         )
         module = content.module
         content.item.delete()
@@ -237,3 +237,14 @@ class CourseDeleteView(OwnerCourseMixin, DeleteView):
     # Users can delete only their own courses (via OwnerMixin.get_queryset).
     template_name = "courses/manage/course/delete.html"
     permission_required = 'courses.delete_course'
+    
+class ModuleContentListView(TemplateResponseMixin, View):
+    template_name = 'courses/manage/module/content_list.html'
+    
+    def get(self, request, module_id):
+        module = get_object_or_404(
+            Module,
+            id=module_id,
+            course__owner=request.user
+        )
+        return self.render_to_response({'module': module})

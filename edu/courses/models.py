@@ -98,7 +98,8 @@ class Content(models.Model):
     # Example: if content_type=Video and object_id=7, item returns Video(id=7).
     item = GenericForeignKey("content_type", "object_id")
     
-    order = OrderField(blank=True, for_fields=["course"])
+    order = OrderField(blank=True, for_fields=["module"])
+
     class Meta:
         ordering = ['order']
 from django.contrib.auth.models import User
