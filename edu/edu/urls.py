@@ -34,6 +34,7 @@ urlpatterns = [
     path('', CourseListview.as_view(), name='course_list'),
     path('students/', include('students.urls')),
     path('__debug__/', include('debug_toolbar.urls')),
+    path('assistant/', include('assistant.urls', namespace='assistant'))
 ]
 
 if settings.DEBUG:

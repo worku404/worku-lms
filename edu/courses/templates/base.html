@@ -25,6 +25,23 @@
             {% endif %}
         </ul>
     </div>
+    {% if request.user.is_authenticated %}
+    <button
+        id="assistant-unhide"
+        class="assistant-unhide"
+        type="button"
+        aria-label="Show AI assistant"
+        aria-controls="assistant-panel"
+        aria-expanded="true"
+    >
+        AI
+    </button>
+    <div id="assistant-panel" class="assistance">
+        {% block ai %}
+            {% include "assistant/llm.html" %}
+        {% endblock %}
+    </div>
+    {% endif %}
     <div id="content">
         {% block content %}{% endblock %}
     </div>
