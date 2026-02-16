@@ -2,12 +2,19 @@
 Settings for the edu project.
 """
 
+import os
 from pathlib import Path  # Standard library: build OS-safe filesystem paths
 from django.urls import reverse_lazy  # Django utility: resolve URL names lazily at runtime
+from dotenv import load_dotenv
 
 
 # Core project paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from either project root or settings directory.
+for _env_path in (BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
+    if _env_path.exists():
+        load_dotenv(_env_path)
 
 # Authentication behavior
 # Redirect authenticated users to the student course list after login.
@@ -35,6 +42,7 @@ INSTALLED_APPS = [
 
     # Project apps
     "students.apps.StudentsConfig",
+    'assistant.apps.AssistantConfig',
 
     # Third-party apps
     "embed_video",   # Embed and render video content in templates/models
@@ -76,6 +84,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "assistant.context_processors.llm_widget",
             ],
         },
     },
@@ -137,3 +146,10 @@ INTERNAL_IPS = ["127.0.0.1"]
 CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 60 * 15  # 15 minutes
 CACHE_MIDDLEWARE_KEY_PREFIX = "educa"
+
+
+# GEMINI API
+API1_KEY = os.getenv("API1_KEY")
+API2_KEY = os.getenv("API2_KEY")
+API3_KEY = os.getenv("API3_KEY")
+API4_KEY = os.getenv("API4_KEY")
