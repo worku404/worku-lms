@@ -35,9 +35,6 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     # User defined apps
     'courses.apps.CoursesConfig',
-    'students.apps.StudentsConfig',
-    'embed_video',
-    'debug_toolbar',
     
     'django.contrib.admin',
     'django.contrib.auth',
@@ -46,13 +43,24 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    'students.apps.StudentsConfig',
+    'embed_video',
+    'debug_toolbar',
+    'redisboard',
+    
 ]
 
 MIDDLEWARE = [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    
+    # 'django.middleware.cache.UpdateCacheMiddleware',
+    
     'django.middleware.common.CommonMiddleware',
+    
+    # 'django.middleware.cache.FetchFromCacheMiddleware'
+    
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -131,12 +139,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',
-        'LOCATION': '127.0.0.1:11211',
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
     }
 }
 
 INTERNAL_IPS = [
     '127.0.0.1',
 ]
+
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 60 * 15 # 15 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'educa'
