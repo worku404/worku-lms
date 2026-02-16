@@ -18,6 +18,7 @@ from django.views.generic.edit import CreateView, UpdateView, DeleteView
 # Request/response helpers.
 from django.shortcuts import get_object_or_404, redirect
 from django.http import Http404
+from django.conf import settings
 
 # Auth and permission guards.
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -63,10 +64,13 @@ class CourseListview(TemplateResponseMixin, View):
         query = (request.GET.get("q") or "").strip()
 
         # 1) Subjects sidebar (with number of courses per subject).
-        subjects = cache.get("all_subjects")
-        if subjects is None:
+        if settings.DEBUG:
             subjects = Subject.objects.annotate(total_courses=Count("courses"))
-            cache.set("all_subjects", subjects, COURSE_LIST_CACHE_TTL)
+        else:
+            subjects = cache.get("all_subjects")
+            if subjects is None:
+                subjects = Subject.objects.annotate(total_courses=Count("courses"))
+                cache.set("all_subjects", subjects, COURSE_LIST_CACHE_TTL)
 
         # 2) Base queryset for courses (with number of modules per course).
         all_courses = Course.objects.annotate(total_modules=Count("modules"))
@@ -74,22 +78,31 @@ class CourseListview(TemplateResponseMixin, View):
         # 3) Optional filtering by subject slug from URL.
         if subject:
             current_subject = get_object_or_404(Subject, slug=subject)
-            cache_key = f"subject_{current_subject.id}_courses"  # fixed: use .id
-            courses = cache.get(cache_key)
-            if courses is None:
+            if settings.DEBUG:
                 courses = all_courses.filter(subject=current_subject)
-                cache.set(cache_key, courses, COURSE_LIST_CACHE_TTL)
+            else:
+                cache_key = f"subject_{current_subject.id}_courses"  # fixed: use .id
+                courses = cache.get(cache_key)
+                if courses is None:
+                    courses = all_courses.filter(subject=current_subject)
+                    cache.set(cache_key, courses, COURSE_LIST_CACHE_TTL)
         else:
-            courses = cache.get("all_courses")
-            if courses is None:
+            if settings.DEBUG:
                 courses = all_courses
-                cache.set("all_courses", courses, COURSE_LIST_CACHE_TTL)
+            else:
+                courses = cache.get("all_courses")
+                if courses is None:
+                    courses = all_courses
+                    cache.set("all_courses", courses, COURSE_LIST_CACHE_TTL)
 
         # 4) Optional search over title and overview.
         if query:
             if hasattr(courses, "filter"):
                 courses = courses.filter(
-                    Q(title__icontains=query) | Q(overview__icontains=query)
+                    Q(title__icontains=query) | 
+                    Q(overview__icontains=query) |
+                    Q(subject__title__icontains=query)
+                    
                 ).distinct()
             else:
                 q = query.lower()
