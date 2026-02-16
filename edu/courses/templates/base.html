@@ -12,7 +12,9 @@
 
     <header id="header" class="topbar">
         <div class="topbar__inner">
-            <a href="{% url 'course_list' %}" class="topbar__brand">Gold-Edu</a>
+            <a href="{% url 'course_list' %}" class="topbar__brand" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;background:linear-gradient(90deg,rgba(255,215,0,.18),rgba(255,105,180,.22));box-shadow:0 4px 14px rgba(255,105,180,.25);text-decoration:none;">
+                <span style="color:#ffd54f;font-weight:800;letter-spacing:.4px;">Gold</span><span style="color:#ffe0ea;">-</span><span style="color:#ff9ec5;font-weight:800;letter-spacing:.4px;">Edu</span>
+            </a>
 
             <form class="c-search topbar__search" action="{% url 'course_list' %}" method="get" role="search" aria-label="Search courses">
                 <label class="u-sr-only" for="global-search">Search courses</label>
@@ -30,6 +32,9 @@
             <nav class="topbar__actions" aria-label="Account actions">
                 {% if request.user.is_authenticated %}
                     <a href="{% url 'student_course_list' %}" class="c-btn c-btn--ghost">My Courses</a>
+                    <a href="#" id="theme-toggle-link" class="c-btn c-btn--ghost" role="button" aria-pressed="false">
+                        Dark mode
+                    </a>
                     <form action="{% url 'logout' %}" method="post">
                         <button type="submit" class="c-btn c-btn--secondary">Sign out</button>
                         {% csrf_token %}
@@ -98,6 +103,44 @@
 
     {% block include_js %}{% endblock %}
     <script>
+        (function () {
+            const themeStorageKey = "theme_preference";
+            const body = document.body;
+            const toggleLink = document.getElementById("theme-toggle-link");
+
+            if (!body || !toggleLink) return;
+
+            const applyTheme = (mode) => {
+                const darkModeEnabled = mode === "dark";
+                body.classList.toggle("theme-dark", darkModeEnabled);
+                toggleLink.textContent = darkModeEnabled ? "Light mode" : "Dark mode";
+                toggleLink.setAttribute("aria-pressed", String(darkModeEnabled));
+            };
+
+            let preferredMode = "light";
+            try {
+                const storedMode = localStorage.getItem(themeStorageKey);
+                if (storedMode === "dark" || storedMode === "light") {
+                    preferredMode = storedMode;
+                }
+            } catch (error) {
+                preferredMode = "light";
+            }
+
+            applyTheme(preferredMode);
+
+            toggleLink.addEventListener("click", function (event) {
+                event.preventDefault();
+                const nextMode = body.classList.contains("theme-dark") ? "light" : "dark";
+                applyTheme(nextMode);
+                try {
+                    localStorage.setItem(themeStorageKey, nextMode);
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            });
+        })();
+
         document.addEventListener('DOMContentLoaded', (event) => {
             // DOM loaded
             {% block domready %} {% endblock %}

@@ -49,3 +49,21 @@
     --bp-lg: 1200px;
     --bp-xl: 1440px;
 }
+
+body.theme-dark {
+    --color-primary: #2a9d66;
+    --color-primary-hover: #227f53;
+    --color-secondary-surface: #1b2a3b;
+    --color-accent: #5aa1e6;
+    --color-warning: #d0a649;
+    --color-error: #ef6363;
+    --color-text: #e7eef7;
+    --side-bar-text:;
+    --color-text-muted: #9ab0c7;
+    --color-border: #2a3b50;
+    --color-bg: #0f1723;
+    --color-surface: #121c2a;
+    --color-surface-soft: #172434;
+    --color-focus-ring: color-mix(in srgb, var(--color-accent) 70%, white);
+    --color-shadow: 0 0 0;
+}

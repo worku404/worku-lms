@@ -75,7 +75,19 @@
     border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
     background: color-mix(in srgb, var(--color-primary) 12%, white);
 }
+/* Dark theme: selected/hover subject links */
+body.theme-dark .c-module-item a {
+    background: color-mix(in srgb, var(--color-surface) 92%, #0d1522);
+    border-color: color-mix(in srgb, var(--color-border) 75%, #0d1522);
+    color: var(--color-text);
+}
 
+body.theme-dark .c-module-item.selected a,
+body.theme-dark .c-module-item a:hover {
+    border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+    background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
+    color: #ecf4ff;
+}
 /* Compatibility for legacy templates still using .module/.contents/.course-info ids */
 .module,
 .contents {

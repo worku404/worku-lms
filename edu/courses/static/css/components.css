@@ -44,6 +44,17 @@
     color: #fff;
 }
 
+.topbar .c-btn--secondary {
+    background: #ffffff;
+    color: #1b2630;
+    border-color: color-mix(in srgb, #ffffff 72%, #9eb5cc);
+}
+
+.topbar .c-btn--secondary:hover {
+    background: #f2f6fa;
+    color: #1b2630;
+}
+
 a.button,
 a.secondary-button {
     display: inline-flex;
@@ -91,6 +102,16 @@ a.secondary-button {
 
 .c-search__input::placeholder {
     color: color-mix(in srgb, var(--color-text) 60%, white);
+}
+
+body.theme-dark .c-search__input {
+    background: color-mix(in srgb, #0d1522 92%, #0d1522);
+    border-color: color-mix(in srgb, #ffffff 22%, transparent);
+    color: #eff5ff;
+}
+
+body.theme-dark .c-search__input::placeholder {
+    color: #b8c9dc;
 }
 
 .c-card {
@@ -146,6 +167,17 @@ a.secondary-button {
     background: color-mix(in srgb, var(--color-primary) 14%, white);
     color: color-mix(in srgb, var(--color-primary) 78%, black);
 }
+/* Dark theme: sidebar selected/hover links */
+body.theme-dark .c-nav__item:hover {
+    background: color-mix(in srgb, var(--color-surface-soft) 85%, #0b1320);
+    color: var(--color-text);
+}
+
+body.theme-dark .c-nav__item.is-active {
+    border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
+    background: color-mix(in srgb, var(--color-accent) 22%, var(--color-surface));
+    color: #eaf3ff;
+}
 
 .c-progress-card {
     background: linear-gradient(160deg, #ffffff 0%, var(--color-secondary-surface) 100%);
@@ -166,7 +198,23 @@ a.secondary-button {
     background: linear-gradient(90deg, var(--color-primary), #37a669);
     transition: width 0.16s ease-in-out;
 }
+/* Weekly Focus card in dark theme */
+body.theme-dark .c-progress-card {
+    background: linear-gradient(
+        160deg,
+        color-mix(in srgb, var(--color-surface) 92%, #0b1320) 0%,
+        color-mix(in srgb, var(--color-secondary-surface) 82%, #0b1320) 100%
+    );
+    border-color: color-mix(in srgb, var(--color-border) 80%, #0b1320);
+}
 
+body.theme-dark .c-progress {
+    background: color-mix(in srgb, var(--color-border) 42%, #0b1320);
+}
+
+body.theme-dark .c-progress__bar {
+    background: linear-gradient(90deg, #2a9d66, #5cc98d);
+}
 .c-progress__text {
     font-size: var(--fs-0);
     color: var(--color-text-muted);
@@ -423,7 +471,7 @@ body.assistant-sidebar-open .llm-history {
     height: 44px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    background: #fff;
+    background: #9eb5cc;
     color: var(--color-text);
     display: inline-flex;
     align-items: center;
