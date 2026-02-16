@@ -131,13 +131,13 @@
 
   const waitingMarkup = () =>
     `
-      <span class="llm-wait" role="status" aria-live="polite">
-        <span class="llm-wait__letter">W</span>
-        <span class="llm-wait__dots" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
+      <span class="llm-wait" role="status" aria-live="polite" aria-label="Assistant is thinking">
+        <span class="llm-wait__dot"></span>
+        <span class="llm-wait__dot"></span>
+        <span class="llm-wait__dot"></span>
       </span>
     `.trim();
+
 
   function renderHistory() {
     const container = document.getElementById("history-container");
