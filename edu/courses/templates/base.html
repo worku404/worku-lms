@@ -77,16 +77,31 @@
 
         <aside class="l-util" aria-label="Tools and assistant">
             {% if request.user.is_authenticated %}
-                <button
-                    id="assistant-unhide"
-                    class="assistant-unhide"
-                    type="button"
-                    aria-label="Show AI assistant"
-                    aria-controls="assistant-panel"
-                    aria-expanded="true"
-                >
-                    AI
-                </button>
+<button
+    id="assistant-unhide"
+    class="assistant-unhide"
+    type="button"
+    aria-label="Show W-AI assistant"
+    aria-controls="assistant-panel"
+    aria-expanded="true"
+>
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="24" 
+        height="24" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        stroke-width="2.5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        aria-hidden="true"
+    >
+        <path d="M4 11 L8 21 L12 14 L16 21 L20 11" />
+        <path d="M19 2 L20 5 L23 6 L20 7 L19 10 L18 7 L15 6 L18 5 Z" fill="currentColor" stroke="none" />
+        <path d="M7 3 L7.5 4.5 L9 5 L7.5 5.5 L7 7 L6.5 5.5 L5 5 L6.5 4.5 Z" fill="currentColor" stroke="none" />
+    </svg>
+</button>
                 <section id="assistant-panel" class="assistance c-ai-panel">
                     {% block ai %}
                         {% include "assistant/llm.html" %}
