@@ -5,46 +5,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
 </head>
-<body>
-    <div id="header">
-        <a href="/" class="logo">EduCa</a>
-        <ul class="menu">
+<body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <header id="header" class="topbar">
+        <div class="topbar__inner">
+            <a href="{% url 'course_list' %}" class="topbar__brand">Gold-Edu</a>
+
+            <form class="c-search topbar__search" action="{% url 'course_list' %}" method="get" role="search" aria-label="Search courses">
+                <label class="u-sr-only" for="global-search">Search courses</label>
+                <input
+                    id="global-search"
+                    class="c-search__input"
+                    name="q"
+                    type="search"
+                    value="{{ request.GET.q|default:'' }}"
+                    placeholder="Search courses, topics, instructors"
+                >
+                <button type="submit" class="c-btn c-btn--ghost">Search</button>
+            </form>
+
+            <nav class="topbar__actions" aria-label="Account actions">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'student_course_list' %}" class="c-btn c-btn--ghost">My Courses</a>
+                    <form action="{% url 'logout' %}" method="post">
+                        <button type="submit" class="c-btn c-btn--secondary">Sign out</button>
+                        {% csrf_token %}
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="c-btn c-btn--primary">Sign in</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="l-shell">
+        <aside class="l-rail l-rail--left" aria-label="Primary navigation">
+            <nav class="c-nav">
+                <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
+                <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
+                <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
+                {% if request.user.is_staff or request.user.is_superuser %}
+                    <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
+                {% endif %}
+            </nav>
+
             {% if request.user.is_authenticated %}
-            <li>
-                <form action="{% url 'logout' %}" method="post">
-                    <button type="submit">Sign out</button>
-                    {% csrf_token %}
-                </form>
-            </li>
-            {% else %}
-            <li>
-                <a href="{% url 'login' %}">Sign in</a>
-            </li>
+            <section class="c-card c-progress-card" aria-label="Progress snapshot">
+                <h2 class="c-card__title">Weekly Focus</h2>
+                <p class="c-card__meta">Keep your momentum: complete 3 learning sessions this week.</p>
+                <div class="c-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42" aria-label="Weekly focus progress">
+                    <span class="c-progress__bar" style="width:42%"></span>
+                </div>
+                <p class="c-progress__text">42% complete</p>
+            </section>
             {% endif %}
-        </ul>
-    </div>
-    {% if request.user.is_authenticated %}
-    <button
-        id="assistant-unhide"
-        class="assistant-unhide"
-        type="button"
-        aria-label="Show AI assistant"
-        aria-controls="assistant-panel"
-        aria-expanded="true"
-    >
-        AI
-    </button>
-    <div id="assistant-panel" class="assistance">
-        {% block ai %}
-            {% include "assistant/llm.html" %}
-        {% endblock %}
-    </div>
-    {% endif %}
-    <div id="content">
-        {% block content %}{% endblock %}
-    </div>
+        </aside>
+
+        <section id="content" class="l-main" aria-label="Learning workspace">
+            <div id="main-content" class="l-main__inner">
+                {% block content %}{% endblock %}
+            </div>
+        </section>
+
+        <aside class="l-util" aria-label="Tools and assistant">
+            {% if request.user.is_authenticated %}
+                <button
+                    id="assistant-unhide"
+                    class="assistant-unhide"
+                    type="button"
+                    aria-label="Show AI assistant"
+                    aria-controls="assistant-panel"
+                    aria-expanded="true"
+                >
+                    AI
+                </button>
+                <section id="assistant-panel" class="assistance c-ai-panel">
+                    {% block ai %}
+                        {% include "assistant/llm.html" %}
+                    {% endblock %}
+                </section>
+            {% else %}
+                <section class="c-card c-alert c-alert--info">
+                    <h2 class="c-card__title">AI Study Assistant</h2>
+                    <p class="c-card__meta">Sign in to access AI guidance, contextual summaries, and quick study support.</p>
+                </section>
+            {% endif %}
+        </aside>
+    </main>
+
     {% block include_js %}{% endblock %}
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
