@@ -2,20 +2,22 @@
 {% block title %}Log-in{% endblock %}
 
 {% block content %}
-    <h1>Log-in</h1>
-    <div class="module">
-        {% if form.errors %}
-            <p>Your username and password didn't match. Please try again.</p>
-        {% else %}
-            <p>Please, use the following form to log-in:</p>
-        {% endif %}
-        <div class="login-form">
-            <form action="{% url 'login' %}" method="post">
+    <section class="page page--auth c-stack">
+        <header class="page-heading">
+            <h1 class="page-title">Log-in</h1>
+        </header>
+        <article class="module c-card auth-card">
+            {% if form.errors %}
+                <p class="c-alert c-alert--error">Your username and password did not match. Please try again.</p>
+            {% else %}
+                <p class="c-card__meta">Use your account credentials to continue learning.</p>
+            {% endif %}
+            <form action="{% url 'login' %}" method="post" class="c-stack">
                 {{ form.as_p }}
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ next }}">
-                <p><input type="submit" value="Log-in"></p>
+                <p><button type="submit" class="c-btn c-btn--primary">Log-in</button></p>
             </form>
-        </div>
-    </div>
+        </article>
+    </section>
 {% endblock %}
