@@ -23,7 +23,7 @@ from django.http import Http404
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 
 # ORM and dynamic-form helpers.
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.apps import apps
 from django.forms.models import modelform_factory
 
@@ -60,6 +60,7 @@ class CourseListview(TemplateResponseMixin, View):
 
     def get(self, request, subject=None):
         current_subject = None
+        query = (request.GET.get("q") or "").strip()
 
         # 1) Subjects sidebar (with number of courses per subject).
         subjects = cache.get("all_subjects")
@@ -84,12 +85,26 @@ class CourseListview(TemplateResponseMixin, View):
                 courses = all_courses
                 cache.set("all_courses", courses, COURSE_LIST_CACHE_TTL)
 
-        # 4) Render page context used by courses/course/list.html.
+        # 4) Optional search over title and overview.
+        if query:
+            if hasattr(courses, "filter"):
+                courses = courses.filter(
+                    Q(title__icontains=query) | Q(overview__icontains=query)
+                ).distinct()
+            else:
+                q = query.lower()
+                courses = [
+                    c for c in courses
+                    if q in (c.title or "").lower() or q in (c.overview or "").lower()
+                ]
+
+        # 5) Render page context used by courses/course/list.html.
         return self.render_to_response(
             {
                 "subjects": subjects,
                 "subject": current_subject,
                 "courses": courses,
+                "query": query,
             }
         )
 
