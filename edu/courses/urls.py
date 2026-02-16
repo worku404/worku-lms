@@ -1,65 +1,99 @@
+"""
+
+Route groups:
+1) Instructor management routes
+2) Module/content management routes
+3) Public catalog routes
+"""
+
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
+    # -------------------------------
+    # Instructor course management
+    # -------------------------------
     path(
-        'mine/',
-        views.ManageCourseListView.as_view(), name='manage_course_list'
+        "mine/",
+        views.ManageCourseListView.as_view(),
+        name="manage_course_list",
     ),
     path(
-        'create/',
-        views.CourseCreateView.as_view(), name='course_create'
+        "create/",
+        views.CourseCreateView.as_view(),
+        name="course_create",
     ),
     path(
-        '<pk>/edit/',
-        views.CourseUpdateView.as_view(), name='course_edit'
+        "<pk>/edit/",
+        views.CourseUpdateView.as_view(),
+        name="course_edit",
     ),
     path(
-        '<pk>/delete/',
-        views.CourseDeleteView.as_view(), name='course_delete'
+        "<pk>/delete/",
+        views.CourseDeleteView.as_view(),
+        name="course_delete",
+    ),
+
+    # -------------------------------
+    # Module management for a course
+    # -------------------------------
+    path(
+        "<pk>/module/",
+        views.CourseModuleUpdateView.as_view(),
+        name="course_module_update",
     ),
     path(
-        '<pk>/module/',
-        views.CourseModuleUpdateView.as_view(), name='course_module_update'
-    ),
-    path(
-        'module/<int:module_id>/content/<str:model_name>/create/',
-        views.ContentCreateUpdateView.as_view(), name='module_content_create'
-    ),
-    path(
-        'module/<int:module_id>/content/<model_name>/<id>/',
-        views.ContentCreateUpdateView.as_view(),
-        name='module_content_update'
-    ),
-    path(
-        'content/<int:id>/delete/',
-        views.ContentDeleteView.as_view(),
-        name='module_content_delete'
-        ),
-    
-    path(
-        'module/<int:module_id>/',
+        "module/<int:module_id>/",
         views.ModuleContentListView.as_view(),
-        name='module_content_list'
+        name="module_content_list",
+    ),
+
+    # -------------------------------
+    # Content CRUD inside a module
+    # model_name is one of: text, video, image, file
+    # -------------------------------
+    path(
+        "module/<int:module_id>/content/<str:model_name>/create/",
+        views.ContentCreateUpdateView.as_view(),
+        name="module_content_create",
     ),
     path(
-        'module/order/',
+        "module/<int:module_id>/content/<str:model_name>/<int:id>/",
+        views.ContentCreateUpdateView.as_view(),
+        name="module_content_update",
+    ),
+    path(
+        "content/<int:id>/delete/",
+        views.ContentDeleteView.as_view(),
+        name="module_content_delete",
+    ),
+
+    # -------------------------------
+    # AJAX ordering endpoints
+    # -------------------------------
+    path(
+        "module/order/",
         views.ModuleOrderView.as_view(),
-        name='module_order'
+        name="module_order",
     ),
     path(
-        'content/order/',
+        "content/order/",
         views.ContentOrderview.as_view(),
-        name='content_order'
+        name="content_order",
     ),
+
+    # -------------------------------
+    # Public catalog routes
+    # -------------------------------
     path(
-        'subject/<slug:subject>/',
+        "subject/<slug:subject>/",
         views.CourseListview.as_view(),
-        name='course_list_subject'
+        name="course_list_subject",
     ),
     path(
-        '<slug:slug>/',
+        "<slug:slug>/",
         views.CourseDetailView.as_view(),
-        name='course_detail'
+        name="course_detail",
     ),
 ]

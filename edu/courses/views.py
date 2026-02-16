@@ -1,129 +1,291 @@
-from django.views.generic.list import ListView
-from django.urls import reverse_lazy
-from django.views.generic.edit import CreateView, DeleteView, UpdateView
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic.base import TemplateResponseMixin, View
+"""
 
+Main view layer for:
+1) Public course browsing (catalog + course detail)
+2) Instructor management (course/module/content CRUD)
+3) AJAX ordering for modules and content
+"""
+
+# Redirect URL builder used by class-based views after successful actions.
+from django.urls import reverse_lazy
+
+# Core class-based views.
+from django.views.generic.base import TemplateResponseMixin, View
+from django.views.generic.list import ListView
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+
+# Request/response helpers.
+from django.shortcuts import get_object_or_404, redirect
+from django.http import Http404
+
+# Auth and permission guards.
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+
+# ORM and dynamic-form helpers.
+from django.db.models import Count
 from django.apps import apps
 from django.forms.models import modelform_factory
-from django.http import Http404
-from django.db.models import Count
-from django.views.generic.detail import DetailView
+
+# Django cache API (Redis/Memcache/local depending on settings).
 from django.core.cache import cache
 
-
+# Third-party helpers for JSON endpoints.
 from braces.views import CsrfExemptMixin, JsonRequestResponseMixin
 
-from .models import Module,Course, Content, Subject
+# Local models/forms.
+from .models import Course, Subject, Module, Content
 from .forms import ModuleFormSet
 from students.forms import CourseEnrollForm
 
+
+# Shared cache duration for public course list data.
+COURSE_LIST_CACHE_TTL = 60 * 15  # 15 minutes
+
+
+# -------------------------------------------------------------------
+# Public views (student/visitor facing)
+# -------------------------------------------------------------------
+
 class CourseListview(TemplateResponseMixin, View):
+    """
+    Public catalog page.
+    Data flow:
+    - Try cache for subjects + courses
+    - If cache miss, query DB and store in cache
+    - Render list template with filtering by optional subject slug
+    """
     model = Course
-    template_name = 'courses/course/list.html'
-    
+    template_name = "courses/course/list.html"
+
     def get(self, request, subject=None):
-        subjects = cache.get('all_subjects')
-        if not subjects:
-            subjects = Subject.objects.annotate(
-                total_courses = Count('courses')
-            )
-            cache.set('all_subjects', subjects)
-            
-        all_courses = Course.objects.annotate(
-            total_modules=Count('modules')
-        )
-        
+        current_subject = None
+
+        # 1) Subjects sidebar (with number of courses per subject).
+        subjects = cache.get("all_subjects")
+        if subjects is None:
+            subjects = Subject.objects.annotate(total_courses=Count("courses"))
+            cache.set("all_subjects", subjects, COURSE_LIST_CACHE_TTL)
+
+        # 2) Base queryset for courses (with number of modules per course).
+        all_courses = Course.objects.annotate(total_modules=Count("modules"))
+
+        # 3) Optional filtering by subject slug from URL.
         if subject:
-            subject = get_object_or_404(Subject, slug=subject)
-            key = f'subject_{subject:id}_courses'
-            courses = cache.get(key)
-            if not courses:
-                courses = all_courses.filter(subject=subject)
-                cache.set(key, courses)
+            current_subject = get_object_or_404(Subject, slug=subject)
+            cache_key = f"subject_{current_subject.id}_courses"  # fixed: use .id
+            courses = cache.get(cache_key)
+            if courses is None:
+                courses = all_courses.filter(subject=current_subject)
+                cache.set(cache_key, courses, COURSE_LIST_CACHE_TTL)
         else:
-            courses = cache.get('all_courses')
-            if not courses:
+            courses = cache.get("all_courses")
+            if courses is None:
                 courses = all_courses
-                cache.set('all_courses', courses)
+                cache.set("all_courses", courses, COURSE_LIST_CACHE_TTL)
+
+        # 4) Render page context used by courses/course/list.html.
         return self.render_to_response(
             {
-                'subjects': subjects,
-                'subject': subject,
-                'courses': courses
+                "subjects": subjects,
+                "subject": current_subject,
+                "courses": courses,
             }
         )
 
+
 class CourseDetailView(DetailView):
+    """
+    Public single-course page.
+    Adds hidden enrollment form into template context.
+    """
     model = Course
-    template_name = 'courses/course/detail.html'
-    
+    template_name = "courses/course/detail.html"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['enroll_form'] = CourseEnrollForm(
-            initial = {'course': self.object}
-        )
+
+        # Pre-fill hidden course field so POST enroll endpoint knows selected course.
+        context["enroll_form"] = CourseEnrollForm(initial={"course": self.object})
         return context
-    
+
+
+# -------------------------------------------------------------------
+# Shared owner mixins (used by instructor management views)
+# -------------------------------------------------------------------
+
+class OwnerMixin:
+    """
+    Restricts queryset to objects owned by logged-in user.
+    Used for list/update/delete safety.
+    """
+    def get_queryset(self):
+        return super().get_queryset().filter(owner=self.request.user)
+
+
+class OwnerEditMixin:
+    """
+    Forces object.owner to current user during create/update.
+    Prevents client-side owner spoofing.
+    """
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+
+class OwnerCourseMixin(OwnerMixin, LoginRequiredMixin, PermissionRequiredMixin):
+    """
+    Base config for Course CRUD views.
+    """
+    model = Course
+    fields = ["subject", "title", "slug", "overview"]
+    success_url = reverse_lazy("manage_course_list")
+
+
+class OwnerCourseEditMixin(OwnerCourseMixin, OwnerEditMixin):
+    """
+    Shared template for create/update course forms.
+    """
+    template_name = "courses/manage/course/form.html"
+
+
+# -------------------------------------------------------------------
+# Instructor course CRUD
+# -------------------------------------------------------------------
+
+class ManageCourseListView(OwnerCourseMixin, ListView):
+    """
+    Instructor dashboard listing only their own courses.
+    """
+    template_name = "courses/manage/course/list.html"
+    permission_required = "courses.view_course"
+
+
+class CourseCreateView(OwnerCourseEditMixin, CreateView):
+    """
+    Create course; owner set automatically in OwnerEditMixin.
+    """
+    permission_required = "courses.add_course"
+
+
+class CourseUpdateView(OwnerCourseEditMixin, UpdateView):
+    """
+    Update course; queryset already restricted to current owner.
+    """
+    permission_required = "courses.change_course"
+
+
+class CourseDeleteView(OwnerCourseMixin, DeleteView):
+    """
+    Delete course; only owner can reach object via restricted queryset.
+    """
+    template_name = "courses/manage/course/delete.html"
+    permission_required = "courses.delete_course"
+
+
+# -------------------------------------------------------------------
+# Instructor module management
+# -------------------------------------------------------------------
+
+class CourseModuleUpdateView(TemplateResponseMixin, View):
+    """
+    Edit module formset for one course.
+    Data flow:
+    - dispatch(): load owned course once
+    - GET: show module formset
+    - POST: validate/save module formset
+    """
+    template_name = "courses/manage/module/formset.html"
+    course = None
+
+    def dispatch(self, request, *args, **kwargs):
+        self.course = get_object_or_404(
+            Course,
+            id=kwargs["pk"],
+            owner=request.user,
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_formset(self, data=None):
+        return ModuleFormSet(instance=self.course, data=data)
+
+    def get(self, request, *args, **kwargs):
+        formset = self.get_formset()
+        return self.render_to_response({"course": self.course, "formset": formset})
+
+    def post(self, request, *args, **kwargs):
+        formset = self.get_formset(data=request.POST)
+        if formset.is_valid():
+            formset.save()
+            return redirect("manage_course_list")
+        return self.render_to_response({"course": self.course, "formset": formset})
+
+
+class ModuleContentListView(TemplateResponseMixin, View):
+    """
+    Shows all content blocks inside one module.
+    """
+    template_name = "courses/manage/module/content_list.html"
+
+    def get(self, request, module_id):
+        module = get_object_or_404(
+            Module,
+            id=module_id,
+            course__owner=request.user,
+        )
+        return self.render_to_response({"module": module})
+
+
+# -------------------------------------------------------------------
+# Instructor content CRUD (Text / Video / Image / File)
+# -------------------------------------------------------------------
 
 class ContentCreateUpdateView(TemplateResponseMixin, View):
     """
-    Handles both create and update flows for course content models
-    (Text, Video, Image, File) attached to a specific module.
+    Handles create and update for content item models dynamically.
+    model_name in URL decides which model is used: text/video/image/file.
     """
     template_name = "courses/manage/content/form.html"
-
-    # These are populated during dispatch for use in get/post.
     module = None
     model = None
     obj = None
 
     def get_model(self, model_name):
-        """
-        Resolve the model class safely from URL text.
-        Only allow known content model names to avoid arbitrary model access.
-        """
-        allowed_models = {"text", "video", "image", "file"}
-        if model_name not in allowed_models:
+        # Whitelist to block arbitrary model access from URL.
+        allowed = {"text", "video", "image", "file"}
+        if model_name not in allowed:
             return None
         return apps.get_model(app_label="courses", model_name=model_name)
 
     def get_form(self, model, *args, **kwargs):
-        """
-        Build a ModelForm class dynamically for the resolved model.
-        Exclude internal/system-managed fields from user editing.
-        """
+        # Build ModelForm on the fly for the resolved model class.
         FormClass = modelform_factory(
             model,
-            exclude=["owner", "order", "created", "updated"],  
+            exclude=["owner", "order", "created", "updated"],
         )
         return FormClass(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
         """
-        Common pre-processing for all HTTP methods:
-        1) Load module and enforce ownership.
-        2) Resolve content model from URL.
-        3) If object id exists, load existing object for update flow.
+        Shared preload before GET/POST:
+        - module lookup with ownership check
+        - content model resolution from URL
+        - existing object fetch for update mode
         """
         module_id = kwargs.get("module_id")
         model_name = kwargs.get("model_name")
         object_id = kwargs.get("id")
 
-        # Ensure user can only edit modules in their own courses.
         self.module = get_object_or_404(
             Module,
             id=module_id,
             course__owner=request.user,
         )
 
-        # Resolve model class (Text/Video/Image/File).
         self.model = self.get_model(model_name)
         if self.model is None:
             raise Http404("Unsupported content type")
 
-        # Update mode: fetch existing owned object.
         if object_id is not None:
             self.obj = get_object_or_404(
                 self.model,
@@ -132,27 +294,13 @@ class ContentCreateUpdateView(TemplateResponseMixin, View):
             )
 
         return super().dispatch(request, *args, **kwargs)
-    
-    
+
     def get(self, request, module_id, model_name, id=None):
-        # Build the form for display:
-        # - create mode: self.obj is None -> empty form     
-        # - update mode: self.obj exists -> form prefilled with existing data
+        # Empty form for create mode, prefilled form for update mode.
         form = self.get_form(self.model, instance=self.obj)
-
-        # Render the template with:
-        # - form: the content form to showKMkkk
-        # - object: existing object (None in create mode), useful for template logic
-        return self.render_to_response(
-            {"form": form, "object": self.obj}
-        )
-
+        return self.render_to_response({"form": form, "object": self.obj})
 
     def post(self, request, module_id, model_name, id=None):
-        # Build a bound form from submitted data:
-        # - request.POST handles text fields
-        # - request.FILES handles file/image uploads
-        # - instance=self.obj means "update" if object exists, otherwise "create new"
         form = self.get_form(
             self.model,
             instance=self.obj,
@@ -160,164 +308,63 @@ class ContentCreateUpdateView(TemplateResponseMixin, View):
             files=request.FILES,
         )
 
-    # Validate submitted data against model/form rules
         if form.is_valid():
-            # Don't save yet; we need to set owner first
+            # Force owner server-side.
             obj = form.save(commit=False)
-
-            # Enforce ownership on server side (never trust client input)
             obj.owner = request.user
-
-            # Save the concrete content object (Text/File/Image/Video)
             obj.save()
 
-            # If this is create mode (no existing id), create the link
-            # between the current module and this newly created content object.
-            if not id:
+            # Create Content relation only on create.
+            if id is None:
                 Content.objects.create(module=self.module, item=obj)
 
-            # Redirect after successful POST to avoid duplicate form resubmission
             return redirect("module_content_list", self.module.id)
 
-        # If form is invalid, re-render with errors and previously submitted values
-        return self.render_to_response(
-            {"form": form, "object": self.obj}
-        )
+        return self.render_to_response({"form": form, "object": self.obj})
 
-    
-    
-class CourseModuleUpdateView(TemplateResponseMixin, View):
-    # Template that shows the module formset for one course.
-    template_name = "courses/manage/module/formset.html"
-
-    # Will store the current course object after permission-safe lookup.
-    course = None
-
-    def get_formset(self, data=None):
-        # Build a formset bound to THIS course.
-        # data=None -> empty/unbound formset for GET
-        # data=request.POST -> bound formset for POST validation
-        return ModuleFormSet(instance=self.course, data=data)
-
-    def dispatch(self, request, *args, **kwargs):
-        # Runs before get/post.
-        # Load the course from URL and ensure the logged-in user owns it.
-        # If not found or not owned, return 404.
-        self.course = get_object_or_404(
-            Course,
-            id=kwargs["pk"],
-            owner=request.user,
-        )
-
-        # Continue normal request flow (GET/POST/etc).
-        return super().dispatch(request, *args, **kwargs)
-
-    def get(self, request, *args, **kwargs):
-        # User opened the page: show current modules + extra empty forms.
-        formset = self.get_formset()
-        return self.render_to_response(
-            {"course": self.course, "formset": formset}
-        )
-
-    def post(self, request, *args, **kwargs):
-        # User submitted the module forms: validate and save.
-        formset = self.get_formset(data=request.POST)
-
-        if formset.is_valid():
-            formset.save()  # create/update/delete Module rows
-            return redirect("manage_course_list")  # back to "My courses"
-
-        # Validation failed: show same page with error messages.
-        return self.render_to_response(
-            {"course": self.course, "formset": formset}
-        )
 
 class ContentDeleteView(View):
+    """
+    Deletes content relation + underlying item (Text/Video/Image/File).
+    """
     def post(self, request, id):
         content = get_object_or_404(
             Content,
             id=id,
-            module__course__owner = request.user
+            module__course__owner=request.user,
         )
         module = content.module
         content.item.delete()
         content.delete()
-        return redirect('module_content_list', module.id)
-
-class OwnerMixin:
-    # Restrict querysets to objects owned by the current user.
-    def get_queryset(self):
-        qs = super().get_queryset()
-        return qs.filter(owner=self.request.user)
+        return redirect("module_content_list", module.id)
 
 
-class OwnerEditMixin:
-    # On create/update, force ownership to the current user.
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+# -------------------------------------------------------------------
+# AJAX ordering endpoints
+# -------------------------------------------------------------------
 
-
-class OwnerCourseMixin(
-    OwnerMixin, LoginRequiredMixin, PermissionRequiredMixin
-    ):
-    # Shared configuration for views that work with Course objects.
-    model = Course
-    fields = ["subject", "title", "slug", "overview"]
-    success_url = reverse_lazy("manage_course_list")
-
-
-class OwnerCourseEditMixin(OwnerCourseMixin, OwnerEditMixin):
-    # Shared template for create and update forms.
-    template_name = "courses/manage/course/form.html"
-
-
-class ManageCourseListView(OwnerCourseMixin, ListView):
-    # Shows only the current user's courses (via OwnerMixin.get_queryset).
-    template_name = "courses/manage/course/list.html"
-    permission_required = 'courses.view_course'
-
-
-class CourseCreateView(OwnerCourseEditMixin, CreateView):
-    # Uses OwnerEditMixin to set owner automatically.
-    permission_required = 'courses.add_course'
-
-
-class CourseUpdateView(OwnerCourseEditMixin, UpdateView):
-    # Users can update only their own courses (via OwnerMixin.get_queryset).
-    permission_required = 'courses.change_course'
-
-
-class CourseDeleteView(OwnerCourseMixin, DeleteView):
-    # Users can delete only their own courses (via OwnerMixin.get_queryset).
-    template_name = "courses/manage/course/delete.html"
-    permission_required = 'courses.delete_course'
-    
-class ModuleContentListView(TemplateResponseMixin, View):
-    template_name = 'courses/manage/module/content_list.html'
-    
-    def get(self, request, module_id):
-        module = get_object_or_404(
-            Module,
-            id=module_id,
-            course__owner=request.user
-        )
-        return self.render_to_response({'module': module})
-    
 class ModuleOrderView(CsrfExemptMixin, JsonRequestResponseMixin, View):
+    """
+    Receives JSON like {"module_id": new_order, ...} and updates module order.
+    """
     def post(self, request):
         for id, order in self.request_json.items():
             Module.objects.filter(
                 id=id,
-                course__owner=request.user
+                course__owner=request.user,
             ).update(order=order)
-        return self.render_json_response({'saved': 'OK'})
-    
+        return self.render_json_response({"saved": "OK"})
+
+
 class ContentOrderview(CsrfExemptMixin, JsonRequestResponseMixin, View):
+    """
+    Receives JSON like {"content_id": new_order, ...} and updates content order.
+    (Name kept as-is to avoid breaking existing URL references.)
+    """
     def post(self, request):
         for id, order in self.request_json.items():
             Content.objects.filter(
                 id=id,
-                module__course__owner = request.user
+                module__course__owner=request.user,
             ).update(order=order)
-        return self.render_json_response({'saved': 'OK'})
+        return self.render_json_response({"saved": "OK"})

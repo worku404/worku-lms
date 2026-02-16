@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+
+{# Browser tab title changes based on active subject filter #}
 {% block title %}
     {% if subject %}
         {{ subject.title }} courses
@@ -6,7 +8,10 @@
         All courses
     {% endif %}
 {% endblock %}
+
+
 {% block content %}
+    {# Main heading: same logic as title block for clear page context #}
     <h1>
         {% if subject %}
             {{ subject.title }} courses
@@ -14,14 +19,20 @@
             All courses
         {% endif %}
     </h1>
+
+    {# Left panel: subject filters #}
     <div class="contents">
         <h3>Subjects</h3>
+
         <ul id="modules">
-            <li {% if not subject %}class='selected'{% endif %}>
+            {# "All" filter: active when no specific subject is selected #}
+            <li {% if not subject %}class="selected"{% endif %}>
                 <a href="{% url 'course_list' %}">All</a>
             </li>
+
+            {# List each subject with number of courses #}
             {% for s in subjects %}
-                <li {% if subject == s %}class='selected'{% endif %}>
+                <li {% if subject == s %}class="selected"{% endif %}>
                     <a href="{% url 'course_list_subject' s.slug %}">
                         {{ s.title }}
                         <br>
@@ -33,22 +44,31 @@
             {% endfor %}
         </ul>
     </div>
+
+    {# Right panel: courses for current filter (all or by subject) #}
     <div class="module">
         {% for course in courses %}
             {% with subject=course.subject %}
                 <h3>
+                    {# Open course detail page using slug #}
                     <a href="{% url 'course_detail' course.slug %}">
                         {{ course.title }}
                     </a>
                 </h3>
+
                 <p>
+                    {# Link back to this course's subject filter #}
                     <a href="{% url 'course_list_subject' subject.slug %}">
                         {{ subject }}
                     </a>
+
+                    {# total_modules comes from annotate() in the view #}
                     {{ course.total_modules }} modules.
                     Instructor: {{ course.owner.get_full_name }}
                 </p>
             {% endwith %}
+        {% empty %}
+            <p>No courses found.</p>
         {% endfor %}
     </div>
 {% endblock %}

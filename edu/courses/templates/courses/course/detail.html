@@ -1,27 +1,37 @@
 {% extends "base.html" %}
 {% load course_markdown %}
+
+{# Browser tab title for this course page #}
 {% block title %}
     {{ object.title }}
 {% endblock %}
+
+
 {% block content %}
+    {# `object` is the Course instance from CourseDetailView #}
     {% with subject=object.subject %}
-        <h1>
-            {{ object.title }}
-        </h1>
+        <h1>{{ object.title }}</h1>
+
         <div class="module">
             <h2>Overview</h2>
+
+            {# Course meta: subject link, module count, instructor #}
             <p>
                 <a href="{% url 'course_list_subject' subject.slug %}">
                     {{ subject.title }}
                 </a>
                 {{ object.modules.count }} modules.
-                Instructor: {{ object.owner.get_full_name}}
+                Instructor: {{ object.owner.get_full_name }}
             </p>
+
+            {# Render overview as markdown -> safe HTML #}
             {{ object.overview|markdown }}
+
+            {# Enrollment action depends on authentication status #}
             {% if request.user.is_authenticated %}
                 <form action="{% url 'student_enroll_course' %}" method="post">
-                    {{ enroll_form }}
                     {% csrf_token %}
+                    {{ enroll_form }}
                     <input type="submit" value="Enroll now">
                 </form>
             {% else %}
