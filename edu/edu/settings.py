@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     # User defined apps
     'courses.apps.CoursesConfig',
     'students.apps.StudentsConfig',
+    'embed_video',
     
     'django.contrib.admin',
     'django.contrib.auth',
@@ -124,3 +125,5 @@ USE_TZ = True
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
