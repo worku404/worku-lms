@@ -75,10 +75,10 @@ class TokenDashboardView(LoginRequiredMixin, TemplateView):
         context['courses_url'] = self.request.build_absolute_uri(reverse('api:course-list'))
         context['subjects_url'] = self.request.build_absolute_uri(reverse('api:subject-list'))
         context['sample_enroll_url'] = self.request.build_absolute_uri(
-            reverse('api:course-enroll', kwargs={'pk': 1})
+            reverse('api:course-enroll', kwargs={'pk': 'course_id'})
         )
         context['sample_contents_url'] = self.request.build_absolute_uri(
-            reverse('api:course-contents', kwargs={'pk': 1})
+            reverse('api:course-contents', kwargs={'pk': 'course_id'})
         )
         context['token'] = token.key
         return context

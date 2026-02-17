@@ -69,7 +69,9 @@
     color: var(--color-text-muted);
     font-size: var(--fs-0);
 }
-
+.header-underline{
+    border-bottom: #0d1522 2ps red solid !important;
+}
 .c-module-item.selected a,
 .c-module-item a:hover {
     border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
