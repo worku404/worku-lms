@@ -12,7 +12,15 @@
     letter-spacing: 0.01em;
     transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
+#theme-toggle-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
+.theme-icon svg {
+    display: block;
+}
 .c-btn--primary {
     background: var(--color-primary);
     color: #fff;
@@ -172,6 +180,10 @@ body.theme-dark .c-nav__item:hover {
     background: color-mix(in srgb, var(--color-surface-soft) 85%, #0b1320);
     color: var(--color-text);
 }
+body.theme-dark .assistance-action:hover {
+    background: color-mix(in srgb, var(--color-surface-soft) 85%, #0b1320);
+    color: var(--color-text);
+}
 
 body.theme-dark .c-nav__item.is-active {
     border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
@@ -211,6 +223,10 @@ body.theme-dark .c-progress-card {
 body.theme-dark .c-progress {
     background: color-mix(in srgb, var(--color-border) 42%, #0b1320);
 }
+body.theme-dark .c-alert  {
+    background: color-mix(in srgb, var(--color-border) 42%, #0b1320);
+}
+
 
 body.theme-dark .c-progress__bar {
     background: linear-gradient(90deg, #2a9d66, #5cc98d);
@@ -371,7 +387,6 @@ body.assistant-hidden .assistance {
     gap: var(--space-2);
 }
 
-.assistance-action,
 .assistance-close {
     min-height: 36px;
     border: 1px solid var(--color-border);
@@ -514,6 +529,9 @@ body.assistant-sidebar-open .llm-history {
 
 .llm-wait__dot:nth-child(2) { animation-delay: 0.15s; }
 .llm-wait__dot:nth-child(3) { animation-delay: 0.3s; }
+body.theme-dark #assistant-close-btn  {
+    background: color-mix(in srgb, var(--color-border) 42%, #0b1320);
+}
 
 @keyframes llm-wait-pulse {
   0%, 80%, 100% {
