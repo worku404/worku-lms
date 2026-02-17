@@ -1,9 +1,9 @@
 <div class="assistance-toolbar">
   <span class="assistance-title">AI Assistant</span>
   <div class="assistance-toolbar-actions">
-    <button id="assistant-hide-btn" class="assistance-action" type="button" aria-label="Hide AI assistant">
+    {% comment %} <button id="assistant-hide-btn" class="assistance-action" type="button" aria-label="Hide AI assistant">
       Hide
-    </button>
+    </button> {% endcomment %}
     <button id="assistant-close-btn" class="assistance-close" type="button" aria-label="Close AI sidebar">
       &times;
     </button>
@@ -38,7 +38,7 @@
   const bodyEl = document.body;
   const assistantPanel = document.getElementById("assistant-panel");
   const assistantLauncher = document.getElementById("assistant-unhide");
-  const assistantHideBtn = document.getElementById("assistant-hide-btn");
+  {% comment %} const assistantHideBtn = document.getElementById("assistant-hide-btn"); {% endcomment %}
   const assistantCloseBtn = document.getElementById("assistant-close-btn");
   const assistantUiStateKey = "assistant_ui_state";
 
@@ -87,9 +87,9 @@
     updateAssistantOffset();
     window.addEventListener("resize", updateAssistantOffset);
 
-    if (assistantHideBtn) {
-      assistantHideBtn.addEventListener("click", hideAssistant);
-    }
+    //if (assistantHideBtn) {
+    //  assistantHideBtn.addEventListener("click", hideAssistant);
+    //}
     if (assistantCloseBtn) {
       assistantCloseBtn.addEventListener("click", hideAssistant);
     }
@@ -131,13 +131,13 @@
 
   const waitingMarkup = () =>
     `
-      <span class="llm-wait" role="status" aria-live="polite">
-        <span class="llm-wait__letter">W</span>
-        <span class="llm-wait__dots" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
+      <span class="llm-wait" role="status" aria-live="polite" aria-label="Assistant is thinking">
+        <span class="llm-wait__dot"></span>
+        <span class="llm-wait__dot"></span>
+        <span class="llm-wait__dot"></span>
       </span>
     `.trim();
+
 
   function renderHistory() {
     const container = document.getElementById("history-container");

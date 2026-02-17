@@ -343,7 +343,7 @@ ul#course-modules li:hover {
     top:50%;
     transform:translateY(-50%);
     z-index:1200;
-    width:44px;
+    width:30px;
     height:112px;
     border:1px solid #aab8c8;
     border-radius:12px;
@@ -387,7 +387,7 @@ body.assistant-hidden .assistant-unhide {
 .assistance-action,
 .assistance-close {
     border:1px solid #bdc8d4;
-    background:#fff;
+    background: #ae2c2c;
     color:#3a4a5f;
     border-radius:8px;
     height:32px;

@@ -78,6 +78,7 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
     # Base model for list.
     model = Course
     template_name = "students/course/list.html"
+    context_object_name = "courses"
 
     def get_queryset(self):
         # Return only courses where current user is enrolled.
