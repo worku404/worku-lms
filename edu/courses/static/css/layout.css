@@ -41,16 +41,57 @@
     align-items: center;
 }
 
+/* Base Brand Container */
 .topbar__brand {
-    font-size: var(--fs-3);
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px; /* Increased gap slightly for the icon */
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255,215,0,0.1), rgba(255,105,180,0.1));
+    border: 1px solid rgba(255, 215, 0, 0.2); /* Added subtle border for depth */
+    box-shadow: 0 4px 14px rgba(255,105,180,0.15);
+    text-decoration: none;
+    transition: all 0.3s ease; /* Smooth hover animation */
 }
 
+/* Hover Effect */
 .topbar__brand:hover {
-    color: #fff;
+    box-shadow: 0 6px 20px rgba(255,105,180,0.3);
+    transform: translateY(-1px);
+}
+
+/* Icon Sizing */
+.brand-icon {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+}
+
+.topbar__brand:hover .brand-icon {
+    transform: scale(1.1); /* Icon pops slightly on hover */
+}
+
+/* Typography Styling */
+.brand-text {
+    font-size: var(--fs-3, 1.2rem);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.brand-primary {
+    color: #ffd54f;
+    font-weight: 800;
+}
+
+.brand-divider {
+    color: #ffe0ea;
+    margin: 0 2px;
+}
+
+.brand-secondary {
+    color: #ff9ec5;
+    font-weight: 800;
 }
 
 .topbar__actions {
