@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "embed_video",   # Embed and render video content in templates/models
     "debug_toolbar", # Development-time request/SQL/debug inspection
     "redisboard",    # Redis monitoring dashboard
+    'rest_framework', # To build an API
 ]
 
 
@@ -159,3 +160,10 @@ API1_KEY = os.getenv("API1_KEY")
 API2_KEY = os.getenv("API2_KEY")
 API3_KEY = os.getenv("API3_KEY")
 API4_KEY = os.getenv("API4_KEY")
+
+# API
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ]
+}
