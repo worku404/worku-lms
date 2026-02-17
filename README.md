@@ -1,42 +1,45 @@
 # Gold-EDU E-Learning Platform
 
-A production-oriented Django learning management system for course publishing, enrollment, module-based learning, and in-page AI assistance.
+A production-oriented Django learning management system with course publishing, enrollment, module-based learning, token-secured REST APIs, and in-page AI assistance.
 
 ## Preview
 
-<!-- Replace these placeholders with your final screenshots -->
 
 ![Homepage Preview](./docs/images/preview-home.png)
-
 ![Course Workspace Preview](./docs/images/preview-workspace.png)
+![API Developer Tools Preview](./docs/images/preview-api-tools.png)
+
+---
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Core Features](#core-features)
+- [Feature Highlights](#feature-highlights)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
-- [Key Routes](#key-routes)
-- [AI Assistant Notes](#ai-assistant-notes)
-- [Dark Mode](#dark-mode)
+- [Web Routes](#web-routes)
+- [API Overview](#api-overview)
+- [API Quick Start](#api-quick-start)
+- [Security Notes](#security-notes)
+- [Documentation](#documentation)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
+---
+
 ## Overview
 
-Gold-EDU is a university-focused e-learning platform built with Django. It supports:
+Gold-EDU is a university-focused e-learning platform built with Django.  
+It supports public discovery, guided learning, instructor content management, and external integration through REST APIs.
 
-- Public course discovery by subject
-- Student enrollment and learning flow
-- Instructor-side course/module/content management
-- AI assistant integration in the learning UI
-- A modern responsive UI with light and dark themes
+---
 
-## Core Features
+## Feature Highlights
 
+### Learning Platform
 - Course catalog with subject filtering and keyword search
 - Student dashboard for enrolled courses
 - Course detail and module-based learning workspace
@@ -45,55 +48,89 @@ Gold-EDU is a university-focused e-learning platform built with Django. It suppo
   - Video
   - Image
   - File
-- Instructor management panel for course CRUD
-- Module/content ordering endpoints
-- AI assistant sidebar with Gemini API integration and conversation history
+- Instructor management panel for course/module/content CRUD
+- Module/content ordering support
+
+### API (Django REST Framework)
+- Router-based endpoints for `courses` and `subjects`
+- Pagination (`page`, `page_size`, max 50)
+- Subject enrichment:
+  - `total_courses`
+  - `popular_courses`
+- Course actions:
+  - `POST /api/courses/{id}/enroll/`
+  - `GET /api/courses/{id}/contents/` (requires enrollment)
+
+### Authentication & Developer Experience
+- Token authentication (`/api/token-auth/`)
+- Basic auth fallback for quick testing
+- Developer token dashboard (`/api/developer/token-ui/`)
+  - view/copy token
+  - rotate token
+  - ready-to-use request examples
+- Auto token creation for newly created users (signals)
+
+### UI/UX
+- Responsive layout and polished component system
 - Theme toggle (light/dark mode)
+- API docs page styling improvements (overflow-safe + responsive)
+- AI assistant sidebar with Gemini integration
+
+---
 
 ## Tech Stack
 
-- Backend: Django 6
-- Database: SQLite (default)
-- Cache: Redis via `django-redis` (configured in settings)
-- Frontend: Django Templates + Modern CSS + Vanilla JS
-- Media Handling: Pillow
-- Video Embeds: `django-embed-video`
-- AI Requests: Gemini API via `requests`
+- **Backend:** Django, Django REST Framework
+- **Database:** SQLite (default)
+- **Cache:** Redis (`django-redis`, configured)
+- **Frontend:** Django Templates, modern CSS, vanilla JS
+- **Media:** Pillow
+- **Video Embeds:** `django-embed-video`
+- **AI Integration:** Gemini API via `requests`
+
+---
 
 ## Project Structure
 
 ```text
 e-learning/
-|- edu/
-|  |- assistant/     # AI assistant app (widget, endpoints, context processor)
-|  |- courses/       # Course models, catalog, instructor views, templates, static css
-|  |- students/      # Student registration, enrollment, learning views
-|  |- edu/           # Project settings and root urls
-|  |- manage.py
-|- requirements.txt
-|- README.md
+├─ edu/
+│  ├─ assistant/                 # AI assistant app
+│  ├─ courses/
+│  │  ├─ api/                    # DRF viewsets, serializers, permissions, routes
+│  │  ├─ templates/              # web + API developer UI templates
+│  │  ├─ static/css/             # tokens/components/pages styles
+│  │  └─ signals.py              # auto token creation
+│  ├─ students/                  # student registration/enrollment/learning views
+│  ├─ edu/                       # project settings + root urls
+│  └─ manage.py
+├─ api_examples/                 # API automation examples
+├─ docs/
+│  └─ api.md                     # full API reference
+├─ requirements.txt
+└─ README.md
 ```
+
+---
 
 ## Getting Started
 
-### 1) Clone the repository
+### 1) Clone repository
 
 ```bash
 git clone https://github.com/<your-username>/<your-repo>.git
 cd e-learning
 ```
 
-### 2) Create and activate virtual environment
+### 2) Create virtual environment
 
-Windows (PowerShell):
-
+**Windows (PowerShell):**
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-macOS/Linux:
-
+**macOS/Linux:**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -105,7 +142,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4) Run migrations and load initial subjects
+### 4) Run migrations and seed subjects
 
 ```bash
 cd edu
@@ -113,13 +150,13 @@ python manage.py migrate
 python manage.py loaddata courses/fixtures/subjects.json
 ```
 
-### 5) Create admin user (optional but recommended)
+### 5) Create a superuser (recommended)
 
 ```bash
 python manage.py createsuperuser
 ```
 
-### 6) Start development server
+### 6) Run server
 
 ```bash
 python manage.py runserver
@@ -127,78 +164,132 @@ python manage.py runserver
 
 Open: `http://127.0.0.1:8000/`
 
+---
+
 ## Environment Variables
 
-Create a `.env` file in `edu/` (or project root) and add:
+Create `.env` in `edu/` (or project root):
 
 ```env
-# Gemini API keys (used in assistant fallback order)
+# Gemini API keys (fallback order)
 API1_KEY=your_key_here
 API2_KEY=your_key_here
 API3_KEY=your_key_here
 API4_KEY=your_key_here
 ```
 
-Note:
-- If no valid API keys are configured, assistant calls will return an error.
-- Keep your keys private. Never commit real keys to GitHub.
+Notes:
+- If keys are missing/invalid, assistant requests fail gracefully.
+- Never commit real credentials.
 
-## Key Routes
+---
 
-Public:
-- `/` -> course catalog
-- `/course/<slug>/` -> course detail
+## Web Routes
 
-Authentication:
+### Public
+- `/` → course catalog
+- `/course/<slug>/` → course detail
+
+### Auth
 - `/accounts/login/`
 - `/accounts/logout/`
 
-Student:
+### Student
 - `/students/register/`
 - `/students/courses/`
 - `/students/course/<course_id>/`
 - `/students/enroll-course/`
 
-Instructor:
+### Instructor
 - `/course/mine/`
 - `/course/create/`
 - `/course/<pk>/edit/`
 - `/course/<pk>/module/`
 
-Assistant:
+### Assistant
 - `/assistant/`
 - `/assistant/llm/generate/` (POST)
 
-## AI Assistant Notes
+---
 
-- The assistant is available to authenticated users.
-- Conversation history is stored in session (`llm_history`).
-- The assistant tries multiple Gemini keys in order (`API1_KEY` ... `API4_KEY`) and returns helpful error details when all fail.
+## API Overview
 
-## Dark Mode
+Base URL: `/api/`
 
-- Theme toggle is available in the top-right navigation.
-- Preference is saved in browser local storage.
-- You can further tune dark theme tokens in your CSS component files.
+Core endpoints:
+- `GET /api/subjects/`
+- `GET /api/subjects/{id}/`
+- `GET /api/courses/`
+- `GET /api/courses/{id}/`
+- `POST /api/courses/{id}/enroll/` (auth required)
+- `GET /api/courses/{id}/contents/` (auth + enrolled required)
+- `POST /api/token-auth/`
+- `GET /api/developer/token-ui/` (login required UI)
+
+---
+
+## API Quick Start
+
+### 1) Get token (PowerShell)
+```powershell
+$body = @{
+  username = "your_username"
+  password = "your_password"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:8000/api/token-auth/" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+### 2) Enroll in a course
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/api/courses/1/enroll/ -H "Authorization: Token your_generated_token_value"
+```
+
+### 3) Access protected course contents
+```powershell
+curl.exe http://127.0.0.1:8000/api/courses/1/contents/ -H "Authorization: Token your_generated_token_value"
+```
+
+---
+
+## Security Notes
+
+- Treat API tokens as secrets.
+- Rotate tokens immediately if exposed.
+- Use HTTPS in production.
+- Prefer token auth for integrations; use basic auth for local diagnostics only.
+
+---
+
+## Documentation
+
+- Full API guide: [`docs/api.md`](./docs/api.md)
+- API automation example: `api_examples/enroll_all.py`
+
+---
 
 ## Roadmap
 
-<!-- Replace with your real roadmap -->
+- [ ] Assignments and quizzes
+- [ ] Progress analytics dashboard
+- [ ] Notifications and reminders
+- [ ] OpenAPI schema + generated client SDK
+- [ ] Production deployment guide (Docker + Nginx + PostgreSQL)
 
-- [ ] Add assignment and quiz modules
-- [ ] Add progress analytics dashboard
-- [ ] Add notifications and reminders
-- [ ] Add production deployment guide (Docker + Nginx + PostgreSQL)
+---
 
 ## Contributing
 
-Contributions are welcome.
+1. Fork the repository  
+2. Create a feature branch  
+3. Commit changes  
+4. Push branch  
+5. Open Pull Request
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push your branch
-5. Open a Pull Request
+---
 
 ## License
 
