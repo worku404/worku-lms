@@ -45,6 +45,7 @@
                 {% if request.user.is_authenticated %}
                     <a href="{% url 'student_course_list' %}" class="c-btn c-btn--ghost">My Courses</a>
                 {% endif %}
+                    <a href="{% url 'api:token_ui' %}" class="c-btn c-btn--ghost">API</a>
                     <a href="#"
                         id="theme-toggle-link"
                         class="c-btn c-btn--ghost"

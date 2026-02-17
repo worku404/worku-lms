@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "debug_toolbar", # Development-time request/SQL/debug inspection
     "redisboard",    # Redis monitoring dashboard
     'rest_framework', # To build an API
+    'rest_framework.authtoken', # DRF token authentication model
 ]
 
 
@@ -163,6 +164,11 @@ API4_KEY = os.getenv("API4_KEY")
 
 # API
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
     ]
