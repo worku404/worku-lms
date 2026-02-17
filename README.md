@@ -7,10 +7,8 @@ A production-oriented Django learning management system for course publishing, e
 <!-- Replace these placeholders with your final screenshots -->
 
 ![Homepage Preview](./docs/images/preview-home.png)
-_Placeholder: add your main homepage screenshot here._
 
 ![Course Workspace Preview](./docs/images/preview-workspace.png)
-_Placeholder: add your learning workspace screenshot here._
 
 ## Table of Contents
 
