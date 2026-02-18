@@ -223,7 +223,7 @@
           aiResponse = data.generated || escapeHtml(data.error || "Something went wrong.");
         }
       } catch (error) {
-        aiResponse = "Network error. Please try again.";
+        aiResponse = "Something went wrong.";
       } finally {
         history[history.length - 1].response = aiResponse;
         renderHistory();

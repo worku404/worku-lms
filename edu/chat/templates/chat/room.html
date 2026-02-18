@@ -5,7 +5,17 @@
 {% block content %}
 {% block motivation %}{% endblock %}
     <section id="chat-room-shell" aria-label="Course chat room">
-        <div id="chat" aria-live="polite"></div>
+        <div id="chat" aria-live="polite">
+            {% for message in latest_messages %}
+                <div class="message {% if message.user == request.user %} me {% else %} other {% endif %}">
+                    <div class="meta"> 
+                        <strong>{{ message.user.username }}&nbsp;</strong>
+                        <span class="date">{{ message.sent_on|date:"Y.m.d H:i A" }}</span>
+                    </div>
+                   <div class="text">  {{message.content}}  </div> 
+                </div>
+            {% endfor %}
+        </div>
 
         <div id="chat-input">
             <input type="text" id="chat-message-input" autocomplete="off">
