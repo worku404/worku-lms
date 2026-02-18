@@ -2,7 +2,6 @@ import json
 from channels.generic.websocket import WebsocketConsumer
 from asgiref.sync import async_to_sync
 from django.utils import timezone
-
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
         self.user = self.scope['user']
