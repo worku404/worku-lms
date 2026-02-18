@@ -24,8 +24,9 @@
                 <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
             </svg>
             <span class="brand-text">
-                <span class="brand-primary">Gold</span><span class="brand-divider">-</span><span class="brand-secondary">Edu</span>
+                <span class="brand-primary">{{request.user.username }}</span><span class="brand-divider">-</span><span class="brand-secondary">Edu</span>
             </span>
+
         </a>
 
             <form class="c-search topbar__search" action="{% url 'course_list' %}" method="get" role="search" aria-label="Search courses">
@@ -78,7 +79,7 @@
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
                 {% endif %}
             </nav>
-
+            {% block motivation %}
             {% if request.user.is_authenticated %}
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
                 <h2 class="c-card__title">Weekly Focus</h2>
@@ -89,6 +90,7 @@
                 <p class="c-progress__text">42% complete</p>
             </section>
             {% endif %}
+            {% endblock %}
         </aside>
 
         <section id="content" class="l-main" aria-label="Learning workspace">

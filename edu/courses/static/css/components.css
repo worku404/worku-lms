@@ -543,3 +543,249 @@ body.theme-dark #assistant-close-btn  {
     opacity: 1;
   }
 }
+
+#chat-room-shell {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+    height: calc(100dvh - 200px);
+    overflow: hidden;
+}
+
+@supports not (height: 100dvh) {
+    #chat-room-shell {
+        height: calc(100vh - 200px);
+    }
+}
+
+#chat-room-shell #chat {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#chat-room-shell #chat .message {
+    width: fit-content;
+    max-width: min(760px, 92%);
+    min-width: 180px;
+    margin: 10px 10px 0;
+    padding: 10px 20px;
+    box-sizing: border-box;
+    clear: both;
+}
+
+#chat-room-shell #chat .message.me {
+    margin-left: auto;
+}
+#chat {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+#chat .message {
+    display: block;
+    width: fit-content;
+    max-width: 78%;
+    padding: 10px 14px;
+    margin: 0;
+    box-sizing: border-box;
+    clear: both;
+}
+/* My message -> right side */
+#chat .message.me {
+    background-color: #285076;
+    align-self: flex-end;
+    margin-left: auto;
+    margin-right: 0;
+    border-radius: 18px 18px 6px 18px;
+}
+/* Other message -> left side */
+#chat .message.other {
+    background-color: #282A36;
+    align-self: flex-start;
+    margin-left: 0;
+    margin-right: auto;
+    border-radius: 18px 18px 18px 6px;
+}
+
+
+#chat .message .meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+#chat .message .date {
+    font-size: 12px;
+    line-height: 1;
+    opacity: .7;
+    white-space: nowrap;
+}
+
+#chat .message .text {
+    margin-top: 4px;
+    word-break: break-word;
+}
+#chat-room-shell #chat-input {
+    flex: 0 0 auto;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#chat-room-shell #chat-message-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#chat-room-shell #chat-message-submit {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+/* ...existing code... */
+
+/* Base safety */
+#chat-room-shell,
+#chat,
+#chat-input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#chat-room-shell {
+    min-height: 0;
+    overflow: hidden;
+}
+
+#chat {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Desktop default (keeps input visible) */
+#chat-room-shell {
+    height: calc(100dvh - 200px);
+}
+@supports not (height: 100dvh) {
+    #chat-room-shell {
+        height: calc(100vh - 200px);
+    }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+    #chat-room-shell {
+        height: calc(100dvh - 180px);
+    }
+    @supports not (height: 100dvh) {
+        #chat-room-shell {
+            height: calc(100vh - 180px);
+        }
+    }
+
+    #chat {
+        padding: 10px 8px;
+    }
+
+    #chat .message {
+        max-width: 88%;
+    }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    #chat-room-shell {
+        height: calc(100dvh - 165px);
+    }
+    @supports not (height: 100dvh) {
+        #chat-room-shell {
+            height: calc(100vh - 165px);
+        }
+    }
+
+    #chat {
+        padding: 8px 6px;
+    }
+
+    #chat .message {
+        max-width: 94%;
+        padding: 10px 12px;
+        border-radius: 14px;
+    }
+
+    #chat .message .meta {
+        gap: 8px;
+    }
+
+    #chat .message .date {
+        font-size: 11px;
+    }
+
+    #chat-input {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        padding: 8px 6px;
+        gap: 8px;
+    }
+
+    #chat-message-input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    #chat-message-submit {
+        flex: 0 0 auto;
+        min-width: 84px;
+        padding: 10px 12px;
+        white-space: nowrap;
+    }
+}
+
+/* Small phones */
+@media (max-width: 420px) {
+    #chat-room-shell {
+        height: calc(100dvh - 155px);
+    }
+    @supports not (height: 100dvh) {
+        #chat-room-shell {
+            height: calc(100vh - 155px);
+        }
+    }
+
+    #chat .message {
+        max-width: 96%;
+    }
+
+    #chat-message-submit {
+        min-width: 76px;
+        padding: 9px 10px;
+    }
+}
