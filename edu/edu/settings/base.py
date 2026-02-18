@@ -71,6 +71,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",  # Built-in: attaches authenticated user
     "django.contrib.messages.middleware.MessageMiddleware",     # Built-in: one-time message framework
     "django.middleware.clickjacking.XFrameOptionsMiddleware",   # Built-in: clickjacking protection
+    'courses.middleware.subdomain_course_middleware',
 ]
 
 

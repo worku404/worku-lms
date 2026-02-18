@@ -7,7 +7,7 @@ ADMIN = [
     ('Worku W.', 'worku0963@gmail.com'),
 ]
 
-ALLOWED_HOSTS = ['www.educaproject.com', 'educaproject.com']
+ALLOWED_HOSTS = ['www.educaproject.com', '.educaproject.com']
 
 DATABASES = {
     'default': {
