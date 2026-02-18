@@ -22,7 +22,7 @@ LOGIN_REDIRECT_URL = reverse_lazy("student_course_list")
 
 
 # Security and runtime mode
-SECRET_KEY = "django-insecure-a^t)_kd7cve$=bhjrqj_qt+4*3*sooh9t=mxp$&7*8apel@9a6"
+SECRET_KEY = "7IbkXJQpjATuvsYerStSa^t)_kd7cve$=bhjrqj_qt+4*3*sooh9t=mxp$&7*8apel@9a6"
 ALLOWED_HOSTS = []
 
 
@@ -118,6 +118,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+STATIC_ROOT = BASE_DIR / 'static'
 
 
 # Security headers

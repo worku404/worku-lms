@@ -210,3 +210,30 @@ __marimo__/
 AGENTS.md
 .vscode/
 staticfiles
+
+# Environments
+env/
+venv/
+.env
+
+# Database
+data/db/
+
+# Static/Media
+edu/static/
+edu/media/
+
+# SSL Secrets
+edu/ssl/
+
+# Runtime files
+*.sock
+*.log
+*.pot
+*.pyc
+__pycache__/
+db.sqlite3
+
+# Docker
+.docker_temp/
+data
