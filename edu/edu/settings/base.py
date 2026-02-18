@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 
 # Core project paths
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables from either project root or settings directory.
 for _env_path in (BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
@@ -23,7 +23,6 @@ LOGIN_REDIRECT_URL = reverse_lazy("student_course_list")
 
 # Security and runtime mode
 SECRET_KEY = "django-insecure-a^t)_kd7cve$=bhjrqj_qt+4*3*sooh9t=mxp$&7*8apel@9a6"
-DEBUG = True
 ALLOWED_HOSTS = []
 
 
@@ -97,13 +96,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "edu.wsgi.application"
 
 
-# Database
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
 
 
 # Password validation
