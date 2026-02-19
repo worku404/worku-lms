@@ -553,6 +553,8 @@ body.theme-dark #assistant-close-btn  {
     flex-direction: column;
     background: linear-gradient(180deg, #0b1c2d 0%, #091423 100%);
     overflow: hidden;
+    background-color: red !important;
+
 }
 
 @supports not (height: 100dvh) {
@@ -728,4 +730,46 @@ body.theme-dark #assistant-close-btn  {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===================================================== */
+/* LIGHT MODE OVERRIDES                                  */
+/* ===================================================== */
+
+body.light-mode #chat {
+    background: #f7f9fc;
+}
+
+body.light-mode #chat .message.other {
+    background: #eef2f7;
+    color: #1f2933;
+}
+
+body.light-mode #chat .message.me {
+    background: linear-gradient(135deg, #2bb673, #239e60); /* main accent green */
+    color: #ffffff;
+}
+
+body.light-mode #chat .meta {
+    opacity: .55;
+    color: #4b5563;
+}
+
+body.light-mode #chat-input {
+    background: #ffffff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+body.light-mode #chat-message-input {
+    background: #f1f5f9;
+    color: #111827;
+}
+
+body.light-mode #chat-message-input:focus {
+    background: #e8eef5;
+}
+
+body.light-mode #chat-message-submit {
+    background: #2bb673;
+    color: #ffffff;
 }

@@ -8,6 +8,15 @@ from django.urls import reverse_lazy  # Django utility: resolve URL names lazily
 from dotenv import load_dotenv
 
 
+from decouple import config
+
+
+# Redis Configuration
+# Using values derived from your container inspection
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
+REDIS_DB = config('REDIS_DB', default=0, cast=int)
+
 # Core project paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -71,7 +80,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",  # Built-in: attaches authenticated user
     "django.contrib.messages.middleware.MessageMiddleware",     # Built-in: one-time message framework
     "django.middleware.clickjacking.XFrameOptionsMiddleware",   # Built-in: clickjacking protection
-    'courses.middleware.subdomain_course_middleware',
+    # 'courses.middleware.subdomain_course_middleware',
 ]
 
 
@@ -89,6 +98,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "assistant.context_processors.llm_widget",
+                'students.context_processors.global_progress',
             ],
         },
     },

@@ -84,10 +84,22 @@
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
                 <h2 class="c-card__title">Weekly Focus</h2>
                 <p class="c-card__meta">Keep your momentum: complete 3 learning sessions this week.</p>
-                <div class="c-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42" aria-label="Weekly focus progress">
-                    <span class="c-progress__bar" style="width:42%"></span>
+                <div class="c-progress"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="{{ overall_progress }}"
+                    aria-label="Overall learning progress">
+
+                    <span class="c-progress__bar"
+                        style="width: {{ overall_progress|default:0 }}%">
+                    </span>
                 </div>
-                <p class="c-progress__text">42% complete</p>
+
+                <p class="c-progress__text">
+                    {{ overall_progress|default:0 }}% complete
+                </p>
+
             </section>
             {% endif %}
             {% endblock %}
