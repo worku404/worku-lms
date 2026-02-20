@@ -553,8 +553,6 @@ body.theme-dark #assistant-close-btn  {
     flex-direction: column;
     background: linear-gradient(180deg, #0b1c2d 0%, #091423 100%);
     overflow: hidden;
-    background-color: red !important;
-
 }
 
 @supports not (height: 100dvh) {
@@ -632,6 +630,53 @@ body.theme-dark #assistant-close-btn  {
 
 #chat .text {
     margin-top: 2px;
+}
+
+/* ===================================================== */
+/* EMPTY CHAT STATE                                      */
+/* ===================================================== */
+
+#chat .chat-empty-state {
+    margin: auto;
+    width: min(640px, 100%);
+    border-radius: 24px;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    text-align: center;
+    border: 1px solid color-mix(in srgb, #ffffff 16%, transparent);
+    background: linear-gradient(
+        145deg,
+        color-mix(in srgb, #2e7dd7 18%, #12253b) 0%,
+        color-mix(in srgb, #17304b 86%, #0b1725) 100%
+    );
+    color: #dce9f7;
+    box-shadow: 0 18px 48px rgba(5, 10, 18, 0.35);
+}
+
+#chat .chat-empty-state__emoji {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 0.9rem;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 1.75rem;
+    background: color-mix(in srgb, #2e7dd7 52%, #102338);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 22%, transparent);
+}
+
+#chat .chat-empty-state__title {
+    margin: 0;
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+#chat .chat-empty-state__text {
+    margin: 0.7rem auto 0;
+    max-width: 44ch;
+    font-size: 0.97rem;
+    line-height: 1.5;
+    color: color-mix(in srgb, #dce9f7 84%, #ffffff);
 }
 
 /* ===================================================== */
@@ -714,6 +759,11 @@ body.theme-dark #assistant-close-btn  {
         font-size: 13px;
     }
 
+    #chat .chat-empty-state {
+        width: 100%;
+        border-radius: 18px;
+    }
+
     #chat-input {
         padding: 12px;
     }
@@ -732,44 +782,175 @@ body.theme-dark #assistant-close-btn  {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ===================================================== */
-/* LIGHT MODE OVERRIDES                                  */
-/* ===================================================== */
 
-body.light-mode #chat {
-    background: #f7f9fc;
+/* Light mode chat background (append at the end of components.css) */
+body:not(.theme-dark) #chat-room-shell {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-secondary-surface) 78%, #fff6ea) 0%,
+        color-mix(in srgb, #ffffff 72%, #ffe9f3) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--color-border) 76%, #ffd8b5);
 }
 
-body.light-mode #chat .message.other {
-    background: #eef2f7;
-    color: #1f2933;
+body:not(.theme-dark) #chat .chat-empty-state {
+    border-color: color-mix(in srgb, var(--color-border) 72%, #ffd0de);
+    background: linear-gradient(
+        145deg,
+        color-mix(in srgb, #ffffff 82%, #ffe7f2) 0%,
+        color-mix(in srgb, #fff5ea 86%, #ffe2c8) 100%
+    );
+    color: color-mix(in srgb, var(--color-text) 88%, #2b3a4e);
+    box-shadow: 0 14px 32px rgba(170, 117, 83, 0.16);
 }
 
-body.light-mode #chat .message.me {
-    background: linear-gradient(135deg, #2bb673, #239e60); /* main accent green */
-    color: #ffffff;
+body:not(.theme-dark) #chat .chat-empty-state__emoji {
+    background: color-mix(in srgb, #2e7dd7 16%, #ffffff);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #2e7dd7 32%, #ffffff);
 }
 
-body.light-mode #chat .meta {
-    opacity: .55;
-    color: #4b5563;
+body:not(.theme-dark) #chat .chat-empty-state__text {
+    color: color-mix(in srgb, var(--color-text) 75%, #53657c);
 }
 
-body.light-mode #chat-input {
-    background: #ffffff;
-    border-top: 1px solid rgba(0,0,0,0.06);
+body:not(.theme-dark) #chat-input {
+    background: color-mix(in srgb, #ffffff 82%, #ffeef6);
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, #ffc9dd);
 }
 
-body.light-mode #chat-message-input {
-    background: #f1f5f9;
-    color: #111827;
+body:not(.theme-dark) #chat-message-input {
+    background: #fffdf9;
+    color: var(--color-text);
+    border: 1px solid color-mix(in srgb, var(--color-border) 72%, #ffd7a8);
 }
 
-body.light-mode #chat-message-input:focus {
-    background: #e8eef5;
+body:not(.theme-dark) #chat-message-input:focus {
+    background: #fff7ef;
 }
 
-body.light-mode #chat-message-submit {
-    background: #2bb673;
-    color: #ffffff;
+body:not(.theme-dark) #chat::-webkit-scrollbar-thumb {
+    background: rgba(255, 158, 197, 0.45);
+}
+/* Light mode (default) */
+.course-chat-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #b7e4d0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f3fff9 0%, #e8fff4 100%);
+  color: #0f5132;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.course-chat-link:hover,
+.course-chat-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: #7fd3ad;
+  box-shadow: 0 8px 18px rgba(15, 81, 50, 0.18);
+  outline: none;
+}
+
+.course-chat-link__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.course-chat-link__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.course-chat-link__title {
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.course-chat-link__path {
+  font-size: 0.76rem;
+  line-height: 1.25;
+  opacity: 0.8;
+  word-break: break-all;
+}
+
+.course-chat-link__arrow {
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+/* Dark mode */
+body.theme-dark .course-chat-link {
+  border-color: #2b5f8a;
+  background: linear-gradient(135deg, #13263a 0%, #1a3550 100%);
+  color: #d6ecff;
+}
+
+body.theme-dark .course-chat-link:hover,
+body.theme-dark .course-chat-link:focus-visible {
+  border-color: #4ea5e9;
+  box-shadow: 0 8px 18px rgba(23, 77, 126, 0.35);
+}
+
+body.theme-dark .course-chat-link__path {
+  color: #8fc6f0;
+  opacity: 1;
+}
+/* Keep it minimal: color + weight only */
+.page-subtitle--focus {
+  color: #8fb9df;
+  font-weight: 500;
+}
+
+.page-subtitle__value {
+  color: #d8ecff;
+  font-weight: 700;
+}
+
+.course-time {
+  color: #9ec2e6;
+  font-weight: 500;
+}
+
+.course-time__value {
+  color: #f2f8ff;
+  font-weight: 700;
+}
+
+/* Light mode adjustments */
+body:not(.theme-dark) .page-subtitle--focus {
+  color: #38607f;
+}
+
+body:not(.theme-dark) .page-subtitle__value {
+  color: #16374f;
+}
+
+body:not(.theme-dark) .course-time {
+  color: #335a78;
+}
+
+body:not(.theme-dark) .course-time__value {
+  color: #102e45;
+}
+
+.c-pdf-viewer {
+  margin: 0 0 0.75rem 0;
+}
+
+.c-pdf-viewer__frame {
+  width: 100%;
+  min-height: 70vh;
+  border: 1px solid var(--border-subtle, #2a4b6a);
+  border-radius: 8px;
 }

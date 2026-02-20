@@ -7,10 +7,14 @@ Student-facing views:
 
 
 # URL builder used for redirects after successful actions.
+import os
+import mimetypes
+
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
+from django.contrib.contenttypes.models import ContentType
 
 # Auth helpers and login-protection mixin.
 from django.contrib.auth import authenticate, login
@@ -25,7 +29,7 @@ from django.views.generic import TemplateView, DetailView, View
 
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
-from courses.models import Course, Module
+from courses.models import Content, Course, File, Image, Module
 from .services import add_time_spent, mark_module_completed
 from .services import get_overall_progress, get_course_time_spent
 
@@ -109,6 +113,7 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.filter(students__in=[self.request.user])
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         course = self.get_object()
@@ -121,27 +126,30 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
             module = modules.first()
 
         context["module"] = module
-
-        # --- FIX: mark module as completed when opened ---
-        if module:
-            mark_module_completed(user, module)
-
-        context['course_time'] = get_course_time_spent(user, course)
-
+        context["course_time"] = get_course_time_spent(self.request.user, course)
         return context
 
 
-class MarkModuleCompleteView(View):
+class MarkModuleCompleteView(LoginRequiredMixin, View):
     def post(self, request, module_id):
-        module = get_object_or_404(Module, id=module_id)
+        module = get_object_or_404(
+            Module, 
+            id=module_id,
+            course__students=request.user,
+            )
 
         mark_module_completed(request.user, module)
 
         return JsonResponse({'status': 'completed'})
 
-class TrackTimeView(View):
+class TrackTimeView(LoginRequiredMixin, View):
     def post(self, request, module_id):
-        module = get_object_or_404(Module, id=module_id)
+        module = get_object_or_404(
+            Module,
+            id=module_id,
+            course__students=request.user,
+            
+            )
         
         try:
             # Handle both standard POST and JSON/Beacon payloads
@@ -168,3 +176,98 @@ class StudentDashboardView(LoginRequiredMixin, TemplateView):
         context['courses'] = user.courses_joined.all()
 
         return context
+
+
+class DownloadModuleFileView(LoginRequiredMixin, View):
+    """
+    Serves a module file as an attachment for enrolled users.
+    This avoids relying on direct /media URLs in production.
+    """
+    def get(self, request, file_id):
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+        file_obj = content.item
+
+        if not file_obj or not file_obj.file:
+            raise Http404("File not found.")
+
+        filename = os.path.basename(file_obj.file.name)
+
+        try:
+            return FileResponse(
+                file_obj.file.open("rb"),
+                as_attachment=True,
+                filename=filename,
+            )
+        except FileNotFoundError as exc:
+            raise Http404("File not found.") from exc
+
+
+
+
+class ModuleImageView(LoginRequiredMixin, View):
+    """
+    Serves module images only to enrolled users.
+    This avoids relying on direct /media URLs in production.
+    """
+    def get(self, request, image_id):
+        image_type = ContentType.objects.get_for_model(Image)
+        content = get_object_or_404(
+            Content,
+            content_type=image_type,
+            object_id=image_id,
+            module__course__students=request.user,
+        )
+        image_obj = content.item
+
+        if not image_obj or not image_obj.file:
+            raise Http404("Image not found.")
+
+        filename = os.path.basename(image_obj.file.name)
+
+        try:
+            return FileResponse(
+                image_obj.file.open("rb"),
+                filename=filename,
+            )
+        except FileNotFoundError as exc:
+            raise Http404("Image not found.") from exc
+
+
+# pdf previw page
+
+class ModuleFilePreviewView(LoginRequiredMixin, View):
+    """
+    Serve module file inline (for PDF browser preview) to enrolled users.
+    """
+    def get(self, request, file_id):
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+        file_obj = content.item
+
+        if not file_obj or not file_obj.file:
+            raise Http404("File not found.")
+
+        filename = os.path.basename(file_obj.file.name)
+        content_type, _ = mimetypes.guess_type(filename)
+        content_type = content_type or "application/octet-stream"
+
+        try:
+            return FileResponse(
+                file_obj.file.open("rb"),
+                as_attachment=False,  # inline view
+                filename=filename,
+                content_type=content_type,
+            )
+        except FileNotFoundError as exc:
+            raise Http404("File not found.") from exc
