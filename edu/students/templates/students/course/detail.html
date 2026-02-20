@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load course %}
-{% load cache %}
 
 {% block title %}
     {{ object.title }}
@@ -9,9 +8,9 @@
     <section class="page page--workspace c-stack">
         <header class="page-heading">
             <h1 class="page-title">{{ object.title }}</h1>
-            <p class="page-subtitle">
+            <p class="page-subtitle page-subtitle--focus">
                 {% if module %}
-                    Current module: {{ module.title }}
+                    Current module: <span class="page-subtitle__value">{{ module.title }}</span>
                 {% else %}
                     Start with the first available module.
                 {% endif %}
@@ -22,7 +21,9 @@
             <aside class="contents c-card" aria-label="Module navigation">
                 <h2 class="c-card__title">Modules</h2>
                 <ul id="modules" class="c-module-list">
-                    <p>Time Spent: {{ course_time|duration_format }}</p>
+                    <p class="course-time">
+                        Time spent: <span class="course-time__value">{{ course_time|duration_format }}</span>
+                    </p>
 
                     {% for m in object.modules.all %}
                         <li data-id="{{ m.id }}" class="c-module-item {% if m == module %}selected{% endif %}">
@@ -36,34 +37,42 @@
                     {% empty %}
                         <li class="c-module-item">No modules yet.</li>
                     {% endfor %}
-                    <h3>
-                        <a href="{% url 'chat:course_chat_room' object.id %}">
-                            Course chat room
-                        </a>
-                    </h3>
+                    <a href="{% url 'chat:course_chat_room' object.id %}" class="course-chat-link" aria-label="Open course chat room">
+                    <span class="course-chat-link__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+                        </svg>
+                    </span>
+
+                    <span class="course-chat-link__text">
+                        <span class="course-chat-link__title">Open Course Chat Room</span>
+                        <span class="course-chat-link__path">
+                        </span>
+                    </span>
+
+                    <span class="course-chat-link__arrow" aria-hidden="true">↗</span>
+                    </a>
+
                 </ul>
             </aside>
 
             <section class="module c-stack c-reader" aria-label="Module content">
                 {% if module %}
-                    {% cache 600 module_contents module request.user.id %}
-                        {% for content in module.contents.all %}
-                            {% with item=content.item %}
-                                <article class="c-card c-content-block">
-                                    <h2 class="c-card__title">{{ item.title }}</h2>
-                                    <div class="c-reader__content">
-                                        {{ item.render }}
-                                    </div>
-                                    
-                                </article>
-                            {% endwith %}
-                        {% empty %}
-                            <div class="c-card c-alert c-alert--info">
-                                <h2 class="c-card__title">No lesson content yet</h2>
-                                <p class="c-card__meta">This module does not contain any content yet.</p>
-                            </div>
-                        {% endfor %}
-                    {% endcache %}
+                    {% for content in module.contents.all %}
+                        {% with item=content.item %}
+                            <article class="c-card c-content-block">
+                                <h2 class="c-card__title">{{ item.title }}</h2>
+                                <div class="c-reader__content">
+                                    {{ item.render }}
+                                </div>
+                            </article>
+                        {% endwith %}
+                    {% empty %}
+                        <div class="c-card c-alert c-alert--info">
+                            <h2 class="c-card__title">No lesson content yet</h2>
+                            <p class="c-card__meta">This module does not contain any content yet.</p>
+                        </div>
+                    {% endfor %}
                 {% else %}
                     <div class="c-card c-alert c-alert--info">
                         <h2 class="c-card__title">No modules found</h2>
@@ -75,18 +84,61 @@
     </section>
 {% endblock %}
 
-
 {% block include_js %}
 <script>
-// --- Fix for Back Button Stale Data ---
-// Only reload if the page was restored from bfcache (Back/Forward cache)
-window.addEventListener( "pageshow", function ( event ) {
-  if ( event.persisted ) {
-    window.location.reload();
-  }
+window.addEventListener("pageshow", function (event) {
+    if (event.persisted) window.location.reload();
 });
 
 let startTime = Date.now();
+let completionSent = false;
+let userHasScrolled = false;
+
+const moduleContainer = document.querySelector(".module");
+const completeUrl = "{% if module %}{% url 'mark_module_complete' module.id %}{% endif %}";
+const timeUrl = "{% if module %}{% url 'track_time' module.id %}{% endif %}";
+
+function getCookie(name) {
+    const cookies = document.cookie ? document.cookie.split("; ") : [];
+    for (const c of cookies) {
+        const [key, ...rest] = c.split("=");
+        if (key === name) return decodeURIComponent(rest.join("="));
+    }
+    return "";
+}
+
+function isAtBottom() {
+    if (moduleContainer && moduleContainer.scrollHeight > moduleContainer.clientHeight + 2) {
+        return moduleContainer.scrollTop + moduleContainer.clientHeight >= moduleContainer.scrollHeight - 8;
+    }
+    return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
+}
+
+function markCompleteIfNeeded() {
+    if (!completeUrl || completionSent || !userHasScrolled || !isAtBottom()) return;
+
+    completionSent = true;
+    fetch(completeUrl, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin"
+    }).catch(() => {
+        completionSent = false; // retry on later scroll if request failed
+    });
+}
+
+function onScroll() {
+    userHasScrolled = true;
+    markCompleteIfNeeded();
+}
+
+window.addEventListener("scroll", onScroll, { passive: true });
+if (moduleContainer) {
+    moduleContainer.addEventListener("scroll", onScroll, { passive: true });
+}
 
 document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
@@ -97,20 +149,13 @@ document.addEventListener("visibilitychange", function () {
 });
 
 function sendTime() {
-    let seconds = Math.floor((Date.now() - startTime) / 1000);
-    
-    // Prevent sending 0 or negative seconds
-    if (seconds <= 0) return;
+    const seconds = Math.floor((Date.now() - startTime) / 1000);
+    if (seconds <= 0 || !timeUrl) return;
 
-    // Create form data to include CSRF token
     const formData = new FormData();
-    formData.append('seconds', seconds);
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-    navigator.sendBeacon(
-        "{% if module %}{% url 'track_time' module.id %}{% endif %}",
-        formData
-    );
+    formData.append("seconds", seconds);
+    formData.append("csrfmiddlewaretoken", getCookie("csrftoken"));
+    navigator.sendBeacon(timeUrl, formData);
 }
 
 window.addEventListener("beforeunload", sendTime);
