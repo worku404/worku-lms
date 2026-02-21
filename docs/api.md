@@ -1,4 +1,4 @@
-# Gold-EDU API Documentation
+# NextGen Academy API Documentation
 
 This document explains the API in `edu/courses/api/` so developers can integrate quickly and correctly.
 

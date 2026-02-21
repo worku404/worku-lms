@@ -1,4 +1,4 @@
-# Gold-EDU E-Learning Platform
+# NextGen Academy E-Learning Platform
 
 A production-focused Learning Management System built with Django, Django REST Framework, Channels, and Redis.
 

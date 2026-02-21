@@ -1,4 +1,4 @@
-# Gold-EDU Documentation Index
+# NextGen Academy Documentation Index
 
 Use this page to navigate project documentation quickly.
 

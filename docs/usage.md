@@ -1,4 +1,4 @@
-# Gold-EDU Client Usage Guide
+# NextGen Academy Client Usage Guide
 
 This guide is for end users and external clients consuming the deployed Gold-EDU product on Render.
 
