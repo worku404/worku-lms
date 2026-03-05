@@ -56,7 +56,7 @@
                         Time spent: <span class="course-time__value">{{ course_time|duration_format }}</span>
                     </p>
 
-                    {% comment %} {% for m in object.modules.all %}
+                    {% for m in object.modules.all %}
                         <li data-id="{{ m.id }}" class="c-module-item {% if m == module %}selected{% endif %}">
                             <a href="{% url 'student_course_detail_module' object.id m.id %}">
                                 <span>
@@ -67,19 +67,7 @@
                         </li>
                     {% empty %}
                         <li class="c-module-item">No modules yet.</li>
-                    {% endfor %} {% endcomment %}
-
-                    {% for m in modules %}
-                        <li data-id="{{ m.id }}" class="c-module-item {% if m == module %}selected{% endif %}">
-                            <a href="{% url 'student_course_detail_module' object.id m.id %}">
-                                <span>Module <span class="order">{{ m.order|add:1 }}</span></span>
-                                {{ m.title }}
-                            </a>
-                        </li>
-                    {% empty %}
-                        <li class="c-module-item">No modules yet.</li>
                     {% endfor %}
-
                     <a href="{% url 'chat:course_chat_room' object.id %}" class="course-chat-link" aria-label="Open course chat room">
                     <span class="course-chat-link__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -100,7 +88,7 @@
             </aside>
 
             <section class="module c-stack c-reader" aria-label="Module content">
-                {% comment %} {% if module %}
+                {% if module %}
                     {% for content in module.contents.all %}
                         {% with item=content.item %}
                             <article class="c-card c-content-block">
@@ -109,31 +97,6 @@
                                     {{ item.render }}
                                 </div>
                             </article>
-                        {% endwith %}
-                    {% empty %}
-                        <div class="c-card c-alert c-alert--info">
-                            <h2 class="c-card__title">No lesson content yet</h2>
-                            <p class="c-card__meta">This module does not contain any content yet.</p>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="c-card c-alert c-alert--info">
-                        <h2 class="c-card__title">No modules found</h2>
-                        <p class="c-card__meta">This course has no modules yet.</p>
-                    </div>
-                {% endif %} {% endcomment %}
-
-                {% if module %}
-                    {% for content in module_contents %}
-                        {% with item=content.prefetched_item %}
-                            {% if item %}
-                                <article class="c-card c-content-block">
-                                    <h2 class="c-card__title">{{ item.title }}</h2>
-                                    <div class="c-reader__content">
-                                        {{ item.render }}
-                                    </div>
-                                </article>
-                            {% endif %}
                         {% endwith %}
                     {% empty %}
                         <div class="c-card c-alert c-alert--info">

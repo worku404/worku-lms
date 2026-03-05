@@ -33,13 +33,12 @@ from django.views.generic import TemplateView, DetailView, View
 
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
-from courses.models import Content, Course, File, Image, Module, Text, Video
-from .services import add_time_spent, mark_module_completed
-from .services import get_overall_progress, get_course_time_spent
-from .services import touch_user_presence
+from courses.models import Content, Course, File, Image, Module
+from .services import (add_time_spent, mark_module_completed, 
+                       get_overall_progress, get_course_time_spent,
+                        touch_user_presence
+                    )
 
-from collections import defaultdict  # add
-from django.db.models import Count  # add (also used in StudentCourseListView)
 
 import redis
 
@@ -110,109 +109,31 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         # Return only courses where current user is enrolled.
-        # qs = super().get_queryset()
-        # return qs.filter(students__in=[self.request.user])
-        return (
-            super()
-            .get_queryset()
-            .filter(students=self.request.user)
-            .select_related("subject", "owner")
-            .annotate(total_modules=Count("modules", distinct=True))
-        )
+        qs = super().get_queryset()
+        return qs.filter(students__in=[self.request.user])
 
 class StudentCourseDetailView(LoginRequiredMixin, DetailView):
     model = Course
     template_name = "students/course/detail.html"
 
     def get_queryset(self):
-        # qs = super().get_queryset()
-        # return qs.filter(students__in=[self.request.user])
-        return (
-            super()
-            .get_queryset()
-            .filter(students=self.request.user)
-            .prefetch_related("modules")
-        )
-    def _hydrate_module_items(self, contents):
-        """
-        Batch-resolve GenericForeignKey targets for Content.item.
-        Avoids one query per content row in template.
-        """
-        ids_by_content_type = defaultdict(set)
-        for content in contents:
-            ids_by_content_type[content.content_type_id].add(content.object_id)
-
-        content_types = ContentType.objects.get_for_models(Text, Video, Image, File)
-        model_by_ct_id = {
-            content_types[Text].id: Text,
-            content_types[Video].id: Video,
-            content_types[Image].id: Image,
-            content_types[File].id: File,
-        }
-        
-        item_cache = {}
-        for content_type_id, object_ids in ids_by_content_type.items():
-            model = model_by_ct_id.get(content_type_id)
-            if model is None:
-                continue
-            
-             # Keep payload smaller with only fields template/render needs.
-            if model is Text:
-                qs = model.objects.only("id", "title", "content")
-            elif model is Video:
-                qs = model.objects.only("id", "title", "url")
-            else:
-                qs = model.objects.only("id", "title", "file")
-
-            for item in qs.filter(id__in=object_ids):
-                item_cache[(content_type_id, item.id)] = item
-                
-        for content in contents:
-            content.prefetched_item = item_cache.get(
-                (content.content_type_id, content.object_id)
-            )
-        
-        return contents
-    
+        qs = super().get_queryset()
+        return qs.filter(students__in=[self.request.user])
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # course = self.get_object()
-        course = self.object 
-        
-        # modules = course.modules.all()
-        modules = list(course.modules.all())
-        requested_module_id = self.kwargs.get("module_id")
+        course = self.get_object()
+        modules = course.modules.all()
+        user = self.request.user
 
-        if requested_module_id is not None:
-            module = next((m for m in modules if m.id == requested_module_id), None)
-            if module is None:
-                raise Http404("Module not found for this course.")
+        if "module_id" in self.kwargs:
+            module = get_object_or_404(Module, id=self.kwargs["module_id"], course=course)
         else:
-            module = modules[0] if modules else None
-            
-        
-        module_contents = []
-        if module is not None:
-            module_contents = list(
-                module.contents.select_related("content_type").all()
-            )
-            module_contents = self._hydrate_module_items(module_contents)
+            module = modules.first()
 
-        context["modules"] = modules
         context["module"] = module
-        context["module_contents"] = module_contents
         context["course_time"] = get_course_time_spent(self.request.user, course)
         return context
-        
-        # if "module_id" in self.kwargs:
-        #     module = get_object_or_404(Module, id=self.kwargs["module_id"], course=course)
-        # else:
-        #     module = modules.first()
-
-        # context["module"] = module
-        # context["course_time"] = get_course_time_spent(self.request.user, course)
-        # return context
 
 
 class MarkModuleCompleteView(LoginRequiredMixin, View):
@@ -346,6 +267,8 @@ class ModuleFilePreviewView(LoginRequiredMixin, View):
         # Redirect to the storage URL (signed for private B2).
         return redirect(file_obj.file.url)
 
+
+# Online count
 class PresencePingView(LoginRequiredMixin, View):
     def post(self, request):
         online_count = touch_user_presence(request.user.id)
