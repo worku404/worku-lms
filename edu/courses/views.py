@@ -73,7 +73,12 @@ class CourseListview(TemplateResponseMixin, View):
                 cache.set("all_subjects", subjects, COURSE_LIST_CACHE_TTL)
 
         # 2) Base queryset for courses (with number of modules per course).
-        all_courses = Course.objects.annotate(total_modules=Count("modules"))
+        # all_courses = Course.objects.annotate(total_modules=Count("modules"))
+        all_courses = (
+                        Course.objects
+                        .select_related("subject", "owner")
+                        .annotate(total_modules=Count("modules"))
+                    )
 
         # 3) Optional filtering by subject slug from URL.
         if subject:
