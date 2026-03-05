@@ -18,7 +18,7 @@ def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECOND
     now = int(time.time())
     cutoff = now - window_seconds
     member = str(user_id)
-
+    
     try:
         pipe = _presence_redis.pipeline()
         pipe.zadd(ONLINE_USERS_KEY, {member: now})          # upsert heartbeat
@@ -27,10 +27,10 @@ def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECOND
         pipe.expire(ONLINE_USERS_KEY, window_seconds * 2)   # safety TTL
         _, _, online_count, _ = pipe.execute()
         return int(online_count)
+    
     except redis.RedisError:
         return 0
-
-
+    
 def mark_module_completed(user, module):
     progress, created = ModuleProgress.objects.get_or_create(
         user=user,
