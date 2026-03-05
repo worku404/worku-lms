@@ -41,6 +41,13 @@
     align-items: center;
 }
 
+.topbar__brand-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
 /* Base Brand Container */
 .topbar__brand {
     display: inline-flex;
@@ -124,7 +131,9 @@
 .l-rail--left {
     position: sticky;
     top: calc(var(--topbar-height) + var(--space-4));
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - var(--topbar-height) - (2 * var(--space-4)));
     gap: var(--space-4);
 }
 
@@ -136,7 +145,9 @@
 
 .l-util {
     position: sticky;
-    top: calc(var(--topbar-height) + var(--space-4));
+    top: var(--topbar-height);
+
+
 }
 
 .app-body.has-assistant.assistant-hidden .l-util {
@@ -146,6 +157,11 @@
 
 .app-body.has-assistant.assistant-hidden .l-util > * {
     pointer-events: auto;
+}
+@media (min-width: 1024px) {
+    .app-body.has-assistant {
+        --rail-right: 400px; /* small increase from 380px */
+    }
 }
 
 @media (max-width: 1200px) {
@@ -167,6 +183,27 @@
         align-items: start;
     }
 
+    .topbar__brand-wrap {
+        width: 100%;
+        justify-content: space-between;
+        gap: var(--space-1);
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .topbar__brand {
+        min-width: 0;
+        flex: 1 1 auto;
+        max-width: 100%;
+    }
+
+    .brand-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .topbar__actions {
         justify-content: flex-start;
         flex-wrap: wrap;
@@ -179,18 +216,20 @@
 
     .l-rail--left {
         position: static;
+        display: grid;
+        min-height: 0;
     }
 
     .l-util {
         position: static;
     }
 
-    .app-body.has-assistant:not(.assistant-hidden) .l-util .assistance {
+    .app-body.has-assistant.assistant-sidebar-open .l-util .assistance {
         position: fixed;
-        top: var(--topbar-height);
+        top: var(--assistant-top-offset, var(--topbar-height));
         right: 0;
         width: min(95vw, 420px);
-        max-height: calc(100vh - var(--topbar-height));
+        max-height: calc(100vh - var(--assistant-top-offset, var(--topbar-height)));
         z-index: 1200;
         border-left: 1px solid var(--color-border);
         box-shadow: -8px 0 24px rgba(var(--color-shadow), 0.12);

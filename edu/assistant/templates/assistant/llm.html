@@ -13,21 +13,23 @@
 
 <form id="llm-form" class="llm-form" autocomplete="off">
   {% csrf_token %}
-  <div class="llm-input">
-    {{ llm_form.prompt }}
-  </div>
-  <div class="llm-controls">
-    <button class="llm-btn llm-btn--icon" type="button" aria-label="Add">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
-      </svg>
-    </button>
-    <button class="llm-btn llm-btn--send" type="submit" aria-label="Send message">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2z" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 19v-8" />
-      </svg>
-    </button>
+  <div class="llm-composer">
+    <div class="llm-input">
+      {{ llm_form.prompt }}
+    </div>
+    <div class="llm-controls">
+      {% comment %} <button class="llm-btn llm-btn--icon" type="button" aria-label="Add">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
+        </svg>
+      </button> {% endcomment %}
+      <button class="llm-btn llm-btn--send" type="submit" aria-label="Send message">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 17V7" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 11.5L12 7l4.5 4.5" />
+        </svg>
+      </button>
+    </div>
   </div>
 </form>
 
@@ -137,30 +139,48 @@
     `.trim();
 
 
-  function renderHistory() {
-    const container = document.getElementById("history-container");
-    if (!container) return;
+function renderHistory() {
+  const container = document.getElementById("history-container");
+  if (!container) return;
 
-    container.innerHTML = "";
-    history.forEach((item) => {
-      const entry = document.createElement("div");
-      entry.className = "llm-chat-entry";
-      entry.innerHTML = `
-        <div class="llm-chat-row llm-chat-row--user">
-          <div class="llm-chat-bubble llm-chat-bubble--user">
-            <div class="llm-chat-msg">${escapeHtml(item.prompt)}</div>
-          </div>
+  const previousScrollTop = container.scrollTop;
+
+  container.innerHTML = "";
+  history.forEach((item) => {
+    const entry = document.createElement("div");
+    entry.className = "llm-chat-entry";
+    entry.innerHTML = `
+      <div class="llm-chat-row llm-chat-row--user">
+        <div class="llm-chat-bubble llm-chat-bubble--user">
+          <div class="llm-chat-msg">${escapeHtml(item.prompt)}</div>
         </div>
-        <div class="llm-chat-row llm-chat-row--ai">
-          <div class="llm-chat-bubble llm-chat-bubble--ai">
-            <div class="llm-chat-msg">${item.response}</div>
-          </div>
+      </div>
+      <div class="llm-chat-row llm-chat-row--ai">
+        <div class="llm-chat-bubble llm-chat-bubble--ai">
+          <div class="llm-chat-msg">${item.response}</div>
         </div>
-      `;
-      container.appendChild(entry);
-    });
-    container.scrollTop = container.scrollHeight;
-  }
+      </div>
+    `;
+    container.appendChild(entry);
+  });
+
+  container.scrollTop = Math.min(
+    previousScrollTop,
+    Math.max(0, container.scrollHeight - container.clientHeight)
+
+  );
+  highlightGeneratedCode(container);
+
+}
+ // llm code highlight
+  const highlightGeneratedCode = (container) => {
+  if (!container || !window.hljs) return;
+  container
+    .querySelectorAll(".llm-chat-row--ai .llm-chat-msg pre code")
+    .forEach((block) => hljs.highlightElement(block));
+};
+
+
   renderHistory();
   const form = document.getElementById("llm-form");
   const promptInput = document.getElementById("id_prompt");
@@ -185,6 +205,8 @@
       const prompt = promptInput.value.trim();
       if (!prompt) return;
 
+      promptInput.value = "";
+      autoGrow();
       openAssistantSidebar();
       sendBtn.disabled = true;
       let aiResponse = waitingMarkup();
@@ -225,8 +247,6 @@
       } finally {
         history[history.length - 1].response = aiResponse;
         renderHistory();
-        promptInput.value = "";
-        autoGrow();
         sendBtn.disabled = false;
         promptInput.focus();
       }
