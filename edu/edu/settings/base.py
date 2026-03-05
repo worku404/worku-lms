@@ -190,3 +190,9 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+CHAT_MAX_MESSAGES_PER_COURSE = config(
+    "CHAT_MAX_MESSAGES_PER_COURSE",
+    default=1000,
+    cast=int,
+)
