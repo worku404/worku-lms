@@ -118,26 +118,26 @@
                     {{ overall_progress|default:0 }}% complete
                 </p>
                 {% if top_courses %}
-                    <div class="c-focus-modules" data-focus-modules>
-                        <button
-                            type="button"
-                            class="c-focus-modules__toggle"
-                            aria-expanded="false"
-                            aria-controls="focus-modules-list"
-                            data-focus-toggle
-                        >
-                            More
-                        </button>
+                <div class="c-focus-modules" data-focus-modules>
+                    <button
+                        type="button"
+                        class="c-focus-modules__toggle"
+                        aria-expanded="false"
+                        aria-controls="focus-modules-list"
+                        data-focus-toggle
+                    >
+                        More
+                    </button>
 
-                        <ul id="focus-modules-list" class="c-focus-modules__list" data-focus-list hidden>
-                            {% for course in top_courses %}
-                            <li class="c-focus-modules__item">
-                                <a href="{% url 'student_course_detail' course.course_id %}" style=""><span class="c-focus-modules__name">{{ course.course__title }}</span></a>
-                                <span class="c-focus-modules__time" style="color: #2A9D66;">{{ course.total_time|duration_format }}</span>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+                    <ul id="focus-modules-list" class="c-focus-modules__list" data-focus-list hidden>
+                        {% for course in top_courses %}
+                        <li class="c-focus-modules__item">
+                            <a href="{% url 'student_course_detail' course.course_id %}" style=""><span class="c-focus-modules__name"> {{ course.course__title|truncatechars:20 }}</span></a>
+                            <span class="c-focus-modules__time" style="color: #2A9D66;">{{ course.total_time|duration_format }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 {% endif %}
 
 
@@ -147,7 +147,7 @@
             {% if request.user.is_authenticated %}
             <div class="c-presence c-presence--desktop" data-presence-badge role="status" aria-live="polite">
                 <span class="c-presence__dot" aria-hidden="true"></span>
-                <span class="c-presence__label">Students online</span>
+                <span class="c-presence__label">Online</span>
                 <strong class="c-presence__count" data-presence-count>--</strong>
             </div>
             {% endif %}
