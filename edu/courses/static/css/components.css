@@ -498,6 +498,7 @@ body.theme-dark.assistant-sidebar-open .llm-form {
 .llm-chat-row {
     display: flex;
     min-width: 0;
+    position: relative;
 }
 
 .llm-chat-row--user {
@@ -547,28 +548,42 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     overflow: hidden;
 }
 
+.llm-chat-stack--user {
+    display: grid;
+    justify-items: end;
+    max-width: 100%;
+}
+
 .llm-chat-bubble__actions {
     /* Keep per-message controls at the bottom-right of each bubble. */
     display: flex;
     justify-content: flex-end;
-    margin-top: 0.45rem;
+    margin-top: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.14s ease;
+}
+
+.llm-chat-bubble__actions--outside {
+    margin-top: 0.2rem;
 }
 
 .llm-copy-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    background: transparent;
+    width: auto;
+    height: auto;
+    border: 0;
+    border-radius: 0;
+    background: none;
     color: var(--color-text-muted);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    gap: 0.25rem;
-    padding: 0 0.45rem;
-    min-width: 68px;
-    transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    line-height: 1;
+    transition: color 0.14s ease, opacity 0.14s ease;
 }
 
 .llm-copy-btn svg {
@@ -576,14 +591,17 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     height: 14px;
 }
 
-.llm-copy-btn__label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    line-height: 1;
+.llm-copy-btn__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.llm-copy-btn__icon--check {
+    display: none;
 }
 
 .llm-copy-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-surface-soft) 70%, var(--color-surface));
     color: var(--color-text);
 }
 
@@ -594,14 +612,25 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
 
 .llm-copy-btn.is-copied {
     color: #2D9D64;
-    border-color: color-mix(in srgb, #2D9D64 60%, var(--color-border));
-    background: color-mix(in srgb, #2D9D64 16%, transparent);
+}
+
+.llm-copy-btn.is-copied .llm-copy-btn__icon--copy {
+    display: none;
+}
+
+.llm-copy-btn.is-copied .llm-copy-btn__icon--check {
+    display: inline-flex;
 }
 
 .llm-copy-btn.is-copy-failed {
     color: #ef6363;
-    border-color: color-mix(in srgb, #ef6363 55%, var(--color-border));
-    background: color-mix(in srgb, #ef6363 12%, transparent);
+}
+
+.llm-chat-row:hover .llm-chat-bubble__actions,
+.llm-chat-row:focus-within .llm-chat-bubble__actions {
+    /* Reveal copy icon when hovering anywhere on full row width. */
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .llm-chat-bubble--user {
@@ -609,11 +638,8 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     /* top-left | top-right | bottom-right | bottom-left */
     border-radius: 10px 5px 0px 10px;
     margin-left: 30px;
+    border: 0;
     /* border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border)); */
-}
-body.theme-dark .llm-chat-bubble--user{
-    background: #2e3031;
-
 }
 
 body.theme-dark .llm-copy-btn {
@@ -622,18 +648,27 @@ body.theme-dark .llm-copy-btn {
 }
 
 body.theme-dark .llm-copy-btn:hover:not(:disabled) {
-    background: #162438;
     color: #ecf4ff;
 }
 
 .llm-code-block-wrap {
     /* Keep generated code and its copy control grouped together. */
     display: grid;
-    gap: 0.35rem;
+    gap: 0;
 }
 
 .llm-code-block-wrap .llm-copy-code {
     justify-self: end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.14s ease;
+}
+
+.llm-code-block-wrap:hover .llm-copy-code,
+.llm-code-block-wrap:focus-within .llm-copy-code {
+    /* Reveal code copy icon when hovering the full code block area. */
+    opacity: 1;
+    pointer-events: auto;
 }
 .llm-chat-msg {
     line-height: 1.55;
@@ -674,6 +709,7 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     font-size: 1.02rem;
     line-height: 1.3;
     font-weight: 650;
+    color: #1678DE;
 }
 
 .llm-chat-msg ul,
