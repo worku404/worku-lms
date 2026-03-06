@@ -27,6 +27,8 @@ foreach ($l in $listeners) {
 docker info *> $null
 if ($LASTEXITCODE -eq 0) {
     docker rm -f redis_educa *> $null
+    # Stop local PostgreSQL container if running (keep container/data intact).
+    docker stop blog_db *> $null
 }
 
 # Optional full Docker shutdown
