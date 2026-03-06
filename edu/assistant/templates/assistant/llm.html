@@ -83,6 +83,51 @@
     syncAssistantLauncher();
   };
 
+  const focusAssistantPrompt = () => {
+    const prompt = document.getElementById("id_prompt");
+    if (!prompt) return;
+    prompt.focus();
+    // Keep caret at end of existing text for quick continuation.
+    if (typeof prompt.setSelectionRange === "function") {
+      const end = (prompt.value || "").length;
+      prompt.setSelectionRange(end, end);
+    }
+  };
+
+  const isEditableTarget = (target) => {
+    if (!target) return false;
+    const tagName = target.tagName;
+    // Do not steal Ctrl/Cmd+B while user is typing in editable controls.
+    return target.isContentEditable || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+  };
+
+  const toggleAssistantSidebar = () => {
+    const isHidden = bodyEl.classList.contains("assistant-hidden");
+    const isSidebarOpen = bodyEl.classList.contains("assistant-sidebar-open");
+    // Toggle between hidden and sidebar-open states.
+    if (!isHidden && isSidebarOpen) {
+      hideAssistant();
+      return;
+    }
+    openAssistantSidebar();
+    focusAssistantPrompt();
+  };
+
+  document.addEventListener("keydown", function (event) {
+    const isToggleShortcut =
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      String(event.key).toLowerCase() === "b";
+
+    if (!isToggleShortcut) return;
+    // Allow toggle inside the assistant prompt itself so Ctrl/Cmd+B can also close.
+    if (isEditableTarget(event.target) && event.target?.id !== "id_prompt") return;
+    // Prevent browser default (for example bookmarks toggle) and handle sidebar toggle.
+    event.preventDefault();
+    toggleAssistantSidebar();
+  });
+
   if (assistantPanel) {
     updateAssistantOffset();
     window.addEventListener("resize", updateAssistantOffset);
@@ -96,8 +141,7 @@
     if (assistantLauncher) {
       assistantLauncher.addEventListener("click", () => {
         openAssistantSidebar();
-        const prompt = document.getElementById("id_prompt");
-        if (prompt) prompt.focus();
+        focusAssistantPrompt();
       });
     }
 
