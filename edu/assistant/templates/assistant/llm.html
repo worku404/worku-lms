@@ -199,10 +199,17 @@
     `.trim();
 
   const copyIconMarkup = `
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="11" rx="2"></rect>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-    </svg>
+    <span class="llm-copy-btn__icon llm-copy-btn__icon--copy" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </span>
+    <span class="llm-copy-btn__icon llm-copy-btn__icon--check" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.2 4.2L19 7.2"></path>
+      </svg>
+    </span>
   `.trim();
 
 const isHistoryNearBottom = (container, threshold = 14) => {
@@ -251,20 +258,13 @@ const setCopyButtonFeedback = (button, copied) => {
   const defaultLabel = button.getAttribute("data-copy-default") || "Copy";
   const copiedLabel = button.getAttribute("data-copy-copied") || "Copied";
   const failedLabel = button.getAttribute("data-copy-failed") || "Copy failed";
-  const labelEl = button.querySelector(".llm-copy-btn__label");
   const activeLabel = copied ? copiedLabel : failedLabel;
 
-  if (labelEl) {
-    labelEl.textContent = activeLabel;
-  }
   button.setAttribute("aria-label", activeLabel);
   button.setAttribute("title", activeLabel);
 
   button._copyFeedbackTimer = window.setTimeout(() => {
     button.classList.remove("is-copied", "is-copy-failed");
-    if (labelEl) {
-      labelEl.textContent = defaultLabel;
-    }
     button.setAttribute("aria-label", defaultLabel);
     button.setAttribute("title", defaultLabel);
   }, 1200);
@@ -336,7 +336,7 @@ const enhanceCodeCopyButtons = (container) => {
     copyBtn.setAttribute("data-copy-default", "Copy code");
     copyBtn.setAttribute("data-copy-copied", "Copied");
     copyBtn.setAttribute("data-copy-failed", "Failed");
-    copyBtn.innerHTML = `${copyIconMarkup}<span class="llm-copy-btn__label">Copy code</span>`;
+    copyBtn.innerHTML = copyIconMarkup;
     wrap.appendChild(copyBtn);
   });
 };
@@ -367,7 +367,17 @@ if (historyContainerEl) {
       const codeEl = copyBtn.closest(".llm-code-block-wrap")?.querySelector("pre code, pre");
       textToCopy = (codeEl?.textContent || "").trim();
     } else {
-      const messageEl = copyBtn.closest(".llm-chat-bubble")?.querySelector(".llm-chat-msg");
+      const scope = copyBtn.getAttribute("data-copy-scope");
+      let bubbleEl = copyBtn.closest(".llm-chat-bubble");
+      if (!bubbleEl) {
+        const entryEl = copyBtn.closest(".llm-chat-entry");
+        if (entryEl) {
+          bubbleEl = entryEl.querySelector(
+            scope === "prompt" ? ".llm-chat-bubble--user" : ".llm-chat-bubble--ai"
+          );
+        }
+      }
+      const messageEl = bubbleEl?.querySelector(".llm-chat-msg");
       textToCopy = (messageEl?.innerText || "").trim();
     }
     if (!textToCopy) return;
@@ -399,20 +409,22 @@ function renderHistory() {
     entry.className = "llm-chat-entry";
     entry.innerHTML = `
       <div class="llm-chat-row llm-chat-row--user">
-        <div class="llm-chat-bubble llm-chat-bubble--user">
-          <div class="llm-chat-msg">${escapeHtml(item.prompt)}</div>
-          <div class="llm-chat-bubble__actions">
+        <div class="llm-chat-stack llm-chat-stack--user">
+          <div class="llm-chat-bubble llm-chat-bubble--user">
+            <div class="llm-chat-msg">${escapeHtml(item.prompt)}</div>
+          </div>
+          <div class="llm-chat-bubble__actions llm-chat-bubble__actions--outside">
             <button
               class="llm-copy-btn llm-copy-message"
               type="button"
               aria-label="Copy prompt"
               title="Copy prompt"
-              data-copy-default="Copy"
+              data-copy-scope="prompt"
+              data-copy-default="Copy prompt"
               data-copy-copied="Copied"
               data-copy-failed="Failed"
             >
               ${copyIconMarkup}
-              <span class="llm-copy-btn__label">Copy</span>
             </button>
           </div>
         </div>
@@ -426,14 +438,14 @@ function renderHistory() {
               type="button"
               aria-label="Copy response"
               title="Copy response"
+              data-copy-scope="response"
               data-response-index="${itemIndex}"
-              data-copy-default="Copy"
+              data-copy-default="Copy response"
               data-copy-copied="Copied"
               data-copy-failed="Failed"
               ${isPendingResponse ? "disabled aria-disabled='true'" : ""}
             >
               ${copyIconMarkup}
-              <span class="llm-copy-btn__label">Copy</span>
             </button>
           </div>
         </div>
