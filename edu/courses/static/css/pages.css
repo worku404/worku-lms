@@ -54,7 +54,11 @@ body::-webkit-scrollbar-thumb {
 
 .course-workspace {
     display: grid;
-    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    /* Sidebar width is variable so it can contract when AI sidebar opens. */
+    grid-template-columns: minmax(
+        var(--workspace-modules-min-current, 220px),
+        var(--workspace-modules-max-current, 280px)
+    ) minmax(0, 1fr);
     gap: var(--space-4);
     align-items: start;
     position: relative;
@@ -135,6 +139,11 @@ body.modules-sidebar-collapsed .modules-unhide {
     margin-inline: auto;
     padding-inline: clamp(var(--space-2), 1.4vw, var(--space-4));
     margin-right: 100px;
+}
+
+.app-body.assistant-sidebar-open .course-workspace.modules-collapsed .module {
+    /* Remove most of the reserved right margin while AI is visible. */
+    margin-right: var(--space-2);
 }
 
 .c-content-block {
