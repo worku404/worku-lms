@@ -551,6 +551,7 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     background: #2e3031;
     /* top-left | top-right | bottom-right | bottom-left */
     border-radius: 10px 5px 0px 10px;
+    margin-left: 10px;
     /* border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border)); */
 }
 
@@ -661,6 +662,53 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
 
 .llm-form {
     display: block;
+    position: relative;
+}
+
+.llm-scroll-bottom {
+    /* Float control just above the composer, aligned to the lower-right corner. */
+    position: absolute;
+    right: 0.35rem;
+    top: -2.75rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 88%, #101522);
+    color: var(--color-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity 0.14s ease, transform 0.14s ease, background-color 0.14s ease;
+    z-index: 3;
+}
+
+.llm-scroll-bottom.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.llm-scroll-bottom:hover {
+    background: color-mix(in srgb, var(--color-surface-soft) 74%, var(--color-surface));
+}
+
+.llm-scroll-bottom svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.theme-dark .llm-scroll-bottom {
+    background: #111827;
+    border-color: #2f415a;
+    color: #e8f2ff;
+}
+
+body.theme-dark .llm-scroll-bottom:hover {
+    background: #1b2a3f;
 }
 
 .llm-composer {
