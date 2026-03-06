@@ -488,6 +488,7 @@ function renderHistory() {
     const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
     const csrfToken = csrfInput ? csrfInput.value : "";
     const maxInputHeight = 152;
+    let isSubmitting = false;
 
     const autoGrow = () => {
       promptInput.style.height = "auto";
@@ -501,13 +502,16 @@ function renderHistory() {
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      // Single-flight guard: block both button and Enter resubmits while awaiting AI response.
+      if (isSubmitting || (sendBtn && sendBtn.disabled)) return;
       const prompt = promptInput.value.trim();
       if (!prompt) return;
 
+      isSubmitting = true;
       promptInput.value = "";
       autoGrow();
       openAssistantSidebar();
-      sendBtn.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
       let aiResponse = waitingMarkup();
       history.push({ prompt: prompt, response: aiResponse });
       renderHistory();
@@ -546,7 +550,8 @@ function renderHistory() {
       } finally {
         history[history.length - 1].response = aiResponse;
         renderHistory();
-        sendBtn.disabled = false;
+        isSubmitting = false;
+        if (sendBtn) sendBtn.disabled = false;
         promptInput.focus();
       }
     });
@@ -556,7 +561,12 @@ function renderHistory() {
     promptInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        form.dispatchEvent(new Event("submit"));
+        if (isSubmitting || (sendBtn && sendBtn.disabled)) return;
+        if (typeof form.requestSubmit === "function") {
+          form.requestSubmit(sendBtn || undefined);
+        } else {
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        }
       }
     });
   }
