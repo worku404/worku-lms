@@ -40,6 +40,12 @@
 
     --rail-left: 280px;
     --rail-right: 380px;
+    /* Compact rail widths used while the AI sidebar is open. */
+    --rail-left-compact: 232px;
+    --course-modules-min: 220px;
+    --course-modules-max: 280px;
+    --course-modules-min-compact: 190px;
+    --course-modules-max-compact: 240px;
     --topbar-height: 74px;
     --main-max: 1100px;
     --reading-max: 65ch;
