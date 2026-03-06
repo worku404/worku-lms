@@ -66,6 +66,12 @@ urlpatterns = [
     views.PresencePingView.as_view(),
     name="presence_ping",
 ),
+    path(
+    "system/stop-local-stack/",
+    # Local developer endpoint: triggers stop.ps1 and shuts down local stack.
+    views.StopLocalStackView.as_view(),
+    name="stop_local_stack",
+),
 
 
 ]
