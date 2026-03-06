@@ -548,13 +548,13 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
 }
 
 .llm-chat-bubble__actions {
-    /* Keep per-response tools aligned to the top-right of each AI bubble. */
+    /* Keep per-message controls at the bottom-right of each bubble. */
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 0.3rem;
+    margin-top: 0.45rem;
 }
 
-.llm-copy-response {
+.llm-copy-btn {
     width: 30px;
     height: 30px;
     border-radius: 8px;
@@ -565,31 +565,40 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    gap: 0.25rem;
+    padding: 0 0.45rem;
+    min-width: 68px;
     transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
-.llm-copy-response svg {
+.llm-copy-btn svg {
     width: 14px;
     height: 14px;
 }
 
-.llm-copy-response:hover:not(:disabled) {
+.llm-copy-btn__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.llm-copy-btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-surface-soft) 70%, var(--color-surface));
     color: var(--color-text);
 }
 
-.llm-copy-response:disabled {
+.llm-copy-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-.llm-copy-response.is-copied {
+.llm-copy-btn.is-copied {
     color: #2D9D64;
     border-color: color-mix(in srgb, #2D9D64 60%, var(--color-border));
     background: color-mix(in srgb, #2D9D64 16%, transparent);
 }
 
-.llm-copy-response.is-copy-failed {
+.llm-copy-btn.is-copy-failed {
     color: #ef6363;
     border-color: color-mix(in srgb, #ef6363 55%, var(--color-border));
     background: color-mix(in srgb, #ef6363 12%, transparent);
@@ -607,14 +616,24 @@ body.theme-dark .llm-chat-bubble--user{
 
 }
 
-body.theme-dark .llm-copy-response {
+body.theme-dark .llm-copy-btn {
     border-color: #2f415a;
     color: #a7bdd6;
 }
 
-body.theme-dark .llm-copy-response:hover:not(:disabled) {
+body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     background: #162438;
     color: #ecf4ff;
+}
+
+.llm-code-block-wrap {
+    /* Keep generated code and its copy control grouped together. */
+    display: grid;
+    gap: 0.35rem;
+}
+
+.llm-code-block-wrap .llm-copy-code {
+    justify-self: end;
 }
 .llm-chat-msg {
     line-height: 1.55;
