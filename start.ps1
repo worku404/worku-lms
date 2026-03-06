@@ -83,6 +83,21 @@ try {
     if (-not $dockerReady) { throw "Docker engine not ready in time (240s)." }
     Log "Docker ready"
 
+    # Ensure blog_db is running when present (used by local PostgreSQL setup).
+    $blogRunning = (& docker ps --filter "name=^/blog_db$" --format "{{.Names}}" 2>$null | Select-Object -First 1)
+    if ($blogRunning -ne "blog_db") {
+        $blogExists = (& docker ps -a --filter "name=^/blog_db$" --format "{{.Names}}" 2>$null | Select-Object -First 1)
+        if ($blogExists -eq "blog_db") {
+            & docker start blog_db *> $null
+            if ($LASTEXITCODE -ne 0) { throw "Failed to start blog_db." }
+            Log "blog_db started"
+        } else {
+            Log "blog_db not found (skipping PostgreSQL container start)"
+        }
+    } else {
+        Log "blog_db already running"
+    }
+
     # Ensure redis_educa is running
     $redisRunning = (& docker ps --filter "name=^/redis_educa$" --format "{{.Names}}" 2>$null | Select-Object -First 1)
     if ($redisRunning -ne "redis_educa") {
