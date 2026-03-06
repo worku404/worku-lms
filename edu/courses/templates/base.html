@@ -419,16 +419,16 @@
             return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
         }
 
-        // Try to close this tab like Ctrl+W, then fall back to blank page if blocked.
+        // Try to close this tab like Ctrl+W.
         function closeCurrentTab() {
-            // Attempt tab close for browsers that allow script-initiated close.
+            // Attempt close using browser-allowed script path first.
             window.open("", "_self");
-            // Attempt direct close.
             window.close();
-            // Fallback to about:blank when close is blocked by browser policy.
+            // If blocked by browser policy, keep current page and ask for manual shortcut.
             window.setTimeout(function () {
                 if (!window.closed) {
-                    window.location.replace("about:blank");
+                    window.focus();
+                    window.alert("Browser blocked automatic tab close. Press Ctrl+W to close this tab.");
                 }
             }, 120);
         }
