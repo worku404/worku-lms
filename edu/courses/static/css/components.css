@@ -547,6 +547,54 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     overflow: hidden;
 }
 
+.llm-chat-bubble__actions {
+    /* Keep per-response tools aligned to the top-right of each AI bubble. */
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.3rem;
+}
+
+.llm-copy-response {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.llm-copy-response svg {
+    width: 14px;
+    height: 14px;
+}
+
+.llm-copy-response:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-surface-soft) 70%, var(--color-surface));
+    color: var(--color-text);
+}
+
+.llm-copy-response:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.llm-copy-response.is-copied {
+    color: #2D9D64;
+    border-color: color-mix(in srgb, #2D9D64 60%, var(--color-border));
+    background: color-mix(in srgb, #2D9D64 16%, transparent);
+}
+
+.llm-copy-response.is-copy-failed {
+    color: #ef6363;
+    border-color: color-mix(in srgb, #ef6363 55%, var(--color-border));
+    background: color-mix(in srgb, #ef6363 12%, transparent);
+}
+
 .llm-chat-bubble--user {
     background-color: var(--color-secondary-surface);
     /* top-left | top-right | bottom-right | bottom-left */
@@ -557,6 +605,16 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
 body.theme-dark .llm-chat-bubble--user{
     background: #2e3031;
 
+}
+
+body.theme-dark .llm-copy-response {
+    border-color: #2f415a;
+    color: #a7bdd6;
+}
+
+body.theme-dark .llm-copy-response:hover:not(:disabled) {
+    background: #162438;
+    color: #ecf4ff;
 }
 .llm-chat-msg {
     line-height: 1.55;
