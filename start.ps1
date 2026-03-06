@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
 $root = "C:\Users\hi\Downloads\webdev\Django_Projects\e-learning"
 $app = Join-Path $root "edu"
@@ -8,60 +9,73 @@ $url = "http://127.0.0.1:8000"
 $log = Join-Path $root "start.log"
 $djangoOut = Join-Path $root "django-out.log"
 $djangoErr = Join-Path $root "django-err.log"
+$lockFile = Join-Path $root ".start.lock"
 
 function Log([string]$m) {
-    "{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $m | Tee-Object -FilePath $log -Append
+    $line = "{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $m
+    $line | Out-File -FilePath $log -Append -Encoding utf8
+    Write-Output $line
 }
 
 try {
-    Set-Content -Path $log -Value ""
+    # fresh UTF-8 log (prevents garbage text)
+    Set-Content -Path $log -Value "" -Encoding utf8
+
+    # simple lock to avoid double-click race
+    if (Test-Path $lockFile) {
+        $age = (Get-Date) - (Get-Item $lockFile).LastWriteTime
+        if ($age.TotalMinutes -lt 10) {
+            Log "Another launcher instance is already running. Exiting."
+            exit 0
+        }
+        Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+    }
+    New-Item -Path $lockFile -ItemType File -Force | Out-Null
+
     Log "Launcher started"
 
     if (-not (Test-Path $python)) { throw "Python not found: $python" }
     if (-not (Test-Path $manage)) { throw "manage.py not found: $manage" }
 
-    # Start Docker Desktop if needed
+    # Use your exact Docker Desktop path
     if (-not (Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue)) {
-        $dockerExe1 = "$Env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
-        $dockerExe2 = "${Env:ProgramFiles(x86)}\Docker\Docker\Docker Desktop.exe"
-
-        if (Test-Path $dockerExe1) {
-            Start-Process $dockerExe1
-            Log "Starting Docker Desktop"
-        } elseif (Test-Path $dockerExe2) {
-            Start-Process $dockerExe2
-            Log "Starting Docker Desktop"
-        } else {
-            throw "Docker Desktop executable not found."
-        }
+        $dockerExe = "$Env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+        if (-not (Test-Path $dockerExe)) { throw "Docker Desktop executable not found: $dockerExe" }
+        Start-Process $dockerExe
+        Log "Starting Docker Desktop"
     }
 
-    # Wait for Docker engine
+    # Wait for Docker engine (up to 240s)
     $dockerReady = $false
-    for ($i = 0; $i -lt 90; $i++) {
-        docker info *> $null
+    for ($i = 0; $i -lt 120; $i++) {
+        & docker info *> $null
         if ($LASTEXITCODE -eq 0) { $dockerReady = $true; break }
         Start-Sleep 2
     }
-    if (-not $dockerReady) { throw "Docker engine not ready in time." }
+    if (-not $dockerReady) { throw "Docker engine not ready in time (240s)." }
     Log "Docker ready"
 
-    # Ensure redis container is running (null-safe)
-    $redisRunning = docker ps --filter "name=^/redis_educa$" --format "{{.Names}}" 2>$null | Select-Object -First 1
-    if ([string]::IsNullOrWhiteSpace($redisRunning) -or $redisRunning.Trim() -ne "redis_educa") {
-        $redisExists = docker ps -a --filter "name=^/redis_educa$" --format "{{.Names}}" 2>$null | Select-Object -First 1
-        if (-not [string]::IsNullOrWhiteSpace($redisExists) -and $redisExists.Trim() -eq "redis_educa") {
-            docker rm -f redis_educa *> $null
+    # Ensure redis_educa is running
+    $redisRunning = (& docker ps --filter "name=^/redis_educa$" --format "{{.Names}}" 2>$null | Select-Object -First 1)
+    if ($redisRunning -ne "redis_educa") {
+        $redisExists = (& docker ps -a --filter "name=^/redis_educa$" --format "{{.Names}}" 2>$null | Select-Object -First 1)
+        if ($redisExists -eq "redis_educa") {
+            & docker rm -f redis_educa *> $null
         }
 
-        docker run -d --rm --name redis_educa -p 6379:6379 redis:latest *> $null
-        if ($LASTEXITCODE -ne 0) { throw "Failed to start redis_educa." }
+        & docker run -d --rm --name redis_educa -p 6379:6379 redis:latest *> $null
+        if ($LASTEXITCODE -ne 0) {
+            # one retry if name conflict/race
+            & docker rm -f redis_educa *> $null
+            & docker run -d --rm --name redis_educa -p 6379:6379 redis:latest *> $null
+            if ($LASTEXITCODE -ne 0) { throw "Failed to start redis_educa." }
+        }
         Log "Redis started"
     } else {
         Log "Redis already running"
     }
 
-    # Start Django if not already listening
+    # Start Django if needed
     if (-not (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)) {
         if (Test-Path $djangoOut) { Remove-Item $djangoOut -Force }
         if (Test-Path $djangoErr) { Remove-Item $djangoErr -Force }
@@ -77,9 +91,9 @@ try {
         Log "Django already running"
     }
 
-    # Wait for Django to bind to 8000
+    # Wait for Django
     $serverReady = $false
-    for ($i = 0; $i -lt 45; $i++) {
+    for ($i = 0; $i -lt 60; $i++) {
         if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) {
             $serverReady = $true
             break
@@ -87,9 +101,7 @@ try {
         Start-Sleep 1
     }
 
-    if (-not $serverReady) {
-        throw "Django did not bind to 127.0.0.1:8000. Check django-err.log"
-    }
+    if (-not $serverReady) { throw "Django did not bind to 127.0.0.1:8000. Check django-err.log" }
 
     Start-Process $url
     Log "Browser opened: $url"
@@ -97,4 +109,7 @@ try {
 catch {
     Log ("ERROR: " + $_.Exception.Message)
     Start-Process notepad.exe $log
+}
+finally {
+    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
 }
