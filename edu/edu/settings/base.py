@@ -65,7 +65,7 @@ INSTALLED_APPS = [
 
 # Middleware pipeline (request/response processing order matters)
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",          # Third-party middleware
+    # "debug_toolbar.middleware.DebugToolbarMiddleware",          # Third-party middleware
     "django.middleware.security.SecurityMiddleware",            # Built-in: security headers and protections
     "django.contrib.sessions.middleware.SessionMiddleware",     # Built-in: session support
 
