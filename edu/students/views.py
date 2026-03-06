@@ -9,6 +9,8 @@ Student-facing views:
 # URL builder used for redirects after successful actions.
 import os
 import mimetypes
+import subprocess
+from pathlib import Path
 
 from django.conf import settings
 from django.http import FileResponse, Http404, JsonResponse
@@ -23,7 +25,6 @@ from django.utils.cache import patch_response_headers
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import UserCreationForm
-from django.shortcuts import redirect
 
 # Generic class-based views for create/form/list/detail pages.
 from django.views.generic.edit import CreateView, FormView
@@ -264,8 +265,25 @@ class ModuleFilePreviewView(LoginRequiredMixin, View):
         if not file_obj or not file_obj.file:
             raise Http404("File not found.")
 
-        # Redirect to the storage URL (signed for private B2).
-        return redirect(file_obj.file.url)
+        filename = os.path.basename(file_obj.file.name)
+        content_type, _ = mimetypes.guess_type(filename)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        try:
+            response = FileResponse(
+                file_obj.file.open("rb"),
+                as_attachment=False,
+                filename=filename,
+                content_type=content_type,
+            )
+        except FileNotFoundError as exc:
+            raise Http404("File not found.") from exc
+
+        # Force inline rendering in browser viewers (PDF/image support).
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        patch_response_headers(response, cache_timeout=0)
+        return response
 
 
 # Online count
@@ -273,3 +291,60 @@ class PresencePingView(LoginRequiredMixin, View):
     def post(self, request):
         online_count = touch_user_presence(request.user.id)
         return JsonResponse({"online_count": online_count})
+
+
+class StopLocalStackView(LoginRequiredMixin, View):
+    """
+    Stop local development services (Django + Redis) by launching stop.ps1.
+    This is intentionally restricted to privileged users on localhost only.
+    """
+
+    def post(self, request):
+        # Guard 1: only staff/superusers can trigger a local shutdown.
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
+        # Guard 2: only allow requests coming from local loopback addresses.
+        remote_addr = request.META.get("REMOTE_ADDR")
+        if remote_addr not in {"127.0.0.1", "::1"}:
+            return JsonResponse({"error": "Localhost only"}, status=403)
+
+        # Guard 3: only allow localhost host headers for extra safety.
+        host = request.get_host().split(":", 1)[0]
+        if host not in {"127.0.0.1", "localhost"}:
+            return JsonResponse({"error": "Localhost host only"}, status=403)
+
+        # Resolve the local stop script from project root.
+        stop_script = Path(settings.BASE_DIR) / "stop.ps1"
+        if not stop_script.exists():
+            return JsonResponse({"error": "stop.ps1 not found"}, status=500)
+
+        # Delay execution slightly so this request can return before the server stops itself.
+        command = [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            f"Start-Sleep -Milliseconds 650; & '{stop_script}'",
+        ]
+
+        # Detach process on Windows so it survives independently of this request thread.
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            )
+
+        # Launch stop script without inheriting stdio handles.
+        subprocess.Popen(
+            command,
+            cwd=str(settings.BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=creationflags,
+        )
+
+        # Return immediate confirmation; shutdown continues asynchronously.
+        return JsonResponse({"status": "stopping"})
