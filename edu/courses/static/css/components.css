@@ -676,6 +676,20 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     word-break: break-word;
 }
 
+/* Use Iosevka for assistant responses while keeping safe monospace fallbacks. */
+.llm-chat-row--ai .llm-chat-msg {
+    /* Soften AI text brightness on the pure-black panel to reduce eye strain. */
+    font-family: "Iosevka", "Cascadia Mono", "Fira Code", "JetBrains Mono",
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    color: #c7d3e1;
+}
+
+.llm-chat-row--ai .llm-chat-msg strong,
+.llm-chat-row--ai .llm-chat-msg b {
+    /* Keep emphasis visible, but still less harsh than pure white. */
+    color: #dbe6f2;
+}
+
 .llm-chat-msg > * {
     max-width: 100%;
 }
