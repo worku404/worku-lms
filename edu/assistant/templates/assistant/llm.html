@@ -224,6 +224,89 @@ const updateScrollBottomVisibility = () => {
   scrollBottomBtn.classList.toggle("is-visible", shouldShow);
 };
 
+const copyTextToClipboard = async (text) => {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  // Clipboard API fallback for older browsers.
+  const helper = document.createElement("textarea");
+  helper.value = text;
+  helper.setAttribute("readonly", "");
+  helper.style.position = "fixed";
+  helper.style.top = "-9999px";
+  helper.style.left = "-9999px";
+  document.body.appendChild(helper);
+  helper.focus();
+  helper.select();
+  const success = document.execCommand("copy");
+  helper.remove();
+  if (!success) {
+    throw new Error("copy-failed");
+  }
+};
+
+const setCopyButtonFeedback = (button, copied) => {
+  if (!button) return;
+  if (button._copyFeedbackTimer) {
+    window.clearTimeout(button._copyFeedbackTimer);
+  }
+
+  button.classList.remove("is-copied", "is-copy-failed");
+  button.classList.add(copied ? "is-copied" : "is-copy-failed");
+  button.setAttribute("aria-label", copied ? "Copied" : "Copy failed");
+  button.setAttribute("title", copied ? "Copied" : "Copy failed");
+
+  button._copyFeedbackTimer = window.setTimeout(() => {
+    button.classList.remove("is-copied", "is-copy-failed");
+    button.setAttribute("aria-label", "Copy response");
+    button.setAttribute("title", "Copy response");
+  }, 1200);
+};
+
+const enhanceChatTables = (container) => {
+  if (!container) return;
+
+  container.querySelectorAll(".llm-chat-row--ai .llm-chat-msg table").forEach((table) => {
+    table.classList.add("llm-chat-table");
+
+    if (!table.parentElement || !table.parentElement.classList.contains("llm-chat-table-wrap")) {
+      // Wrap each table to enable horizontal scrolling without shrinking text size.
+      const wrap = document.createElement("div");
+      wrap.className = "llm-chat-table-wrap";
+      table.parentNode.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    }
+
+    // Collect header labels for stacked mobile fallback.
+    let headerCells = Array.from(table.querySelectorAll("thead tr:first-child th"));
+    if (!headerCells.length) {
+      const firstRow = table.querySelector("tr");
+      if (firstRow) {
+        headerCells = Array.from(firstRow.children);
+      }
+    }
+
+    const headerLabels = headerCells.map((cell, index) => {
+      const text = (cell.textContent || "").trim();
+      return text || `Column ${index + 1}`;
+    });
+
+    let dataRows = Array.from(table.querySelectorAll("tbody tr"));
+    if (!dataRows.length) {
+      const rows = Array.from(table.querySelectorAll("tr"));
+      dataRows = rows.slice(headerCells.length ? 1 : 0);
+    }
+
+    dataRows.forEach((row) => {
+      Array.from(row.children).forEach((cell, index) => {
+        if (cell.tagName !== "TD") return;
+        cell.setAttribute("data-label", headerLabels[index] || `Column ${index + 1}`);
+      });
+    });
+  });
+};
+
 if (historyContainerEl) {
   historyContainerEl.addEventListener("scroll", updateScrollBottomVisibility, { passive: true });
 }
@@ -239,6 +322,25 @@ if (scrollBottomBtn && historyContainerEl) {
   });
 }
 
+if (historyContainerEl) {
+  historyContainerEl.addEventListener("click", async function (event) {
+    const copyBtn = event.target.closest(".llm-copy-response");
+    if (!copyBtn || copyBtn.disabled) return;
+    event.preventDefault();
+
+    const messageEl = copyBtn.closest(".llm-chat-bubble--ai")?.querySelector(".llm-chat-msg");
+    const responseText = (messageEl?.innerText || "").trim();
+    if (!responseText) return;
+
+    try {
+      await copyTextToClipboard(responseText);
+      setCopyButtonFeedback(copyBtn, true);
+    } catch (error) {
+      setCopyButtonFeedback(copyBtn, false);
+    }
+  });
+}
+
 window.addEventListener("resize", updateScrollBottomVisibility);
 
 
@@ -250,7 +352,9 @@ function renderHistory() {
   const previousScrollTop = container.scrollTop;
 
   container.innerHTML = "";
-  history.forEach((item) => {
+  history.forEach((item, itemIndex) => {
+    const isPendingResponse =
+      typeof item.response === "string" && item.response.includes("llm-wait__dot");
     const entry = document.createElement("div");
     entry.className = "llm-chat-entry";
     entry.innerHTML = `
@@ -261,12 +365,30 @@ function renderHistory() {
       </div>
       <div class="llm-chat-row llm-chat-row--ai">
         <div class="llm-chat-bubble llm-chat-bubble--ai">
+          <div class="llm-chat-bubble__actions">
+            <button
+              class="llm-copy-response"
+              type="button"
+              aria-label="Copy response"
+              title="Copy response"
+              data-response-index="${itemIndex}"
+              ${isPendingResponse ? "disabled aria-disabled='true'" : ""}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
           <div class="llm-chat-msg">${item.response}</div>
         </div>
       </div>
     `;
     container.appendChild(entry);
   });
+
+  // Normalize AI tables after each render so layout stays responsive.
+  enhanceChatTables(container);
 
   if (wasNearBottom) {
     container.scrollTop = container.scrollHeight;
