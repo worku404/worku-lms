@@ -38,6 +38,18 @@
                     <span class="c-presence__dot" aria-hidden="true"></span>
                     <span class="c-presence__label">Online</span>
                     <strong class="c-presence__count" data-presence-count>--</strong>
+                    {% if request.user.is_staff or request.user.is_superuser %}
+                    <!-- Local-only developer control: request local stack stop from UI -->
+                    <button
+                        type="button"
+                        class="c-presence__stop"
+                        data-stop-server-btn
+                        aria-label="Stop local server and close this tab"
+                        title="Stop local server"
+                    >
+                        &times;
+                    </button>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -146,9 +158,22 @@
             {% endblock %}
             {% if request.user.is_authenticated %}
             <div class="c-presence c-presence--desktop" data-presence-badge role="status" aria-live="polite">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <!-- Local-only developer control: request local stack stop from UI -->
+                <button
+                    type="button"
+                    class="c-presence__stop"
+                    data-stop-server-btn
+                    aria-label="Stop local server and close this tab"
+                    title="Stop local server"
+                >
+                    &times;
+                </button>
+                {% endif %}
                 <span class="c-presence__dot" aria-hidden="true"></span>
                 <span class="c-presence__label">Online</span>
                 <strong class="c-presence__count" data-presence-count>--</strong>
+                
             </div>
             {% endif %}
 
@@ -372,6 +397,84 @@
         });
 
         window.addEventListener("beforeunload", stopHeartbeat);
+    })();
+
+    (function () {
+        // Collect all stop controls (desktop + mobile badges).
+        const stopButtons = Array.from(document.querySelectorAll("[data-stop-server-btn]"));
+
+        // Skip setup when current user cannot see stop controls.
+        if (!stopButtons.length) return;
+
+        // Resolve the backend endpoint that launches stop.ps1.
+        const stopUrl = "{% url 'stop_local_stack' %}";
+
+        // Read a single cookie value (used for CSRF token).
+        function getCookie(name) {
+            // Split browser cookie string into key/value entries.
+            const cookie = document.cookie
+                .split("; ")
+                .find((row) => row.startsWith(name + "="));
+            // Decode and return cookie value when found.
+            return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+        }
+
+        // Try to close this tab like Ctrl+W, then fall back to blank page if blocked.
+        function closeCurrentTab() {
+            // Attempt tab close for browsers that allow script-initiated close.
+            window.open("", "_self");
+            // Attempt direct close.
+            window.close();
+            // Fallback to about:blank when close is blocked by browser policy.
+            window.setTimeout(function () {
+                if (!window.closed) {
+                    window.location.replace("about:blank");
+                }
+            }, 120);
+        }
+
+        // Ask backend to stop local services; use fetch first, beacon as fallback.
+        async function requestStop() {
+            // Read CSRF token for POST protection.
+            const csrfToken = getCookie("csrftoken");
+            try {
+                // Send authenticated POST request with keepalive.
+                await fetch(stopUrl, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    keepalive: true,
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+                // Mark request path as attempted.
+                return true;
+            } catch (error) {
+                // Build form payload for sendBeacon fallback.
+                const formData = new FormData();
+                formData.append("csrfmiddlewaretoken", csrfToken);
+                // Queue beacon so request can continue during unload.
+                return navigator.sendBeacon(stopUrl, formData);
+            }
+        }
+
+        // Attach click handler to each stop button.
+        stopButtons.forEach((buttonEl) => {
+            buttonEl.addEventListener("click", async function () {
+                // Disable all stop buttons immediately to prevent duplicate clicks.
+                stopButtons.forEach((btn) => {
+                    btn.disabled = true;
+                    btn.textContent = "...";
+                    btn.title = "Stopping local server...";
+                });
+
+                // Trigger shutdown request.
+                await requestStop();
+                // Close tab (or navigate to blank page if browser blocks close).
+                closeCurrentTab();
+            });
+        });
     })();
 
     (function () {
