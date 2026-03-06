@@ -548,13 +548,16 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
 }
 
 .llm-chat-bubble--user {
-    background: #2e3031;
+    background-color: var(--color-secondary-surface);
     /* top-left | top-right | bottom-right | bottom-left */
     border-radius: 10px 5px 0px 10px;
-    margin-left: 10px;
+    margin-left: 30px;
     /* border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border)); */
 }
+body.theme-dark .llm-chat-bubble--user{
+    background: #2e3031;
 
+}
 .llm-chat-msg {
     line-height: 1.55;
     overflow-wrap: anywhere;
@@ -639,19 +642,111 @@ body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
     white-space: inherit;
 }
 
-.llm-chat-msg table {
+/* Keep readable font sizes and scroll tables horizontally when needed. */
+.llm-chat-msg .llm-chat-table-wrap {
     width: 100%;
-    display: block;
+    max-width: 100%;
     overflow-x: auto;
-    border-collapse: collapse;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
 }
 
-.llm-chat-msg th,
-.llm-chat-msg td {
+.llm-chat-msg .llm-chat-table {
+    width: max(100%, 680px);
+    min-width: 680px;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: 1rem;
+}
+
+.llm-chat-msg .llm-chat-table th,
+.llm-chat-msg .llm-chat-table td {
     border: 1px solid var(--color-border);
-    padding: 0.35rem 0.45rem;
+    padding: 0.42rem 0.52rem;
     text-align: left;
     vertical-align: top;
+}
+
+.llm-chat-msg .llm-chat-table th {
+    /* Prevent awkward letter-by-letter header breaks. */
+    font-weight: 700;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: none;
+}
+
+.llm-chat-msg .llm-chat-table td {
+    /* Allow natural wrapping while handling long tokens safely. */
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Very small screens: only slight compaction, avoid hard font shrinking. */
+@media (max-width: 560px) {
+    .llm-chat-msg .llm-chat-table {
+        min-width: 620px;
+        font-size: 0.94rem;
+    }
+
+    .llm-chat-msg .llm-chat-table th,
+    .llm-chat-msg .llm-chat-table td {
+        padding: 0.38rem 0.47rem;
+    }
+}
+
+/* Tight layout fallback: stack rows as cards when table readability collapses. */
+@media (max-width: 420px) {
+    .llm-chat-msg .llm-chat-table-wrap {
+        overflow-x: visible;
+    }
+
+    .llm-chat-msg .llm-chat-table,
+    .llm-chat-msg .llm-chat-table tbody,
+    .llm-chat-msg .llm-chat-table tr,
+    .llm-chat-msg .llm-chat-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .llm-chat-msg .llm-chat-table {
+        min-width: 0;
+        font-size: 0.95rem;
+    }
+
+    .llm-chat-msg .llm-chat-table thead {
+        display: none;
+    }
+
+    .llm-chat-msg .llm-chat-table tr {
+        margin-bottom: 0.58rem;
+        border: 1px solid var(--color-border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--color-surface) 92%, var(--color-surface-soft));
+    }
+
+    .llm-chat-msg .llm-chat-table td {
+        border: 0;
+        border-top: 1px solid var(--color-border);
+        padding: 0.4rem 0.55rem;
+    }
+
+    .llm-chat-msg .llm-chat-table td:first-child {
+        border-top: 0;
+    }
+
+    .llm-chat-msg .llm-chat-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 0.16rem;
+        font-size: 0.78em;
+        font-weight: 700;
+        color: var(--color-text-muted);
+        letter-spacing: 0.01em;
+    }
 }
 
 .llm-chat-msg hr {
