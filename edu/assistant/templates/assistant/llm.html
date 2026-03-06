@@ -12,6 +12,19 @@
 {{ llm_history|json_script:"llm-history" }}
 
 <form id="llm-form" class="llm-form" autocomplete="off">
+  <button
+    id="llm-scroll-bottom"
+    class="llm-scroll-bottom"
+    type="button"
+    aria-label="Scroll to latest message"
+    title="Scroll to bottom"
+    hidden
+  >
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
+      <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.5L12 19l4.5-4.5" />
+    </svg>
+  </button>
   {% csrf_token %}
   <div class="llm-composer">
     <div class="llm-input">
@@ -94,6 +107,7 @@
     bodyEl.classList.add("assistant-sidebar-open");
     persistAssistantState("sidebar");
     syncAssistantLauncher();
+    window.requestAnimationFrame(updateScrollBottomVisibility);
   };
 
   const focusAssistantPrompt = () => {
@@ -163,6 +177,8 @@
   }
 
   const historyEl = document.getElementById("llm-history");
+  const historyContainerEl = document.getElementById("history-container");
+  const scrollBottomBtn = document.getElementById("llm-scroll-bottom");
   let history = [];
 
   if (historyEl) {
@@ -195,11 +211,42 @@
       </span>
     `.trim();
 
+const isHistoryNearBottom = (container, threshold = 14) => {
+  if (!container) return true;
+  return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+};
+
+const updateScrollBottomVisibility = () => {
+  if (!historyContainerEl || !scrollBottomBtn) return;
+  const hasOverflow = historyContainerEl.scrollHeight > historyContainerEl.clientHeight + 2;
+  const shouldShow = hasOverflow && !isHistoryNearBottom(historyContainerEl);
+  scrollBottomBtn.hidden = !shouldShow;
+  scrollBottomBtn.classList.toggle("is-visible", shouldShow);
+};
+
+if (historyContainerEl) {
+  historyContainerEl.addEventListener("scroll", updateScrollBottomVisibility, { passive: true });
+}
+
+if (scrollBottomBtn && historyContainerEl) {
+  scrollBottomBtn.addEventListener("click", function () {
+    historyContainerEl.scrollTo({
+      top: historyContainerEl.scrollHeight,
+      behavior: "smooth",
+    });
+    // Recheck visibility once smooth scroll settles.
+    window.setTimeout(updateScrollBottomVisibility, 220);
+  });
+}
+
+window.addEventListener("resize", updateScrollBottomVisibility);
+
 
 function renderHistory() {
-  const container = document.getElementById("history-container");
+  const container = historyContainerEl;
   if (!container) return;
 
+  const wasNearBottom = isHistoryNearBottom(container);
   const previousScrollTop = container.scrollTop;
 
   container.innerHTML = "";
@@ -221,12 +268,16 @@ function renderHistory() {
     container.appendChild(entry);
   });
 
-  container.scrollTop = Math.min(
-    previousScrollTop,
-    Math.max(0, container.scrollHeight - container.clientHeight)
-
-  );
+  if (wasNearBottom) {
+    container.scrollTop = container.scrollHeight;
+  } else {
+    container.scrollTop = Math.min(
+      previousScrollTop,
+      Math.max(0, container.scrollHeight - container.clientHeight)
+    );
+  }
   highlightGeneratedCode(container);
+  updateScrollBottomVisibility();
 
 }
  // llm code highlight
