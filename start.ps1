@@ -1,6 +1,16 @@
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+# Force UTF-8 end-to-end (PowerShell logs + child process output).
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
+$PSDefaultParameterValues["Out-File:Encoding"] = "utf8"
+$PSDefaultParameterValues["Set-Content:Encoding"] = "utf8"
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+
 $root = "C:\Users\hi\Downloads\webdev\Django_Projects\e-learning"
 $app = Join-Path $root "edu"
 $python = Join-Path $root "env\educa\Scripts\python.exe"
@@ -17,9 +27,27 @@ function Log([string]$m) {
     Write-Output $line
 }
 
+function Initialize-Utf8Log([string]$path) {
+    try {
+        # Write UTF-8 BOM so editors auto-detect encoding correctly.
+        Set-Content -Path $path -Value "" -Encoding utf8 -NoNewline
+        return $path
+    }
+    catch {
+        # Fallback to timestamped file if the target log is locked.
+        $dir = Split-Path -Path $path -Parent
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($path)
+        $ext = [System.IO.Path]::GetExtension($path)
+        $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $fallback = Join-Path $dir "$name-$stamp$ext"
+        Set-Content -Path $fallback -Value "" -Encoding utf8 -NoNewline
+        return $fallback
+    }
+}
+
 try {
     # fresh UTF-8 log (prevents garbage text)
-    Set-Content -Path $log -Value "" -Encoding utf8
+    Set-Content -Path $log -Value "" -Encoding utf8 -NoNewline
 
     # simple lock to avoid double-click race
     if (Test-Path $lockFile) {
@@ -77,16 +105,17 @@ try {
 
     # Start Django if needed
     if (-not (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)) {
-        if (Test-Path $djangoOut) { Remove-Item $djangoOut -Force }
-        if (Test-Path $djangoErr) { Remove-Item $djangoErr -Force }
+        $djangoOut = Initialize-Utf8Log -path $djangoOut
+        $djangoErr = Initialize-Utf8Log -path $djangoErr
 
         Log "Starting Django server"
-        Start-Process -FilePath $python `
+        Log "Django stdout log: $djangoOut"
+        Log "Django stderr log: $djangoErr"
+        $cmdLine = 'set "PYTHONUTF8=1" && set "PYTHONIOENCODING=utf-8" && "' + $python + '" -X utf8 manage.py runserver 127.0.0.1:8000 --settings=edu.settings.local 1>>"' + $djangoOut + '" 2>>"' + $djangoErr + '"'
+        Start-Process -FilePath "cmd.exe" `
             -WorkingDirectory $app `
-            -ArgumentList @("manage.py","runserver","127.0.0.1:8000","--settings=edu.settings.local") `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput $djangoOut `
-            -RedirectStandardError $djangoErr
+            -ArgumentList @("/d","/s","/c",$cmdLine) `
+            -WindowStyle Hidden
     } else {
         Log "Django already running"
     }
@@ -101,7 +130,7 @@ try {
         Start-Sleep 1
     }
 
-    if (-not $serverReady) { throw "Django did not bind to 127.0.0.1:8000. Check django-err.log" }
+    if (-not $serverReady) { throw "Django did not bind to 127.0.0.1:8000. Check $djangoErr" }
 
     Start-Process $url
     Log "Browser opened: $url"
