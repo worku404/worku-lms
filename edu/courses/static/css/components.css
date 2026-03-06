@@ -426,9 +426,10 @@ body.assistant-sidebar-open .assistance-close {
 body.assistant-sidebar-open .assistance {
     position: fixed;
     top: var(--assistant-top-offset, var(--topbar-height));
-    right: var(--space-4);
+    /* Flush the AI panel to the viewport edge (no right-side gap). */
+    right: 0;
     width: var(--rail-right);
-    max-width: calc(100vw - (2 * var(--space-4)));
+    max-width: 100vw;
     height: calc(100vh - var(--assistant-top-offset, var(--topbar-height)));
     margin: 0;
     padding: var(--space-2) var(--space-3) var(--space-3);
@@ -439,6 +440,19 @@ body.assistant-sidebar-open .assistance {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+}
+
+body.theme-dark.assistant-sidebar-open .assistance {
+    /* Use one pure-black canvas so panel + AI response area are visually unified. */
+    background: #000000;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+body.theme-dark.assistant-sidebar-open .assistance-toolbar {
+    /* Keep toolbar readable after removing panel padding. */
+    padding: var(--space-2) var(--space-3) 0 var(--space-3);
 }
 
 .llm-history {
@@ -457,8 +471,21 @@ body.assistant-sidebar-open .llm-history {
     margin-bottom: 0;
 }
 
+body.theme-dark.assistant-sidebar-open .llm-history {
+    /* Remove right-side gutter so AI output reaches the sidebar edge. */
+    padding-right: 10px;
+    padding-left: 0;
+}
+
 body.assistant-sidebar-open .llm-form {
     margin-top: auto;
+    /* top-left | top-right | bottom-right | bottom-left */
+    border-radius: 25px 25px 0px 0px;
+}
+
+body.theme-dark.assistant-sidebar-open .llm-form {
+    /* Preserve composer background while keeping it inset from panel edges. */
+    padding: 0 var(--space-3) var(--space-3);
 }
 
 .llm-chat-entry {
@@ -479,6 +506,17 @@ body.assistant-sidebar-open .llm-form {
 
 .llm-chat-row--ai {
     justify-content: flex-start;
+}
+
+body.theme-dark.assistant-sidebar-open .llm-chat-row--ai .llm-chat-bubble {
+    /* Match AI bubble surface to panel background and remove separator border. */
+    width: 100%;
+    margin: 0;
+    padding: var(--space-3) 0 var(--space-2) var(--space-3);
+    background: #000000;
+    border-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
 }
 /* special chars */
 
@@ -510,8 +548,10 @@ body.assistant-sidebar-open .llm-form {
 }
 
 .llm-chat-bubble--user {
-    background: var(--color-secondary-surface);
-    border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border));
+    background: #2e3031;
+    /* top-left | top-right | bottom-right | bottom-left */
+    border-radius: 10px 5px 0px 10px;
+    /* border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border)); */
 }
 
 .llm-chat-msg {
