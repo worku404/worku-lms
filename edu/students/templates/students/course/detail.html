@@ -368,25 +368,132 @@ function initPdfViewer(viewerEl) {
         sendPdfProgress(state, force);
     };
 
+    const renderTextLayerFallback = (textLayerEl, textContent, viewport) => {
+        const util = window.pdfjsLib && window.pdfjsLib.Util;
+        if (!util || !textLayerEl || !textContent || !Array.isArray(textContent.items)) return;
+
+        const styles = textContent.styles || {};
+        const fragment = document.createDocumentFragment();
+
+        textContent.items.forEach((item) => {
+            if (!item || typeof item.str !== "string" || item.str.length === 0) return;
+
+            const style = styles[item.fontName] || {};
+            const tx = util.transform(
+                util.transform(viewport.transform, item.transform),
+                [1, 0, 0, -1, 0, 0]
+            );
+            const fontHeight = Math.hypot(tx[2], tx[3]);
+            if (!Number.isFinite(fontHeight) || fontHeight <= 0) return;
+
+            let fontAscent = fontHeight;
+            if (Number.isFinite(style.ascent)) {
+                fontAscent = style.ascent * fontHeight;
+            } else if (Number.isFinite(style.descent)) {
+                fontAscent = (1 + style.descent) * fontHeight;
+            }
+
+            const span = document.createElement("span");
+            span.textContent = item.str;
+            span.dir = item.dir || "ltr";
+            span.style.position = "absolute";
+            span.style.whiteSpace = "pre";
+            span.style.transformOrigin = "0 0";
+            span.style.color = "rgba(0, 0, 0, 0.01)";
+            span.style.webkitTextFillColor = "rgba(0, 0, 0, 0.01)";
+            span.style.cursor = "text";
+            span.style.userSelect = "text";
+            span.style.webkitUserSelect = "text";
+            span.style.left = `${tx[4]}px`;
+            span.style.top = `${tx[5] - fontAscent}px`;
+            span.style.fontSize = `${fontHeight}px`;
+            span.style.fontFamily = style.fontFamily || "sans-serif";
+            fragment.appendChild(span);
+        });
+
+        textLayerEl.appendChild(fragment);
+    };
+
+    const renderSelectableTextLayer = async (page, viewport, textLayerEl) => {
+        if (!textLayerEl || !page || !viewport) return;
+
+        textLayerEl.textContent = "";
+        textLayerEl.style.width = `${Math.floor(viewport.width)}px`;
+        textLayerEl.style.height = `${Math.floor(viewport.height)}px`;
+
+        const textContent = await page.getTextContent();
+        if (!textContent || !Array.isArray(textContent.items) || textContent.items.length === 0) return;
+
+        let rendered = false;
+        if (typeof window.pdfjsLib.renderTextLayer === "function") {
+            try {
+                const textLayerTask = window.pdfjsLib.renderTextLayer({
+                    textContentSource: textContent,
+                    container: textLayerEl,
+                    viewport,
+                    enhanceTextSelection: true,
+                });
+                if (textLayerTask && textLayerTask.promise) {
+                    await textLayerTask.promise;
+                } else if (textLayerTask && typeof textLayerTask.then === "function") {
+                    await textLayerTask;
+                }
+                textLayerEl.querySelectorAll("span, br").forEach((node) => {
+                    node.style.position = "absolute";
+                    node.style.whiteSpace = "pre";
+                    node.style.transformOrigin = "0 0";
+                    node.style.color = "rgba(0, 0, 0, 0.01)";
+                    node.style.webkitTextFillColor = "rgba(0, 0, 0, 0.01)";
+                    node.style.cursor = "text";
+                    node.style.userSelect = "text";
+                    node.style.webkitUserSelect = "text";
+                });
+                rendered = textLayerEl.childElementCount > 0;
+            } catch (error) {
+                rendered = false;
+            }
+        }
+
+        if (!rendered) {
+            renderTextLayerFallback(textLayerEl, textContent, viewport);
+        }
+    };
+
     const renderPageCanvas = async (pageNumber) => {
         if (!state.doc || state.renderedPages.has(pageNumber)) return;
         const pageNode = state.pageNodes.get(pageNumber);
         if (!pageNode || pageNode.dataset.rendering === "1") return;
 
         const canvasEl = pageNode.querySelector(".js-pdf-canvas");
+        const textLayerEl = pageNode.querySelector(".js-pdf-text-layer");
         if (!canvasEl) return;
 
         pageNode.dataset.rendering = "1";
         try {
             const page = await state.doc.getPage(pageNumber);
-            const viewport = page.getViewport({ scale: 1.35 });
+            const baseViewport = page.getViewport({ scale: 1 });
+            const availableWidth = Math.max(
+                1,
+                scrollEl.clientWidth || scrollEl.offsetWidth || baseViewport.width
+            );
+            const scale = availableWidth / Math.max(1, baseViewport.width);
+            const viewport = page.getViewport({ scale });
             canvasEl.width = Math.floor(viewport.width);
             canvasEl.height = Math.floor(viewport.height);
+            canvasEl.style.width = `${Math.floor(viewport.width)}px`;
+            canvasEl.style.height = `${Math.floor(viewport.height)}px`;
+            canvasEl.style.pointerEvents = "none";
             const ctx = canvasEl.getContext("2d");
+            if (!ctx) throw new Error("Unable to initialize canvas context");
             await page.render({
                 canvasContext: ctx,
                 viewport,
             }).promise;
+
+            if (textLayerEl) {
+                await renderSelectableTextLayer(page, viewport, textLayerEl);
+            }
+
             state.renderedPages.add(pageNumber);
             pageNode.classList.add("is-rendered");
         } catch (error) {
@@ -458,11 +565,27 @@ function initPdfViewer(viewerEl) {
             const pageNode = document.createElement("div");
             pageNode.className = "c-pdf-page js-pdf-page";
             pageNode.dataset.pageNumber = String(pageNumber);
+            pageNode.style.position = "relative";
+            pageNode.style.overflow = "hidden";
 
             const canvasEl = document.createElement("canvas");
             canvasEl.className = "c-pdf-page__canvas js-pdf-canvas";
             canvasEl.setAttribute("aria-label", `PDF page ${pageNumber}`);
             pageNode.appendChild(canvasEl);
+
+            const textLayerEl = document.createElement("div");
+            textLayerEl.className = "c-pdf-page__text-layer js-pdf-text-layer";
+            textLayerEl.style.position = "absolute";
+            textLayerEl.style.top = "0";
+            textLayerEl.style.left = "0";
+            textLayerEl.style.zIndex = "2";
+            textLayerEl.style.overflow = "hidden";
+            textLayerEl.style.lineHeight = "1";
+            textLayerEl.style.pointerEvents = "auto";
+            textLayerEl.style.cursor = "text";
+            textLayerEl.style.userSelect = "text";
+            textLayerEl.style.webkitUserSelect = "text";
+            pageNode.appendChild(textLayerEl);
 
             state.pageNodes.set(pageNumber, pageNode);
             fragment.appendChild(pageNode);
