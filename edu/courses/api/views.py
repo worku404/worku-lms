@@ -8,6 +8,7 @@ from rest_framework.authtoken.models import Token
 from courses.api.serializers import SubjectSerializer, CourseSerializer, CourseWithContentsSerializer
 from courses.api.pagination import StandardPagination
 from courses.api.permissions import IsEnrolled
+from courses.search import search_courses
 
 from courses.models import Subject, Course
 
@@ -18,10 +19,27 @@ from django.urls import reverse
 
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Course.objects.prefetch_related('modules')
+    queryset = Course.objects.all()
     serializer_class = CourseSerializer
     pagination_class = StandardPagination
     authentication_classes = [TokenAuthentication, BasicAuthentication]
+
+    def get_queryset(self):
+        return Course.objects.select_related("subject", "owner").prefetch_related("modules")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        query = (request.GET.get("q") or "").strip()
+        if query:
+            queryset = search_courses(queryset, query)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(
         detail=True,

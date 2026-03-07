@@ -1,12 +1,15 @@
 from django.contrib.auth.models import User
-from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
+from django.db import models
+from django.db.models import F, Func
 from django.template.loader import render_to_string
 
 from .fields import OrderField
 
-    
+
 class Subject(models.Model):
     # Human-readable subject name (e.g., "Mathematics")
     title = models.CharField(max_length=200)
@@ -39,8 +42,8 @@ class Course(models.Model):
     )
     students = models.ManyToManyField(
         User,
-        related_name='courses_joined',
-        blank=True
+        related_name="courses_joined",
+        blank=True,
     )
     # Core course information
     title = models.CharField(max_length=200)
@@ -59,6 +62,40 @@ class Course(models.Model):
         return self.title
 
 
+class CourseSearchIndex(models.Model):
+    # One denormalized search document per course.
+    course = models.OneToOneField(
+        Course,
+        related_name="search_index",
+        on_delete=models.CASCADE,
+    )
+    document = models.TextField(blank=True, default="")
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(
+                SearchVector(
+                    Func(
+                        F("document"),
+                        function="immutable_unaccent",
+                        output_field=models.TextField(),
+                    ),
+                    config="simple",
+                ),
+                name="course_idx_doc_tsv_gin",
+            ),
+            GinIndex(
+                fields=["document"],
+                opclasses=["gin_trgm_ops"],
+                name="course_idx_doc_trgm_gin",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"SearchIndex(course={self.course_id})"
+
+
 class Module(models.Model):
     # Module belongs to a course; deleting course deletes its modules
     course = models.ForeignKey(
@@ -71,12 +108,13 @@ class Module(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)  # optional field
     order = OrderField(blank=True, for_fields=["course"])
-    
+
     class Meta:
-        ordering = ['order']
+        ordering = ["order"]
+
     def __str__(self) -> str:
-        # Display module title and order  in admin/shell
-        return f'{self.order}. {self.title}'
+        # Display module title and order in admin/shell
+        return f"{self.order}. {self.title}"
 
 
 class Content(models.Model):
@@ -93,8 +131,8 @@ class Content(models.Model):
         ContentType,
         on_delete=models.CASCADE,
         limit_choices_to={
-            'model__in': ('text', 'video', 'image', 'file')
-        }
+            "model__in": ("text", "video", "image", "file"),
+        },
     )
 
     # Stores the primary key of the target object in the selected model table.
@@ -103,13 +141,11 @@ class Content(models.Model):
     # Virtual relation that combines content_type + object_id.
     # Example: if content_type=Video and object_id=7, item returns Video(id=7).
     item = GenericForeignKey("content_type", "object_id")
-    
+
     order = OrderField(blank=True, for_fields=["module"])
 
     class Meta:
-        ordering = ['order']
-from django.contrib.auth.models import User
-from django.db import models
+        ordering = ["order"]
 
 
 class ItemBase(models.Model):
@@ -130,11 +166,11 @@ class ItemBase(models.Model):
 
     # Auto-updated every time object is saved
     updated = models.DateTimeField(auto_now=True)
-    
+
     def render(self):
         return render_to_string(
-            f'courses/content/{self._meta.model_name}.html',
-            {'item': self}
+            f"courses/content/{self._meta.model_name}.html",
+            {"item": self},
         )
 
     class Meta:
@@ -150,6 +186,11 @@ class Text(ItemBase):
 class File(ItemBase):
     # General file upload, stored under MEDIA_ROOT/files/
     file = models.FileField(upload_to="files")
+    pdf_text_index = models.TextField(blank=True, default="")
+    pdf_page_count = models.PositiveIntegerField(default=0)
+    pdf_index_status = models.CharField(max_length=24, default="pending")
+    pdf_index_error = models.TextField(blank=True, default="")
+    pdf_indexed_at = models.DateTimeField(null=True, blank=True)
 
 
 class Image(ItemBase):

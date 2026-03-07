@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     "redisboard",    # Redis monitoring dashboard
     'rest_framework', # To build an API
     'rest_framework.authtoken', # DRF token authentication model
+    "django.contrib.postgres",
+    
 ]
 
 

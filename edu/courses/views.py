@@ -24,7 +24,7 @@ from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 
 # ORM and dynamic-form helpers.
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.apps import apps
 from django.forms.models import modelform_factory
 
@@ -37,6 +37,7 @@ from braces.views import CsrfExemptMixin, JsonRequestResponseMixin
 # Local models/forms.
 from .models import Course, Subject, Module, Content
 from .forms import ModuleFormSet
+from .search import search_courses
 from students.forms import CourseEnrollForm
 
 
@@ -73,15 +74,25 @@ class CourseListview(TemplateResponseMixin, View):
                 cache.set("all_subjects", subjects, COURSE_LIST_CACHE_TTL)
 
         # 2) Base queryset for courses (with number of modules per course).
-        all_courses = Course.objects.annotate(total_modules=Count("modules"))
+        all_courses = Course.objects.select_related("subject", "owner").annotate(
+            total_modules=Count("modules")
+        )
 
         # 3) Optional filtering by subject slug from URL.
         if subject:
             current_subject = get_object_or_404(Subject, slug=subject)
+
+        # 4) Search path bypasses cached querysets so ranking runs in PostgreSQL.
+        if query:
+            courses = all_courses
+            if current_subject:
+                courses = courses.filter(subject=current_subject)
+            courses = search_courses(courses, query)
+        elif current_subject:
             if settings.DEBUG:
                 courses = all_courses.filter(subject=current_subject)
             else:
-                cache_key = f"subject_{current_subject.id}_courses"  # fixed: use .id
+                cache_key = f"subject_{current_subject.id}_courses"
                 courses = cache.get(cache_key)
                 if courses is None:
                     courses = all_courses.filter(subject=current_subject)
@@ -94,22 +105,6 @@ class CourseListview(TemplateResponseMixin, View):
                 if courses is None:
                     courses = all_courses
                     cache.set("all_courses", courses, COURSE_LIST_CACHE_TTL)
-
-        # 4) Optional search over title and overview.
-        if query:
-            if hasattr(courses, "filter"):
-                courses = courses.filter(
-                    Q(title__icontains=query) | 
-                    Q(overview__icontains=query) |
-                    Q(subject__title__icontains=query)
-                    
-                ).distinct()
-            else:
-                q = query.lower()
-                courses = [
-                    c for c in courses
-                    if q in (c.title or "").lower() or q in (c.overview or "").lower()
-                ]
 
         # 5) Render page context used by courses/course/list.html.
         return self.render_to_response(
