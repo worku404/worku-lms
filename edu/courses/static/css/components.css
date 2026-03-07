@@ -1521,14 +1521,59 @@ body:not(.theme-dark) .course-time__value {
 .c-pdf-viewer {
   width: 100%;
   margin: 0 0 0.75rem 0;
+  display: grid;
+  gap: 0.6rem;
 }
 
-.c-pdf-viewer__frame {
-  display: block;
+.c-pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.c-pdf-viewer__scroll {
   width: 100%;
-  min-height: 85vh;
+  max-width: 100%;
+  min-height: 70vh;
+  max-height: 82vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
   border: 1px solid var(--border-subtle, #2a4b6a);
   border-radius: 8px;
+  background: #0b1320;
+}
+
+.c-pdf-page {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1.4142;
+  margin: 0;
+  background: #ffffff;
+}
+
+.c-pdf-page + .c-pdf-page {
+  margin-top: 0.75rem;
+}
+
+.c-pdf-page.is-rendered {
+  aspect-ratio: auto;
+}
+
+.c-pdf-page__canvas {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  background: #ffffff;
+}
+
+.c-pdf-page.is-rendered .c-pdf-page__canvas {
+  height: auto;
 }
 .c-focus-modules {
     display: grid;

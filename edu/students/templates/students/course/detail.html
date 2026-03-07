@@ -91,10 +91,20 @@
                 {% if module %}
                     {% for content in module.contents.all %}
                         {% with item=content.item %}
-                            <article class="c-card c-content-block">
+                            <article class="c-card c-content-block" data-content-model="{{ content.content_type.model }}">
                                 <h2 class="c-card__title">{{ item.title }}</h2>
-                                <div class="c-reader__content">
-                                    {{ item.render }}
+                                <div class="c-content-render">
+                                    {% if content.content_type.model == "text" %}
+                                        {% include "courses/content/text.html" with item=item content=content %}
+                                    {% elif content.content_type.model == "video" %}
+                                        {% include "courses/content/video.html" with item=item content=content %}
+                                    {% elif content.content_type.model == "image" %}
+                                        {% include "courses/content/image.html" with item=item content=content %}
+                                    {% elif content.content_type.model == "file" %}
+                                        {% include "courses/content/file.html" with item=item content=content %}
+                                    {% else %}
+                                        {{ item.render }}
+                                    {% endif %}
                                 </div>
                             </article>
                         {% endwith %}
@@ -116,6 +126,7 @@
 {% endblock %}
 
 {% block include_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 window.addEventListener("pageshow", function (event) {
     if (event.persisted) window.location.reload();
@@ -135,6 +146,12 @@ const moduleCollapseBtn = document.getElementById("modules-collapse-btn");
 const moduleUnhideBtn = document.getElementById("modules-unhide");
 const moduleContentEl = document.querySelector(".course-workspace .module");
 const weeklyFocusCardEl = document.querySelector(".l-rail--left .c-progress-card");
+const textTrackElements = Array.from(document.querySelectorAll(".js-track-text"));
+const pdfViewerElements = Array.from(document.querySelectorAll(".js-pdf-viewer"));
+const hasTrackableContent = textTrackElements.length > 0 || pdfViewerElements.length > 0;
+const contentProgressState = new Map();
+const pdfViewerState = new Map();
+const contentCompletionThreshold = 95;
 
 function updateModulesLauncherPosition() {
     if (!moduleUnhideBtn || !moduleContentEl) return;
@@ -216,6 +233,268 @@ function getCookie(name) {
     return "";
 }
 
+function clampPercent(value) {
+    return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
+function getStateForContent(contentId) {
+    const key = String(contentId || "");
+    if (!contentProgressState.has(key)) {
+        contentProgressState.set(key, {
+            highestPercent: 0,
+            lastSentPercent: 0,
+            lastSentAt: Date.now(),
+        });
+    }
+    return contentProgressState.get(key);
+}
+
+function postContentProgress(progressUrl, payload, options = {}) {
+    if (!progressUrl) return Promise.resolve(null);
+    const keepalive = Boolean(options.keepalive);
+    return fetch(progressUrl, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin",
+        keepalive,
+        body: JSON.stringify(payload),
+    }).catch(() => null);
+}
+
+function computeTextProgress(el) {
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+    if (rect.height <= 1) return 0;
+
+    const visiblePx = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+    const visibilityRatio = visiblePx / rect.height;
+
+    const topInDoc = rect.top + window.scrollY;
+    const viewportBottom = window.scrollY + viewportHeight;
+    const depthRatio = (viewportBottom - topInDoc) / rect.height;
+
+    return clampPercent(Math.max(visibilityRatio, depthRatio) * 100);
+}
+
+function trackVisibleText(force = false) {
+    const now = Date.now();
+    textTrackElements.forEach((el) => {
+        const contentId = el.dataset.contentId;
+        const progressUrl = el.dataset.progressUrl;
+        if (!contentId || !progressUrl) return;
+
+        const state = getStateForContent(contentId);
+        const currentPercent = computeTextProgress(el);
+        state.highestPercent = Math.max(state.highestPercent, currentPercent);
+
+        const shouldSend = force
+            || state.highestPercent >= contentCompletionThreshold
+            || (state.highestPercent - state.lastSentPercent) >= 4;
+        if (!shouldSend) return;
+
+        const secondsDelta = Math.max(0, Math.floor((now - state.lastSentAt) / 1000));
+        state.lastSentAt = now;
+        state.lastSentPercent = state.highestPercent;
+
+        postContentProgress(progressUrl, {
+            kind: "text",
+            percent: Number(state.highestPercent.toFixed(2)),
+            seconds_delta: secondsDelta,
+        });
+    });
+}
+
+function initPdfViewer(viewerEl) {
+    if (!window.pdfjsLib || !viewerEl) return;
+
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    const sourceUrl = viewerEl.dataset.pdfUrl;
+    const contentId = viewerEl.dataset.contentId;
+    const progressUrl = viewerEl.dataset.progressUrl;
+    const scrollEl = viewerEl.querySelector(".js-pdf-scroll");
+    const currentEl = viewerEl.querySelector(".js-pdf-current");
+    const totalEl = viewerEl.querySelector(".js-pdf-total");
+
+    if (!sourceUrl || !scrollEl) return;
+
+    const state = {
+        doc: null,
+        currentPage: 1,
+        totalPages: 1,
+        maxPageSeen: 1,
+        lastSentAt: Date.now(),
+        progressUrl,
+        contentId,
+        renderedPages: new Set(),
+        pageNodes: new Map(),
+    };
+    pdfViewerState.set(viewerEl, state);
+
+    const sendPdfProgress = (pdfState, force) => {
+        if (!pdfState.progressUrl || !pdfState.contentId) return;
+        const now = Date.now();
+        const secondsDelta = Math.max(0, Math.floor((now - pdfState.lastSentAt) / 1000));
+        const shouldSend = force
+            || pdfState.maxPageSeen >= pdfState.totalPages
+            || secondsDelta >= 5;
+        if (!shouldSend) return;
+        pdfState.lastSentAt = now;
+        postContentProgress(
+            pdfState.progressUrl,
+            {
+                kind: "pdf",
+                current_page: pdfState.currentPage,
+                total_pages: pdfState.totalPages,
+                max_page_seen: pdfState.maxPageSeen,
+                seconds_delta: secondsDelta,
+            },
+            { keepalive: force }
+        );
+    };
+
+    const markVisiblePage = (pageNumber, force) => {
+        const normalized = Math.max(1, Math.min(Number(pageNumber) || 1, state.totalPages));
+        state.currentPage = normalized;
+        state.maxPageSeen = Math.max(state.maxPageSeen, normalized);
+        if (currentEl) currentEl.textContent = String(state.currentPage);
+        if (totalEl) totalEl.textContent = String(state.totalPages);
+        sendPdfProgress(state, force);
+    };
+
+    const renderPageCanvas = async (pageNumber) => {
+        if (!state.doc || state.renderedPages.has(pageNumber)) return;
+        const pageNode = state.pageNodes.get(pageNumber);
+        if (!pageNode || pageNode.dataset.rendering === "1") return;
+
+        const canvasEl = pageNode.querySelector(".js-pdf-canvas");
+        if (!canvasEl) return;
+
+        pageNode.dataset.rendering = "1";
+        try {
+            const page = await state.doc.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: 1.35 });
+            canvasEl.width = Math.floor(viewport.width);
+            canvasEl.height = Math.floor(viewport.height);
+            const ctx = canvasEl.getContext("2d");
+            await page.render({
+                canvasContext: ctx,
+                viewport,
+            }).promise;
+            state.renderedPages.add(pageNumber);
+            pageNode.classList.add("is-rendered");
+        } catch (error) {
+            pageNode.classList.add("is-error");
+        } finally {
+            delete pageNode.dataset.rendering;
+        }
+    };
+
+    const visiblePages = new Map();
+    let visibilityFrame = null;
+    const queueVisiblePageUpdate = () => {
+        if (visibilityFrame !== null) return;
+        visibilityFrame = window.requestAnimationFrame(() => {
+            visibilityFrame = null;
+            let bestPage = state.currentPage;
+            let bestRatio = 0;
+            visiblePages.forEach((ratio, pageNumber) => {
+                if (ratio > bestRatio || (ratio === bestRatio && pageNumber < bestPage)) {
+                    bestRatio = ratio;
+                    bestPage = pageNumber;
+                }
+            });
+            if (bestRatio > 0) {
+                markVisiblePage(bestPage, false);
+            }
+        });
+    };
+
+    const trackingObserver = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                const pageNumber = Number(entry.target.dataset.pageNumber || 0);
+                if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
+                if (entry.isIntersecting && entry.intersectionRatio > 0) {
+                    visiblePages.set(pageNumber, entry.intersectionRatio);
+                } else {
+                    visiblePages.delete(pageNumber);
+                }
+            });
+            queueVisiblePageUpdate();
+        },
+        {
+            root: scrollEl,
+            threshold: [0, 0.2, 0.45, 0.65, 0.85, 1],
+        }
+    );
+
+    const renderObserver = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const pageNumber = Number(entry.target.dataset.pageNumber || 0);
+                if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
+                renderPageCanvas(pageNumber);
+            });
+        },
+        {
+            root: scrollEl,
+            threshold: 0.01,
+            rootMargin: "500px 0px",
+        }
+    );
+
+    const buildPageNodes = () => {
+        scrollEl.innerHTML = "";
+        const fragment = document.createDocumentFragment();
+        for (let pageNumber = 1; pageNumber <= state.totalPages; pageNumber += 1) {
+            const pageNode = document.createElement("div");
+            pageNode.className = "c-pdf-page js-pdf-page";
+            pageNode.dataset.pageNumber = String(pageNumber);
+
+            const canvasEl = document.createElement("canvas");
+            canvasEl.className = "c-pdf-page__canvas js-pdf-canvas";
+            canvasEl.setAttribute("aria-label", `PDF page ${pageNumber}`);
+            pageNode.appendChild(canvasEl);
+
+            state.pageNodes.set(pageNumber, pageNode);
+            fragment.appendChild(pageNode);
+        }
+        scrollEl.appendChild(fragment);
+
+        state.pageNodes.forEach((pageNode) => {
+            trackingObserver.observe(pageNode);
+            renderObserver.observe(pageNode);
+        });
+    };
+
+    window.pdfjsLib.getDocument(sourceUrl).promise
+        .then((doc) => {
+            state.doc = doc;
+            state.totalPages = doc.numPages || 1;
+            if (totalEl) totalEl.textContent = String(state.totalPages);
+            buildPageNodes();
+            markVisiblePage(1, false);
+            renderPageCanvas(1);
+        })
+        .catch(() => {
+            if (totalEl) totalEl.textContent = "error";
+        });
+
+    state.flush = () => markVisiblePage(state.currentPage, true);
+}
+
+function initPdfViewers() {
+    pdfViewerElements.forEach((viewerEl) => initPdfViewer(viewerEl));
+}
+
 function isAtBottom() {
     if (moduleContainer && moduleContainer.scrollHeight > moduleContainer.clientHeight + 2) {
         return moduleContainer.scrollTop + moduleContainer.clientHeight >= moduleContainer.scrollHeight - 8;
@@ -224,6 +503,7 @@ function isAtBottom() {
 }
 
 function markCompleteIfNeeded() {
+    if (hasTrackableContent) return;
     if (!completeUrl || completionSent || !userHasScrolled || !isAtBottom()) return;
 
     completionSent = true;
@@ -242,6 +522,7 @@ function markCompleteIfNeeded() {
 function onScroll() {
     userHasScrolled = true;
     markCompleteIfNeeded();
+    trackVisibleText(false);
 }
 
 window.addEventListener("scroll", onScroll, { passive: true });
@@ -252,6 +533,10 @@ if (moduleContainer) {
 document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
         sendTime();
+        trackVisibleText(true);
+        pdfViewerState.forEach((state) => {
+            if (state.flush) state.flush();
+        });
     } else {
         startTime = Date.now();
     }
@@ -268,5 +553,18 @@ function sendTime() {
 }
 
 window.addEventListener("beforeunload", sendTime);
+window.addEventListener("beforeunload", function () {
+    trackVisibleText(true);
+    pdfViewerState.forEach((state) => {
+        if (state.flush) state.flush();
+    });
+});
+
+window.addEventListener("resize", function () {
+    trackVisibleText(false);
+}, { passive: true });
+
+trackVisibleText(false);
+initPdfViewers();
 </script>
 {% endblock %}
