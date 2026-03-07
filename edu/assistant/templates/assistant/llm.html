@@ -36,11 +36,18 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
         </svg>
       </button> {% endcomment %}
-      <button class="llm-btn llm-btn--send" type="submit" aria-label="Send message">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 17V7" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 11.5L12 7l4.5 4.5" />
-        </svg>
+      <button class="llm-btn llm-btn--send" type="submit" aria-label="Send message" title="Send message">
+        <span class="llm-send-icon llm-send-icon--send" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 17V7" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 11.5L12 7l4.5 4.5" />
+          </svg>
+        </span>
+        <span class="llm-send-icon llm-send-icon--stop" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="7.2" y="7.2" width="9.6" height="9.6" rx="2.1" fill="currentColor"></rect>
+          </svg>
+        </span>
       </button>
     </div>
   </div>
@@ -489,6 +496,22 @@ function renderHistory() {
     const csrfToken = csrfInput ? csrfInput.value : "";
     const maxInputHeight = 152;
     let isSubmitting = false;
+    let activeRequestController = null;
+
+    const setSendButtonMode = (mode) => {
+      if (!sendBtn) return;
+      const isStopMode = mode === "stop";
+      // While generating, the same button becomes an explicit stop control.
+      sendBtn.classList.toggle("is-stop", isStopMode);
+      sendBtn.setAttribute("aria-label", isStopMode ? "Stop response" : "Send message");
+      sendBtn.setAttribute("title", isStopMode ? "Stop response" : "Send message");
+    };
+
+    const abortCurrentResponse = () => {
+      if (!isSubmitting || !activeRequestController) return false;
+      activeRequestController.abort();
+      return true;
+    };
 
     const autoGrow = () => {
       promptInput.style.height = "auto";
@@ -499,6 +522,17 @@ function renderHistory() {
     };
 
     autoGrow();
+    setSendButtonMode("send");
+
+    if (sendBtn) {
+      sendBtn.addEventListener("click", (event) => {
+        if (!isSubmitting) return;
+        // Stop is click-only by requirement; Enter key does not trigger cancellation.
+        event.preventDefault();
+        event.stopPropagation();
+        abortCurrentResponse();
+      });
+    }
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -511,7 +545,8 @@ function renderHistory() {
       promptInput.value = "";
       autoGrow();
       openAssistantSidebar();
-      if (sendBtn) sendBtn.disabled = true;
+      setSendButtonMode("stop");
+      activeRequestController = new AbortController();
       let aiResponse = waitingMarkup();
       history.push({ prompt: prompt, response: aiResponse });
       renderHistory();
@@ -525,6 +560,7 @@ function renderHistory() {
             "X-CSRFToken": csrfToken,
           },
           credentials: "same-origin",
+          signal: activeRequestController.signal,
           body: new URLSearchParams({ prompt: prompt }),
         });
 
@@ -546,12 +582,17 @@ function renderHistory() {
           aiResponse = data.generated || escapeHtml(data.error || "Something went wrong.");
         }
       } catch (error) {
-        aiResponse = "Network error. Please try again.";
+        if (error && error.name === "AbortError") {
+          aiResponse = "Response stopped.";
+        } else {
+          aiResponse = "Network error. Please try again.";
+        }
       } finally {
         history[history.length - 1].response = aiResponse;
         renderHistory();
+        activeRequestController = null;
         isSubmitting = false;
-        if (sendBtn) sendBtn.disabled = false;
+        setSendButtonMode("send");
         promptInput.focus();
       }
     });
