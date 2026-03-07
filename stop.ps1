@@ -33,6 +33,6 @@ if ($LASTEXITCODE -eq 0) {
 
 # Optional full Docker shutdown
 if ($stopDockerDesktop) {
-    Get-Process -Name "Docker Desktop", "com.docker.backend", "com.docker.proxy", "vpnkit" -ErrorAction SilentlyContinue |
+    Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue |
         Stop-Process -Force
 }
