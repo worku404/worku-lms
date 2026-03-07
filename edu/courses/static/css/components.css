@@ -1157,7 +1157,8 @@ body.theme-dark #assistant-close-btn  {
     width: 6px;
 }
 #chat::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.15);
+    /* background: rgba(255,255,255,0.15); */
+    background-color: #000000;
     border-radius: 10px;
 }
 
@@ -1403,7 +1404,7 @@ body:not(.theme-dark) #chat-message-input:focus {
 }
 
 body:not(.theme-dark) #chat::-webkit-scrollbar-thumb {
-    background: rgba(255, 158, 197, 0.45);
+    background: #FFFFFF;
 }
 /* Light mode (default) */
 .course-chat-link {
@@ -1548,10 +1549,12 @@ body:not(.theme-dark) .course-time__value {
 
 .c-pdf-page {
   display: block;
+  position: relative;
   width: 100%;
   max-width: 100%;
   aspect-ratio: 1 / 1.4142;
   margin: 0;
+  overflow: hidden;
   background: #ffffff;
 }
 
@@ -1565,6 +1568,8 @@ body:not(.theme-dark) .course-time__value {
 
 .c-pdf-page__canvas {
   display: block;
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: none;
   height: 100%;
@@ -1574,6 +1579,44 @@ body:not(.theme-dark) .course-time__value {
 
 .c-pdf-page.is-rendered .c-pdf-page__canvas {
   height: auto;
+}
+
+.c-pdf-page__text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.c-pdf-page__text-layer span,
+.c-pdf-page__text-layer br {
+  position: absolute;
+  color: rgba(0, 0, 0, 0.01);
+  -webkit-text-fill-color: rgba(0, 0, 0, 0.01);
+  white-space: pre;
+  transform-origin: 0 0;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.c-pdf-page__text-layer::selection,
+.c-pdf-page__text-layer *::selection {
+  background: rgba(66, 133, 244, 0.35) !important;
+  color: rgba(0, 0, 0, 0.01);
+}
+
+.c-pdf-page__text-layer *::-moz-selection {
+  background: rgba(66, 133, 244, 0.35) !important;
+  color: rgba(0, 0, 0, 0.01);
 }
 .c-focus-modules {
     display: grid;
