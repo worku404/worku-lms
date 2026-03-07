@@ -1024,12 +1024,22 @@ body:not(.theme-dark) .llm-composer{
     align-items: center;
     justify-content: center;
     padding: 0;
-    transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.1s ease;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
 }
 
 .llm-btn svg {
     width: 16px;
     height: 16px;
+}
+
+.llm-send-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.llm-send-icon--stop {
+    display: none;
 }
 
 .llm-btn--send {
@@ -1045,6 +1055,27 @@ body:not(.theme-dark) .llm-composer{
 
 .llm-btn--send:active:not(:disabled) {
     transform: translateY(1px);
+}
+
+.llm-btn--send.is-stop {
+    /* Stop state palette requested: mint circle with deep-blue center glyph. */
+    background: #6FD992;
+    border-color: #6FD992;
+    color: #07122C;
+}
+
+.llm-btn--send.is-stop:hover:not(:disabled) {
+    /* Keep same visual family on hover while preserving contrast. */
+    background: color-mix(in srgb, #6FD992 90%, white);
+    border-color: color-mix(in srgb, #6FD992 90%, white);
+}
+
+.llm-btn--send.is-stop .llm-send-icon--send {
+    display: none;
+}
+
+.llm-btn--send.is-stop .llm-send-icon--stop {
+    display: inline-flex;
 }
 
 .llm-btn:disabled {
