@@ -16,10 +16,10 @@ $app = Join-Path $root "edu"
 $python = Join-Path $root "env\educa\Scripts\python.exe"
 $manage = Join-Path $app "manage.py"
 $url = "http://127.0.0.1:8000"
-$log = Join-Path $root "start.log"
-$djangoOut = Join-Path $root "django-out.log"
-$djangoErr = Join-Path $root "django-err.log"
-$lockFile = Join-Path $root ".start.lock"
+$log = Join-Path $root "error/start.log"
+$djangoOut = Join-Path $root "error/django-out.log"
+$djangoErr = Join-Path $root "error/django-err.log"
+$lockFile = Join-Path $root "error/.start.lock"
 
 function Log([string]$m) {
     $line = "{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $m
@@ -144,6 +144,14 @@ try {
         }
         Start-Sleep 1
     }
+    docker stop e-learning-daphne-1
+    Start-Sleep 1
+    docker stop e-learning-nginx-1
+    docker stop e-learning-web-1 
+    Start-Sleep 1
+    docker stop e-learning-cache-1
+    docker stop e-learning-db-1
+    Start-Sleep 1
 
     if (-not $serverReady) { throw "Django did not bind to 127.0.0.1:8000. Check $djangoErr" }
 
