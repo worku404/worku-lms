@@ -7,6 +7,7 @@ Student-facing views:
 
 
 # URL builder used for redirects after successful actions.
+import json
 import os
 import mimetypes
 import subprocess
@@ -37,7 +38,7 @@ from .forms import CourseEnrollForm
 from courses.models import Content, Course, File, Image, Module
 from .services import (add_time_spent, mark_module_completed, 
                        get_overall_progress, get_course_time_spent,
-                        touch_user_presence
+                        touch_user_presence, update_content_progress
                     )
 
 
@@ -170,6 +171,87 @@ class TrackTimeView(LoginRequiredMixin, View):
             
         except ValueError:
             return JsonResponse({'status': 'error', 'reason': 'Invalid seconds value'}, status=400)
+
+
+class TrackContentProgressView(LoginRequiredMixin, View):
+    def post(self, request, content_id):
+        content = get_object_or_404(
+            Content,
+            id=content_id,
+            module__course__students=request.user,
+        )
+
+        payload = {}
+        if request.content_type and request.content_type.startswith("application/json"):
+            try:
+                payload = json.loads(request.body.decode("utf-8") or "{}")
+            except (ValueError, UnicodeDecodeError):
+                return JsonResponse(
+                    {"status": "error", "reason": "Invalid JSON payload"},
+                    status=400,
+                )
+        else:
+            payload = request.POST.dict()
+
+        kind = (payload.get("kind") or "").strip().lower()
+        if not kind:
+            model_name = content.content_type.model
+            if model_name == "text":
+                kind = "text"
+            elif model_name == "file":
+                file_obj = content.item
+                filename = str(getattr(file_obj, "file", "") or "")
+                if filename.lower().endswith(".pdf"):
+                    kind = "pdf"
+
+        try:
+            seconds_delta = int(payload.get("seconds_delta", 0))
+        except (TypeError, ValueError):
+            seconds_delta = 0
+
+        try:
+            result = update_content_progress(
+                user=request.user,
+                content=content,
+                kind=kind,
+                payload=payload,
+                seconds_delta=seconds_delta,
+            )
+        except ValueError as exc:
+            return JsonResponse({"status": "error", "reason": str(exc)}, status=400)
+
+        content_progress = result["content_progress"]
+        module_progress = result["module_progress"]
+        course = content.module.course
+
+        return JsonResponse(
+            {
+                "status": "tracked",
+                "content_progress": {
+                    "id": content_progress.id,
+                    "content_id": content.id,
+                    "kind": content_progress.content_type,
+                    "progress_percent": round(content_progress.progress_percent, 2),
+                    "completed": content_progress.completed,
+                    "seconds_spent": content_progress.seconds_spent,
+                    "last_position": content_progress.last_position,
+                },
+                "module_progress": {
+                    "module_id": module_progress.module_id,
+                    "progress_percent": round(module_progress.progress_percent, 2),
+                    "completed": module_progress.completed,
+                },
+                "course_progress": {
+                    "course_id": course.id,
+                    "progress_percent": result["course_progress_percent"],
+                },
+                "overall_progress": result["overall_progress_percent"],
+                "completed_flags": {
+                    "content": content_progress.completed,
+                    "module": module_progress.completed,
+                },
+            }
+        )
 
 
 class StudentDashboardView(LoginRequiredMixin, TemplateView):

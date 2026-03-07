@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from courses.models import Course, Module
+from courses.models import Content, Course, Module
 
 
 class ModuleProgress(models.Model):
@@ -21,6 +21,7 @@ class ModuleProgress(models.Model):
     )
 
     completed = models.BooleanField(default=False)
+    progress_percent = models.FloatField(default=0.0)
     time_spent = models.PositiveIntegerField(default=0)  # seconds
     last_accessed = models.DateTimeField(auto_now=True)
 
@@ -29,3 +30,46 @@ class ModuleProgress(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.module}"
+
+
+class ContentProgress(models.Model):
+    CONTENT_KIND_TEXT = "text"
+    CONTENT_KIND_PDF = "pdf"
+    CONTENT_KIND_CHOICES = (
+        (CONTENT_KIND_TEXT, "Text"),
+        (CONTENT_KIND_PDF, "PDF"),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="content_progress",
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="content_progress",
+    )
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.CASCADE,
+        related_name="content_progress",
+    )
+    content = models.ForeignKey(
+        Content,
+        on_delete=models.CASCADE,
+        related_name="progress_records",
+    )
+
+    content_type = models.CharField(max_length=12, choices=CONTENT_KIND_CHOICES)
+    progress_percent = models.FloatField(default=0.0)
+    completed = models.BooleanField(default=False)
+    seconds_spent = models.PositiveIntegerField(default=0)
+    last_position = models.JSONField(default=dict, blank=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "content")
+
+    def __str__(self):
+        return f"{self.user} - content:{self.content_id} ({self.progress_percent:.1f}%)"

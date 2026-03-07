@@ -1,6 +1,6 @@
 # URL pattern helper.
 from django.urls import path
-from .views import TrackTimeView, MarkModuleCompleteView
+from .views import TrackContentProgressView, TrackTimeView, MarkModuleCompleteView
 # Student app views used by these routes.
 from . import views
 
@@ -41,6 +41,11 @@ urlpatterns = [
     path('module/<int:module_id>/track-time/',
          TrackTimeView.as_view(),
          name='track_time'),
+    path(
+        "content/<int:content_id>/progress/",
+        TrackContentProgressView.as_view(),
+        name="track_content_progress",
+    ),
     path(
         "file/<int:file_id>/download/",
         views.DownloadModuleFileView.as_view(),
