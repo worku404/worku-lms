@@ -135,15 +135,11 @@ body.modules-sidebar-collapsed .modules-unhide {
 }
 
 .course-workspace.modules-collapsed .module {
-    width: min(100%, 990px);
-    margin-inline: auto;
-    padding-inline: clamp(var(--space-2), 1.4vw, var(--space-4));
-    margin-right: 100px;
-}
-
-.app-body.assistant-sidebar-open .course-workspace.modules-collapsed .module {
-    /* Remove most of the reserved right margin while AI is visible. */
-    margin-right: var(--space-2);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
 }
 
 .c-content-block {
