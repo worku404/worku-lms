@@ -3,6 +3,45 @@ from django.conf import settings
 from courses.models import Content, Course, Module
 
 
+class CourseProgress(models.Model):
+    """
+    Stores one progress row per (user, course).
+
+    Why keep this model when course progress can be calculated on the fly?
+    - We need a persistent "completed" status in the database.
+    - We also keep the latest computed percentage so pages can render quickly.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="course_progress",
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="student_progress",
+    )
+
+    # Cached aggregate value built from all module percentages in this course.
+    progress_percent = models.FloatField(default=0.0)
+
+    # True only when all modules in the course are completed for this user.
+    completed = models.BooleanField(default=False)
+
+    # Timestamp of when the course first became completed.
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Updated automatically each time we save this row.
+    last_accessed = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "course")
+
+    def __str__(self):
+        return f"{self.user} - {self.course} ({self.progress_percent:.1f}%)"
+
+
 class ModuleProgress(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
