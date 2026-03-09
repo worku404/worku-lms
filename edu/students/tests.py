@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from courses.models import Content, Course, File, Module, Subject, Text
-from .models import ContentProgress, ModuleProgress
+from .models import ContentProgress, CourseProgress, ModuleProgress
 from .services import get_overall_progress
 
 
@@ -136,3 +136,38 @@ class ContentProgressTrackingTests(TestCase):
         module_progress = ModuleProgress.objects.get(user=self.learner, module=self.module_other)
         self.assertTrue(module_progress.completed)
         self.assertEqual(module_progress.progress_percent, 100.0)
+
+    def test_course_is_marked_completed_and_persisted_when_all_modules_finish(self):
+        # Complete all trackable content in the course's only module.
+        self.client.post(
+            reverse("track_content_progress", args=[self.text_content.id]),
+            data=json.dumps({"kind": "text", "percent": 100}),
+            content_type="application/json",
+        )
+        self.client.post(
+            reverse("track_content_progress", args=[self.pdf_content.id]),
+            data=json.dumps({"kind": "pdf", "current_page": 3, "total_pages": 3, "max_page_seen": 3}),
+            content_type="application/json",
+        )
+
+        course_progress = CourseProgress.objects.get(user=self.learner, course=self.course_main)
+        self.assertTrue(course_progress.completed)
+        self.assertEqual(course_progress.progress_percent, 100.0)
+        self.assertIsNotNone(course_progress.completed_at)
+
+    def test_pdf_viewer_resumes_from_last_saved_page(self):
+        # Save page state for a PDF content item.
+        self.client.post(
+            reverse("track_content_progress", args=[self.pdf_content.id]),
+            data=json.dumps(
+                {"kind": "pdf", "current_page": 2, "total_pages": 3, "max_page_seen": 2}
+            ),
+            content_type="application/json",
+        )
+
+        response = self.client.get(
+            reverse("student_course_detail_module", args=[self.course_main.id, self.module_main.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-start-page="2"')
+        self.assertContains(response, 'data-max-page-seen="2"')
