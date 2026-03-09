@@ -59,12 +59,6 @@
                     <li class="c-course-progress c-card">
                         <div class="c-course-progress__header">
                             <strong>Course progress</strong>
-                            <span
-                                class="c-course-progress__status js-course-status{% if course_completed %} is-complete{% endif %}"
-                                data-course-status
-                            >
-                                {% if course_completed %}Completed{% else %}In progress{% endif %}
-                            </span>
                         </div>
                         <div
                             class="c-progress c-course-progress__bar"
@@ -84,7 +78,7 @@
                         <p class="c-course-progress__text">
                             <span class="js-course-progress-value" data-course-progress-value>
                                 {{ course_progress_percent|default:0|floatformat:0 }}
-                            </span>% complete
+                            </span>%
                         </p>
                     </li>
 
@@ -102,12 +96,6 @@
                                 <span class="c-module-item__progress-meta">
                                     <span class="c-module-item__progress-value" data-module-progress-value>
                                         {{ m.student_progress_percent|default:0|floatformat:0 }}%
-                                    </span>
-                                    <span
-                                        class="c-module-item__status{% if m.student_completed %} is-complete{% endif %}"
-                                        data-module-status
-                                    >
-                                        {% if m.student_completed %}Completed{% else %}In progress{% endif %}
                                     </span>
                                 </span>
                                 <span
@@ -212,7 +200,6 @@ const weeklyFocusCardEl = document.querySelector(".l-rail--left .c-progress-card
 const courseProgressWrapEl = document.querySelector("[data-course-progress]");
 const courseProgressBarEl = document.querySelector("[data-course-progress-bar]");
 const courseProgressValueEl = document.querySelector("[data-course-progress-value]");
-const courseStatusEl = document.querySelector("[data-course-status]");
 const textTrackElements = Array.from(document.querySelectorAll(".js-track-text"));
 const pdfViewerElements = Array.from(document.querySelectorAll(".js-pdf-viewer"));
 const hasTrackableContent = textTrackElements.length > 0 || pdfViewerElements.length > 0;
@@ -316,7 +303,7 @@ function getStateForContent(contentId) {
     return contentProgressState.get(key);
 }
 
-function updateModuleProgressUI(moduleId, percent, completed) {
+function updateModuleProgressUI(moduleId, percent) {
     // Keep module list progress bars synchronized with backend progress updates.
     const normalizedModuleId = Number(moduleId || 0);
     if (!normalizedModuleId) return;
@@ -329,7 +316,6 @@ function updateModuleProgressUI(moduleId, percent, completed) {
     const progressWrap = moduleRow.querySelector("[data-module-progress]");
     const progressBar = moduleRow.querySelector("[data-module-progress-bar]");
     const progressValue = moduleRow.querySelector("[data-module-progress-value]");
-    const statusEl = moduleRow.querySelector("[data-module-status]");
 
     if (progressWrap) {
         progressWrap.setAttribute("aria-valuenow", String(roundedPercent));
@@ -340,13 +326,9 @@ function updateModuleProgressUI(moduleId, percent, completed) {
     if (progressValue) {
         progressValue.textContent = `${roundedPercent}%`;
     }
-    if (statusEl) {
-        statusEl.textContent = completed ? "Completed" : "In progress";
-        statusEl.classList.toggle("is-complete", Boolean(completed));
-    }
 }
 
-function updateCourseProgressUI(percent, completed) {
+function updateCourseProgressUI(percent) {
     // Course progress is derived from module progress, so update both pieces together.
     const normalizedPercent = clampPercent(percent);
     const roundedPercent = Math.round(normalizedPercent);
@@ -360,10 +342,6 @@ function updateCourseProgressUI(percent, completed) {
     if (courseProgressValueEl) {
         courseProgressValueEl.textContent = String(roundedPercent);
     }
-    if (courseStatusEl) {
-        courseStatusEl.textContent = completed ? "Completed" : "In progress";
-        courseStatusEl.classList.toggle("is-complete", Boolean(completed));
-    }
 }
 
 function applyProgressPayload(payload) {
@@ -374,17 +352,16 @@ function applyProgressPayload(payload) {
     if (moduleProgress && moduleProgress.module_id) {
         updateModuleProgressUI(
             moduleProgress.module_id,
-            moduleProgress.progress_percent,
-            moduleProgress.completed
+            moduleProgress.progress_percent
         );
     } else if (activeModuleId && payload.status === "completed") {
         // Fallback for older/partial payloads: mark active module as completed.
-        updateModuleProgressUI(activeModuleId, 100, true);
+        updateModuleProgressUI(activeModuleId, 100);
     }
 
     const courseProgress = payload.course_progress || null;
     if (courseProgress) {
-        updateCourseProgressUI(courseProgress.progress_percent, courseProgress.completed);
+        updateCourseProgressUI(courseProgress.progress_percent);
     }
 }
 
