@@ -1640,8 +1640,8 @@ body:not(.theme-dark) .course-time__value {
 .c-pdf-page__text-layer span,
 .c-pdf-page__text-layer br {
   position: absolute;
-  color: rgba(0, 0, 0, 0.01);
-  -webkit-text-fill-color: rgba(0, 0, 0, 0.01);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
   white-space: pre;
   transform-origin: 0 0;
   cursor: text;
@@ -1651,13 +1651,52 @@ body:not(.theme-dark) .course-time__value {
 
 .c-pdf-page__text-layer::selection,
 .c-pdf-page__text-layer *::selection {
-  background: rgba(66, 133, 244, 0.35) !important;
-  color: rgba(0, 0, 0, 0.01);
+  /* Stronger default highlight so selected text is clearly visible. */
+  background: rgba(54, 148, 255, 0.46) !important;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .c-pdf-page__text-layer *::-moz-selection {
-  background: rgba(66, 133, 244, 0.35) !important;
-  color: rgba(0, 0, 0, 0.01);
+  background: rgba(54, 148, 255, 0.46) !important;
+  color: transparent;
+}
+
+.c-pdf-page__text-layer--not-selectable {
+  /* Avoid implying selectable text on image-only PDF pages. */
+  pointer-events: none;
+  cursor: default;
+}
+
+.c-pdf-page__text-layer--selectable {
+  pointer-events: auto;
+  cursor: text;
+}
+
+/* Dark mode PDF eye-comfort mode:
+   convert bright white pages into a softer dark-paper look to reduce glare. */
+body.theme-dark .c-pdf-viewer__scroll {
+  background: #0a1320;
+  border-color: color-mix(in srgb, #6c85a4 30%, #0a1320);
+}
+
+body.theme-dark .c-pdf-page {
+  background: #111b29;
+}
+
+body.theme-dark .c-pdf-page__canvas {
+  /* Keep text readable while reducing high luminance from white PDF backgrounds. */
+  filter: invert(0.92) hue-rotate(180deg) brightness(0.96) contrast(0.93) saturate(0.84);
+}
+
+body.theme-dark .c-pdf-page__text-layer::selection,
+body.theme-dark .c-pdf-page__text-layer *::selection {
+  /* Warm highlight tone that remains visible on dark-adjusted PDF pages. */
+  background: rgba(255, 212, 102, 0.42) !important;
+}
+
+body.theme-dark .c-pdf-page__text-layer *::-moz-selection {
+  background: rgba(255, 212, 102, 0.42) !important;
 }
 .c-focus-modules {
     display: grid;
