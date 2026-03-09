@@ -817,9 +817,14 @@ function markCompleteIfNeeded() {
             "X-Requested-With": "XMLHttpRequest"
         },
         credentials: "same-origin"
-    }).catch(() => {
-        completionSent = false; // retry on later scroll if request failed
-    });
+    })
+        .then((response) => (response.ok ? response.json().catch(() => null) : null))
+        .then((data) => {
+            applyProgressPayload(data);
+        })
+        .catch(() => {
+            completionSent = false; // retry on later scroll if request failed
+        });
 }
 
 function onScroll() {
