@@ -56,13 +56,75 @@
                         Time spent: <span class="course-time__value">{{ course_time|duration_format }}</span>
                     </p>
 
-                    {% for m in object.modules.all %}
-                        <li data-id="{{ m.id }}" class="c-module-item {% if m == module %}selected{% endif %}">
+                    <li class="c-course-progress c-card">
+                        <div class="c-course-progress__header">
+                            <strong>Course progress</strong>
+                            <span
+                                class="c-course-progress__status js-course-status{% if course_completed %} is-complete{% endif %}"
+                                data-course-status
+                            >
+                                {% if course_completed %}Completed{% else %}In progress{% endif %}
+                            </span>
+                        </div>
+                        <div
+                            class="c-progress c-course-progress__bar"
+                            role="progressbar"
+                            aria-label="Current course progress"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="{{ course_progress_percent|default:0 }}"
+                            data-course-progress
+                        >
+                            <span
+                                class="c-progress__bar js-course-progress-bar"
+                                data-course-progress-bar
+                                style="width: {{ course_progress_percent|default:0 }}%;"
+                            ></span>
+                        </div>
+                        <p class="c-course-progress__text">
+                            <span class="js-course-progress-value" data-course-progress-value>
+                                {{ course_progress_percent|default:0|floatformat:0 }}
+                            </span>% complete
+                        </p>
+                    </li>
+
+                    {% for m in modules %}
+                        <li
+                            data-id="{{ m.id }}"
+                            data-module-id="{{ m.id }}"
+                            class="c-module-item {% if m == module %}selected{% endif %}"
+                        >
                             <a href="{% url 'student_course_detail_module' object.id m.id %}">
                                 <span>
                                     Module <span class="order">{{ m.order|add:1 }}</span>
                                 </span>
                                 {{ m.title }}
+                                <span class="c-module-item__progress-meta">
+                                    <span class="c-module-item__progress-value" data-module-progress-value>
+                                        {{ m.student_progress_percent|default:0|floatformat:0 }}%
+                                    </span>
+                                    <span
+                                        class="c-module-item__status{% if m.student_completed %} is-complete{% endif %}"
+                                        data-module-status
+                                    >
+                                        {% if m.student_completed %}Completed{% else %}In progress{% endif %}
+                                    </span>
+                                </span>
+                                <span
+                                    class="c-module-item__progress"
+                                    role="progressbar"
+                                    aria-label="Module progress"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="{{ m.student_progress_percent|default:0|floatformat:0 }}"
+                                    data-module-progress
+                                >
+                                    <span
+                                        class="c-module-item__progress-bar"
+                                        data-module-progress-bar
+                                        style="width: {{ m.student_progress_percent|default:0 }}%;"
+                                    ></span>
+                                </span>
                             </a>
                         </li>
                     {% empty %}
@@ -89,7 +151,7 @@
 
             <section class="module c-stack c-reader" aria-label="Module content">
                 {% if module %}
-                    {% for content in module.contents.all %}
+                    {% for content in module_contents %}
                         {% with item=content.item %}
                             <article class="c-card c-content-block" data-content-model="{{ content.content_type.model }}">
                                 <h2 class="c-card__title">{{ item.title }}</h2>
@@ -101,7 +163,7 @@
                                     {% elif content.content_type.model == "image" %}
                                         {% include "courses/content/image.html" with item=item content=content %}
                                     {% elif content.content_type.model == "file" %}
-                                        {% include "courses/content/file.html" with item=item content=content %}
+                                        {% include "courses/content/file.html" with item=item content=content content_progress=content.student_last_position %}
                                     {% else %}
                                         {{ item.render }}
                                     {% endif %}
@@ -140,12 +202,17 @@ const modulesUiStateKey = "modules_sidebar_state";
 const moduleContainer = document.querySelector(".module");
 const completeUrl = "{% if module %}{% url 'mark_module_complete' module.id %}{% endif %}";
 const timeUrl = "{% if module %}{% url 'track_time' module.id %}{% endif %}";
+const activeModuleId = Number("{{ module.id|default:'0' }}") || null;
 const workspaceEl = document.querySelector(".course-workspace");
 const moduleSidebarEl = document.getElementById("module-sidebar");
 const moduleCollapseBtn = document.getElementById("modules-collapse-btn");
 const moduleUnhideBtn = document.getElementById("modules-unhide");
 const moduleContentEl = document.querySelector(".course-workspace .module");
 const weeklyFocusCardEl = document.querySelector(".l-rail--left .c-progress-card");
+const courseProgressWrapEl = document.querySelector("[data-course-progress]");
+const courseProgressBarEl = document.querySelector("[data-course-progress-bar]");
+const courseProgressValueEl = document.querySelector("[data-course-progress-value]");
+const courseStatusEl = document.querySelector("[data-course-status]");
 const textTrackElements = Array.from(document.querySelectorAll(".js-track-text"));
 const pdfViewerElements = Array.from(document.querySelectorAll(".js-pdf-viewer"));
 const hasTrackableContent = textTrackElements.length > 0 || pdfViewerElements.length > 0;
@@ -249,6 +316,78 @@ function getStateForContent(contentId) {
     return contentProgressState.get(key);
 }
 
+function updateModuleProgressUI(moduleId, percent, completed) {
+    // Keep module list progress bars synchronized with backend progress updates.
+    const normalizedModuleId = Number(moduleId || 0);
+    if (!normalizedModuleId) return;
+
+    const moduleRow = document.querySelector(`[data-module-id="${normalizedModuleId}"]`);
+    if (!moduleRow) return;
+
+    const normalizedPercent = clampPercent(percent);
+    const roundedPercent = Math.round(normalizedPercent);
+    const progressWrap = moduleRow.querySelector("[data-module-progress]");
+    const progressBar = moduleRow.querySelector("[data-module-progress-bar]");
+    const progressValue = moduleRow.querySelector("[data-module-progress-value]");
+    const statusEl = moduleRow.querySelector("[data-module-status]");
+
+    if (progressWrap) {
+        progressWrap.setAttribute("aria-valuenow", String(roundedPercent));
+    }
+    if (progressBar) {
+        progressBar.style.width = `${normalizedPercent}%`;
+    }
+    if (progressValue) {
+        progressValue.textContent = `${roundedPercent}%`;
+    }
+    if (statusEl) {
+        statusEl.textContent = completed ? "Completed" : "In progress";
+        statusEl.classList.toggle("is-complete", Boolean(completed));
+    }
+}
+
+function updateCourseProgressUI(percent, completed) {
+    // Course progress is derived from module progress, so update both pieces together.
+    const normalizedPercent = clampPercent(percent);
+    const roundedPercent = Math.round(normalizedPercent);
+
+    if (courseProgressWrapEl) {
+        courseProgressWrapEl.setAttribute("aria-valuenow", String(roundedPercent));
+    }
+    if (courseProgressBarEl) {
+        courseProgressBarEl.style.width = `${normalizedPercent}%`;
+    }
+    if (courseProgressValueEl) {
+        courseProgressValueEl.textContent = String(roundedPercent);
+    }
+    if (courseStatusEl) {
+        courseStatusEl.textContent = completed ? "Completed" : "In progress";
+        courseStatusEl.classList.toggle("is-complete", Boolean(completed));
+    }
+}
+
+function applyProgressPayload(payload) {
+    // This function centralizes all UI updates from progress endpoints.
+    if (!payload || typeof payload !== "object") return;
+
+    const moduleProgress = payload.module_progress || null;
+    if (moduleProgress && moduleProgress.module_id) {
+        updateModuleProgressUI(
+            moduleProgress.module_id,
+            moduleProgress.progress_percent,
+            moduleProgress.completed
+        );
+    } else if (activeModuleId && payload.status === "completed") {
+        // Fallback for older/partial payloads: mark active module as completed.
+        updateModuleProgressUI(activeModuleId, 100, true);
+    }
+
+    const courseProgress = payload.course_progress || null;
+    if (courseProgress) {
+        updateCourseProgressUI(courseProgress.progress_percent, courseProgress.completed);
+    }
+}
+
 function postContentProgress(progressUrl, payload, options = {}) {
     if (!progressUrl) return Promise.resolve(null);
     const keepalive = Boolean(options.keepalive);
@@ -262,7 +401,13 @@ function postContentProgress(progressUrl, payload, options = {}) {
         credentials: "same-origin",
         keepalive,
         body: JSON.stringify(payload),
-    }).catch(() => null);
+    })
+        .then((response) => (response.ok ? response.json().catch(() => null) : null))
+        .then((data) => {
+            applyProgressPayload(data);
+            return data;
+        })
+        .catch(() => null);
 }
 
 function computeTextProgress(el) {
@@ -321,14 +466,18 @@ function initPdfViewer(viewerEl) {
     const scrollEl = viewerEl.querySelector(".js-pdf-scroll");
     const currentEl = viewerEl.querySelector(".js-pdf-current");
     const totalEl = viewerEl.querySelector(".js-pdf-total");
+    const progressEl = viewerEl.querySelector(".js-pdf-progress");
+    const progressLabelEl = viewerEl.querySelector(".js-pdf-progress-label");
+    const persistedStartPage = Math.max(1, Number(viewerEl.dataset.startPage || 1) || 1);
+    const persistedMaxPage = Math.max(1, Number(viewerEl.dataset.maxPageSeen || persistedStartPage) || persistedStartPage);
 
     if (!sourceUrl || !scrollEl) return;
 
     const state = {
         doc: null,
-        currentPage: 1,
+        currentPage: persistedStartPage,
         totalPages: 1,
-        maxPageSeen: 1,
+        maxPageSeen: persistedMaxPage,
         lastSentAt: Date.now(),
         progressUrl,
         contentId,
@@ -336,6 +485,22 @@ function initPdfViewer(viewerEl) {
         pageNodes: new Map(),
     };
     pdfViewerState.set(viewerEl, state);
+
+    const updatePdfProgressBadge = () => {
+        if (!progressEl) return;
+        const total = Math.max(1, Number(state.totalPages) || 1);
+        const seen = Math.max(0, Math.min(Number(state.maxPageSeen) || 0, total));
+        const percent = Math.max(0, Math.min(100, Math.round((seen / total) * 100)));
+
+        progressEl.style.setProperty("--pdf-progress", `${percent}%`);
+        progressEl.setAttribute("aria-valuenow", String(percent));
+        progressEl.classList.toggle("is-complete", percent >= 100);
+        progressEl.setAttribute("title", percent >= 100 ? "PDF completed" : `PDF progress: ${percent}%`);
+
+        if (progressLabelEl) {
+            progressLabelEl.textContent = percent >= 100 ? "\u2714" : `${percent}%`;
+        }
+    };
 
     const sendPdfProgress = (pdfState, force) => {
         if (!pdfState.progressUrl || !pdfState.contentId) return;
@@ -365,6 +530,7 @@ function initPdfViewer(viewerEl) {
         state.maxPageSeen = Math.max(state.maxPageSeen, normalized);
         if (currentEl) currentEl.textContent = String(state.currentPage);
         if (totalEl) totalEl.textContent = String(state.totalPages);
+        updatePdfProgressBadge();
         sendPdfProgress(state, force);
     };
 
@@ -598,14 +764,28 @@ function initPdfViewer(viewerEl) {
         });
     };
 
+    const scrollToPage = (pageNumber) => {
+        // Resume reading from the persisted page when the viewer is opened again.
+        const targetNode = state.pageNodes.get(pageNumber);
+        if (!targetNode) return;
+        const offsetTop = targetNode.offsetTop || 0;
+        scrollEl.scrollTo({ top: offsetTop, behavior: "auto" });
+    };
+
+    updatePdfProgressBadge();
+
     window.pdfjsLib.getDocument(sourceUrl).promise
         .then((doc) => {
             state.doc = doc;
             state.totalPages = doc.numPages || 1;
+            state.currentPage = Math.max(1, Math.min(state.currentPage, state.totalPages));
+            state.maxPageSeen = Math.max(state.currentPage, Math.min(state.maxPageSeen, state.totalPages));
             if (totalEl) totalEl.textContent = String(state.totalPages);
+            updatePdfProgressBadge();
             buildPageNodes();
-            markVisiblePage(1, false);
-            renderPageCanvas(1);
+            markVisiblePage(state.currentPage, false);
+            renderPageCanvas(state.currentPage);
+            window.requestAnimationFrame(() => scrollToPage(state.currentPage));
         })
         .catch(() => {
             if (totalEl) totalEl.textContent = "error";
