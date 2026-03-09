@@ -9,7 +9,7 @@ Gold-EDU supports public course discovery, structured module learning, instructo
 ## Preview
 
 ![Homepage Preview](./docs/images/preview-home.png)
-![Course Workspace Preview](./docs/images/preview-workspace.png)
+![Course Workspace Preview](./docs/images/content-preview.png)
 ![API Tools Preview](./docs/images/preview-api-tools.png)
 
 ## Table of Contents
