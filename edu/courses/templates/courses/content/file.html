@@ -6,11 +6,23 @@
             {% if content %}
             data-content-id="{{ content.id }}"
             data-progress-url="{% url 'track_content_progress' content.id %}"
+            data-start-page="{{ content_progress.current_page|default:1 }}"
+            data-max-page-seen="{{ content_progress.max_page_seen|default:1 }}"
             {% endif %}
         >
             <div class="c-pdf-toolbar">
-                <span class="c-card__meta">
+                <span class="c-card__meta c-pdf-toolbar__meta">
                     Page <strong class="js-pdf-current">1</strong> / <strong class="js-pdf-total">--</strong>
+                </span>
+                <span
+                    class="c-pdf-progress js-pdf-progress"
+                    role="progressbar"
+                    aria-label="PDF reading progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                >
+                    <span class="c-pdf-progress__label js-pdf-progress-label" aria-hidden="true">0%</span>
                 </span>
             </div>
             <div class="c-pdf-viewer__scroll js-pdf-scroll" aria-label="{{ item.title }}"></div>
