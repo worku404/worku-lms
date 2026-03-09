@@ -12,8 +12,11 @@ import os
 import mimetypes
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 from django.conf import settings
+from django.db import connection
+from django.db.utils import OperationalError, ProgrammingError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -52,6 +55,22 @@ r = redis.Redis(
     port=settings.REDIS_PORT,
     db=settings.REDIS_DB,
 )
+
+
+def _course_progress_table_ready() -> bool:
+    """
+    Guard against runtime crashes when code is deployed before migrations run.
+
+    Why this exists:
+    - New code reads from CourseProgress.
+    - If migration 0003 is not applied yet, querying that model raises:
+      `ProgrammingError: relation "students_courseprogress" does not exist`.
+    - This check lets pages render with a safe fallback until migrations are applied.
+    """
+    try:
+        return CourseProgress._meta.db_table in connection.introspection.table_names()
+    except (ProgrammingError, OperationalError):
+        return False
 
 
 
@@ -124,15 +143,34 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
         user = self.request.user
         courses = list(context["courses"])
 
-        progress_rows = {
-            row.course_id: row
-            for row in CourseProgress.objects.filter(user=user, course__in=courses)
-        }
+        # Defensive fallback for environments where DB migration 0003 is pending.
+        if not _course_progress_table_ready():
+            for course in courses:
+                course.student_progress_percent = 0.0
+                course.student_completed = False
+            context["courses"] = courses
+            return context
+
+        try:
+            progress_rows = {
+                row.course_id: row
+                for row in CourseProgress.objects.filter(user=user, course__in=courses)
+            }
+        except (ProgrammingError, OperationalError):
+            # If schema and code become temporarily out of sync, keep page usable.
+            progress_rows = {}
 
         for course in courses:
             row = progress_rows.get(course.id)
             if row is None:
-                row = recompute_course_progress(user, course)
+                try:
+                    row = recompute_course_progress(user, course)
+                except (ProgrammingError, OperationalError):
+                    row = None
+            if row is None:
+                course.student_progress_percent = 0.0
+                course.student_completed = False
+                continue
             course.student_progress_percent = round(row.progress_percent, 2)
             course.student_completed = row.completed
 
@@ -172,9 +210,39 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
             module_item.student_completed = bool(module_row.completed) if module_row else False
 
         # Persisted course completion/percentage row (created on demand if missing).
-        course_progress = CourseProgress.objects.filter(user=user, course=course).first()
+        course_progress = None
+        if _course_progress_table_ready():
+            try:
+                course_progress = CourseProgress.objects.filter(user=user, course=course).first()
+                if course_progress is None:
+                    course_progress = recompute_course_progress(user, course)
+            except (ProgrammingError, OperationalError):
+                course_progress = None
+
         if course_progress is None:
-            course_progress = recompute_course_progress(user, course)
+            # Fallback when CourseProgress table is unavailable:
+            # derive a temporary course percentage from existing module rows.
+            total_modules = len(modules)
+            accumulated_percent = 0.0
+            completed_modules = 0
+            for module_item in modules:
+                module_row = module_progress_rows.get(module_item.id)
+                if not module_row:
+                    continue
+                accumulated_percent += float(module_row.progress_percent or 0.0)
+                if module_row.completed:
+                    completed_modules += 1
+
+            fallback_percent = 0.0
+            fallback_completed = False
+            if total_modules > 0:
+                fallback_percent = max(0.0, min(100.0, accumulated_percent / total_modules))
+                fallback_completed = completed_modules >= total_modules
+
+            course_progress = SimpleNamespace(
+                progress_percent=round(fallback_percent, 2),
+                completed=fallback_completed,
+            )
 
         # Build a concrete list of module contents, and attach content progress state.
         module_contents = list(module.contents.select_related("content_type")) if module else []
