@@ -29,10 +29,7 @@
                         ></span>
                     </div>
                     <p class="c-card__meta">
-                        {{ course.student_progress_percent|default:0|floatformat:0 }}% complete
-                        {% if course.student_completed %}
-                            · Completed
-                        {% endif %}
+                        {{ course.student_progress_percent|default:0|floatformat:0 }}%
                     </p>
                     <div class="c-card__actions">
                         <a href="{% url 'student_course_detail' course.id %}" class="c-btn c-btn--primary">
@@ -52,3 +49,4 @@
         </section>
     </section>
 {% endblock %}
+
