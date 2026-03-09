@@ -36,9 +36,11 @@ from django.views.generic import TemplateView, DetailView, View
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
 from courses.models import Content, Course, File, Image, Module
+from .models import ContentProgress, CourseProgress, ModuleProgress
 from .services import (add_time_spent, mark_module_completed, 
                        get_overall_progress, get_course_time_spent,
-                        touch_user_presence, update_content_progress
+                        touch_user_presence, update_content_progress,
+                        recompute_course_progress
                     )
 
 
@@ -114,6 +116,29 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset()
         return qs.filter(students__in=[self.request.user])
 
+    def get_context_data(self, **kwargs):
+        """
+        Attach persisted course progress fields to each course card.
+        """
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        courses = list(context["courses"])
+
+        progress_rows = {
+            row.course_id: row
+            for row in CourseProgress.objects.filter(user=user, course__in=courses)
+        }
+
+        for course in courses:
+            row = progress_rows.get(course.id)
+            if row is None:
+                row = recompute_course_progress(user, course)
+            course.student_progress_percent = round(row.progress_percent, 2)
+            course.student_completed = row.completed
+
+        context["courses"] = courses
+        return context
+
 class StudentCourseDetailView(LoginRequiredMixin, DetailView):
     model = Course
     template_name = "students/course/detail.html"
@@ -124,17 +149,59 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        course = self.get_object()
-        modules = course.modules.all()
+        course = self.object
+        modules = list(course.modules.all())
         user = self.request.user
 
         if "module_id" in self.kwargs:
             module = get_object_or_404(Module, id=self.kwargs["module_id"], course=course)
         else:
-            module = modules.first()
+            module = modules[0] if modules else None
+
+        # Load and attach per-module progress rows so the template can render module percentages.
+        module_progress_rows = {
+            row.module_id: row
+            for row in ModuleProgress.objects.filter(user=user, course=course)
+        }
+        for module_item in modules:
+            module_row = module_progress_rows.get(module_item.id)
+            module_item.student_progress_percent = round(
+                module_row.progress_percent if module_row else 0.0,
+                2,
+            )
+            module_item.student_completed = bool(module_row.completed) if module_row else False
+
+        # Persisted course completion/percentage row (created on demand if missing).
+        course_progress = CourseProgress.objects.filter(user=user, course=course).first()
+        if course_progress is None:
+            course_progress = recompute_course_progress(user, course)
+
+        # Build a concrete list of module contents, and attach content progress state.
+        module_contents = list(module.contents.select_related("content_type")) if module else []
+        content_progress_rows = {
+            row.content_id: row
+            for row in ContentProgress.objects.filter(
+                user=user,
+                content__in=module_contents,
+            )
+        }
+        for content_item in module_contents:
+            progress_row = content_progress_rows.get(content_item.id)
+            content_item.student_progress_percent = round(
+                progress_row.progress_percent if progress_row else 0.0,
+                2,
+            )
+            content_item.student_completed = bool(progress_row.completed) if progress_row else False
+            # For PDF resume support we expose the stored JSON position to the template.
+            content_item.student_last_position = progress_row.last_position if progress_row else {}
 
         context["module"] = module
+        context["modules"] = modules
+        context["module_contents"] = module_contents
         context["course_time"] = get_course_time_spent(self.request.user, course)
+        context["course_progress"] = course_progress
+        context["course_progress_percent"] = round(course_progress.progress_percent, 2)
+        context["course_completed"] = course_progress.completed
         return context
 
 
@@ -146,9 +213,28 @@ class MarkModuleCompleteView(LoginRequiredMixin, View):
             course__students=request.user,
             )
 
-        mark_module_completed(request.user, module)
+        module_progress, course_progress = mark_module_completed(request.user, module)
 
-        return JsonResponse({'status': 'completed'})
+        return JsonResponse(
+            {
+                "status": "completed",
+                "module_progress": {
+                    "module_id": module.id,
+                    "progress_percent": round(module_progress.progress_percent, 2),
+                    "completed": module_progress.completed,
+                },
+                "course_progress": {
+                    "course_id": module.course_id,
+                    "progress_percent": round(course_progress.progress_percent, 2),
+                    "completed": course_progress.completed,
+                    "completed_at": (
+                        course_progress.completed_at.isoformat()
+                        if course_progress.completed_at
+                        else None
+                    ),
+                },
+            }
+        )
 
 class TrackTimeView(LoginRequiredMixin, View):
     def post(self, request, module_id):
@@ -223,6 +309,7 @@ class TrackContentProgressView(LoginRequiredMixin, View):
         content_progress = result["content_progress"]
         module_progress = result["module_progress"]
         course = content.module.course
+        course_progress = result["course_progress"]
 
         return JsonResponse(
             {
@@ -244,11 +331,18 @@ class TrackContentProgressView(LoginRequiredMixin, View):
                 "course_progress": {
                     "course_id": course.id,
                     "progress_percent": result["course_progress_percent"],
+                    "completed": course_progress.completed,
+                    "completed_at": (
+                        course_progress.completed_at.isoformat()
+                        if course_progress.completed_at
+                        else None
+                    ),
                 },
                 "overall_progress": result["overall_progress_percent"],
                 "completed_flags": {
                     "content": content_progress.completed,
                     "module": module_progress.completed,
+                    "course": course_progress.completed,
                 },
             }
         )
