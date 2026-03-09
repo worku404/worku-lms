@@ -1534,6 +1534,47 @@ body:not(.theme-dark) .course-time__value {
   flex-wrap: wrap;
 }
 
+.c-pdf-toolbar__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.c-pdf-progress {
+  --pdf-progress: 0%;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background:
+    radial-gradient(circle at center, var(--color-surface) 58%, transparent 60%),
+    conic-gradient(
+      color-mix(in srgb, var(--color-primary) 82%, #ffffff) var(--pdf-progress),
+      color-mix(in srgb, var(--color-border) 75%, transparent) 0
+    );
+  color: var(--color-text-muted);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.c-pdf-progress__label {
+  font-size: 0.53rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.c-pdf-progress.is-complete {
+  border-color: color-mix(in srgb, #1fbf75 60%, var(--color-border));
+  color: #1fbf75;
+}
+
+.c-pdf-progress.is-complete .c-pdf-progress__label {
+  font-size: 0.76rem;
+}
+
 .c-pdf-viewer__scroll {
   width: 100%;
   max-width: 100%;
