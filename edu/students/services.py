@@ -5,9 +5,10 @@ import redis
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F, Sum
+from django.utils import timezone
 
 from courses.models import Content, Course, File, Module, Text
-from .models import ContentProgress, ModuleProgress
+from .models import ContentProgress, CourseProgress, ModuleProgress
 
 ONLINE_USERS_KEY = "presence:online_users"
 ONLINE_WINDOW_SECONDS = 120  # user is "online" if active in last 120s
@@ -89,18 +90,68 @@ def recompute_module_progress(user, module: Module) -> ModuleProgress:
     return progress
 
 
-def get_course_progress_percent(user, course: Course) -> float:
-    total_modules = Module.objects.filter(course=course).count()
-    if total_modules == 0:
-        return 0.0
+def recompute_course_progress(user, course: Course) -> CourseProgress:
+    """
+    Recalculate and persist course-level progress for a single user.
 
+    The course percentage is the average of module percentages.
+    Course completion is stricter: every module must be completed.
+    """
+    total_modules = Module.objects.filter(course=course).count()
     sum_progress = (
         ModuleProgress.objects.filter(user=user, course=course)
         .aggregate(total=Sum("progress_percent"))
         .get("total")
         or 0.0
     )
-    return round(_clamp_percent(sum_progress / total_modules), 2)
+    course_percent = 0.0
+    if total_modules > 0:
+        course_percent = round(_clamp_percent(sum_progress / total_modules), 2)
+
+    completed_modules = (
+        ModuleProgress.objects.filter(user=user, course=course, completed=True)
+        .values("module_id")
+        .distinct()
+        .count()
+    )
+    course_completed = total_modules > 0 and completed_modules >= total_modules
+
+    course_progress, _ = CourseProgress.objects.get_or_create(
+        user=user,
+        course=course,
+        defaults={
+            "progress_percent": course_percent,
+            "completed": course_completed,
+            "completed_at": timezone.now() if course_completed else None,
+        },
+    )
+
+    # Keep these fields synchronized whenever module/content progress changes.
+    course_progress.progress_percent = course_percent
+    course_progress.completed = course_completed
+    if course_completed and not course_progress.completed_at:
+        course_progress.completed_at = timezone.now()
+    if not course_completed and course_progress.completed_at:
+        course_progress.completed_at = None
+    course_progress.save(update_fields=["progress_percent", "completed", "completed_at", "last_accessed"])
+    return course_progress
+
+
+def get_or_recompute_course_progress(user, course: Course) -> CourseProgress:
+    """
+    Read the persisted row when available; otherwise compute and persist it.
+    """
+    existing = CourseProgress.objects.filter(user=user, course=course).first()
+    if existing is not None:
+        return existing
+    return recompute_course_progress(user, course)
+
+
+def get_course_progress_percent(user, course: Course) -> float:
+    """
+    Compatibility helper retained for existing template/context code.
+    """
+    return get_or_recompute_course_progress(user, course).progress_percent
 
 
 def mark_module_completed(user, module):
@@ -113,6 +164,8 @@ def mark_module_completed(user, module):
     progress.completed = True
     progress.progress_percent = 100.0
     progress.save(update_fields=["completed", "progress_percent", "last_accessed"])
+    course_progress = recompute_course_progress(user, module.course)
+    return progress, course_progress
 
 
 def update_content_progress(user, content, kind: str, payload: dict, seconds_delta: int = 0) -> dict:
@@ -179,13 +232,14 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
     progress.refresh_from_db()
 
     module_progress = recompute_module_progress(user, content.module)
-    course_progress = get_course_progress_percent(user, content.module.course)
+    course_progress = recompute_course_progress(user, content.module.course)
     overall_progress = get_overall_progress(user)
 
     return {
         "content_progress": progress,
         "module_progress": module_progress,
-        "course_progress_percent": course_progress,
+        "course_progress": course_progress,
+        "course_progress_percent": course_progress.progress_percent,
         "overall_progress_percent": overall_progress,
     }
 
