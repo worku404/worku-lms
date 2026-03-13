@@ -544,13 +544,14 @@ function initPdfViewer(viewerEl) {
             span.style.position = "absolute";
             span.style.whiteSpace = "pre";
             span.style.transformOrigin = "0 0";
-            span.style.color = "rgba(0, 0, 0, 0.01)";
-            span.style.webkitTextFillColor = "rgba(0, 0, 0, 0.01)";
+            // Keep glyphs almost invisible while preserving robust browser selection behavior.
+            span.style.color = "rgba(0, 0, 0, 0.001)";
+            span.style.webkitTextFillColor = "rgba(0, 0, 0, 0.001)";
             span.style.cursor = "text";
             span.style.userSelect = "text";
             span.style.webkitUserSelect = "text";
             span.style.left = `${tx[4]}px`;
-            span.style.top = `${tx[5] - fontAscent}px`;
+            span.style.top = `${tx[5] - fontAscent}px`;  
             span.style.fontSize = `${fontHeight}px`;
             span.style.fontFamily = style.fontFamily || "sans-serif";
             fragment.appendChild(span);
@@ -565,34 +566,57 @@ function initPdfViewer(viewerEl) {
         textLayerEl.textContent = "";
         textLayerEl.style.width = `${Math.floor(viewport.width)}px`;
         textLayerEl.style.height = `${Math.floor(viewport.height)}px`;
+        textLayerEl.classList.remove("c-pdf-page__text-layer--selectable", "c-pdf-page__text-layer--not-selectable");
 
         const textContent = await page.getTextContent();
-        if (!textContent || !Array.isArray(textContent.items) || textContent.items.length === 0) return;
+        if (!textContent || !Array.isArray(textContent.items) || textContent.items.length === 0) {
+            // This page is image-based (or has no text runs), so disable text selection affordances.
+            textLayerEl.classList.add("c-pdf-page__text-layer--not-selectable");
+            return;
+        }
+
+        // Mark this layer selectable so CSS can show proper highlight feedback.
+        textLayerEl.classList.add("c-pdf-page__text-layer--selectable");
 
         let rendered = false;
-        if (typeof window.pdfjsLib.renderTextLayer === "function") {
+        if (typeof window.pdfjsLib.TextLayer === "function") {
             try {
-                const textLayerTask = window.pdfjsLib.renderTextLayer({
+                // Prefer PDF.js TextLayer when available because it produces the most
+                // reliable text geometry and browser selection behavior.
+                const textLayer = new window.pdfjsLib.TextLayer({
                     textContentSource: textContent,
                     container: textLayerEl,
                     viewport,
+                });
+                const maybePromise = textLayer.render();
+                if (maybePromise && typeof maybePromise.then === "function") {
+                    await maybePromise;
+                }
+                rendered = textLayerEl.childElementCount > 0;
+            } catch (error) {
+                rendered = false;
+            }
+        }
+
+        if (!rendered && typeof window.pdfjsLib.renderTextLayer === "function") {
+            try {
+                // Support both renderTextLayer signatures used across PDF.js versions.
+                // Some builds expect `textContent`, others `textContentSource`.
+                const renderArgs = {
+                    container: textLayerEl,
+                    viewport,
                     enhanceTextSelection: true,
+                    textContent,
+                    textContentSource: textContent,
+                };
+                const textLayerTask = window.pdfjsLib.renderTextLayer({
+                    ...renderArgs,
                 });
                 if (textLayerTask && textLayerTask.promise) {
                     await textLayerTask.promise;
                 } else if (textLayerTask && typeof textLayerTask.then === "function") {
                     await textLayerTask;
                 }
-                textLayerEl.querySelectorAll("span, br").forEach((node) => {
-                    node.style.position = "absolute";
-                    node.style.whiteSpace = "pre";
-                    node.style.transformOrigin = "0 0";
-                    node.style.color = "rgba(0, 0, 0, 0.01)";
-                    node.style.webkitTextFillColor = "rgba(0, 0, 0, 0.01)";
-                    node.style.cursor = "text";
-                    node.style.userSelect = "text";
-                    node.style.webkitUserSelect = "text";
-                });
                 rendered = textLayerEl.childElementCount > 0;
             } catch (error) {
                 rendered = false;
