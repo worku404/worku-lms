@@ -5,7 +5,7 @@
 /* Base notes-specific variables for light mode. */
 :root {
     /* Panel width is about half the viewport, capped for large screens. */
-    --notes-panel-width: min(50vw, 760px);
+    --notes-panel-width: min(50vw, 600px);
     /* Panel background uses the main surface color. */
     --notes-panel-bg: var(--color-surface);
     /* Panel border color aligns with global borders. */
@@ -114,8 +114,24 @@ body.theme-dark {
 
 /* Lock page scroll when notes panel is open. */
 body.notes-open {
-    /* Prevent background scrolling. */
-    overflow: hidden;
+    /* Allow background scrolling while notes panel is open. */
+    overflow: auto;
+}
+
+/* Push the main layout right so content behaves like the modules sidebar. */
+/* When notes are open and modules sidebar is collapsed, reserve module space. */
+body.notes-open .course-workspace.modules-collapsed {
+    /* Mimic the two-column layout of the modules sidebar. */
+    grid-template-columns: minmax(
+        var(--workspace-modules-min-current, 220px),
+        var(--workspace-modules-max-current, 280px)
+    ) minmax(0, 1fr);
+}
+
+/* Keep the main content in the second column when modules are collapsed. */
+body.notes-open .course-workspace.modules-collapsed .module {
+    /* Force the module content to stay in column two. */
+    grid-column: 2 / 3;
 }
 
 /* Reveal panel when notes-open class is active. */
@@ -130,10 +146,10 @@ body.notes-open .notes-panel {
 
 /* Show backdrop while panel is open. */
 body.notes-open .notes-backdrop {
-    /* Fade in the overlay. */
-    opacity: 1;
-    /* Allow clicks to close. */
-    pointer-events: auto;
+    /* Keep overlay invisible while notes are open. */
+    opacity: 0;
+    /* Allow clicks to pass through to the page. */
+    pointer-events: none;
 }
 
 /* ============================================= */
@@ -554,6 +570,12 @@ body.notes-open .notes-backdrop {
     line-height: var(--lh-reading);
     /* Ensure the editor has a minimum height. */
     min-height: 100%;
+}
+
+/* Explicit paragraph font size for normal text. */
+.notes-editor .ql-editor p {
+    /* Increase paragraph font size for readability. */
+    font-size: 1.1rem;
 }
 
 /* Quill placeholder styling for visibility. */
