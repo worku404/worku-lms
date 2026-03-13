@@ -179,7 +179,7 @@
 @media (min-width: 1024px) {
     .app-body.has-assistant {
         /* Match a Copilot-like sidebar width on desktop. */
-        --rail-right: 4600px;
+        --rail-right: 500px;
     }
 }
 
