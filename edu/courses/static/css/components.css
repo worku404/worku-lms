@@ -1668,22 +1668,23 @@ body:not(.theme-dark) .course-time__value {
    use a warm dark-paper treatment instead of pure black/white contrast so long
    reading sessions feel less harsh while the text remains distinct. */
 body.theme-dark .c-pdf-viewer__scroll {
-  background:
-    radial-gradient(circle at top, rgba(94, 119, 145, 0.08), transparent 34%),
-    linear-gradient(180deg, #0f1724 0%, #0a121d 100%);
-  border-color: color-mix(in srgb, #6f8aa6 28%, #0a121d);
+  /* Use pure black for maximum contrast. */
+  background: #000000;
+  /* Darken the border to match black background. */
+  border-color: #000000;
 }
 
 body.theme-dark .c-pdf-page {
-  background: #171d22;
+  /* Use pure black page background. */
+  background: #000000;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.03),
     0 14px 30px rgba(2, 6, 12, 0.28);
 }
 
 body.theme-dark .c-pdf-page__canvas {
-  /* Slight warm-paper tint with softened luminance, while preserving contrast. */
-  filter: invert(0.93) hue-rotate(180deg) brightness(0.99) contrast(0.95) sepia(0.16) saturate(0.82);
+  /* Increase contrast and darken background for stronger readability. */
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.25) sepia(0) saturate(1);
 }
 
 body.theme-dark .c-pdf-page__text-layer::selection,
