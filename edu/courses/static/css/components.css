@@ -681,13 +681,17 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     /* Soften AI text brightness on the pure-black panel to reduce eye strain. */
     font-family: "Iosevka", "Cascadia Mono", "Fira Code", "JetBrains Mono",
         ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    color: #c7d3e1;
+    color: var(--llm-text);
 }
 
 .llm-chat-row--ai .llm-chat-msg strong,
 .llm-chat-row--ai .llm-chat-msg b {
     /* Keep emphasis visible, but still less harsh than pure white. */
-    color: #dbe6f2;
+    color: var(--llm-bold);
+    text-decoration-line: underline;
+    text-decoration-color: var(--llm-bold-underline);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
 }
 
 .llm-chat-msg > * {
@@ -723,7 +727,7 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     font-size: 1.02rem;
     line-height: 1.3;
     font-weight: 650;
-    color: #1678DE;
+    color: var(--llm-heading);
 }
 
 .llm-chat-msg ul,
@@ -744,8 +748,9 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
 }
 
 .llm-chat-msg :not(pre) > code {
-    background: color-mix(in srgb, var(--color-surface-soft) 78%, var(--color-surface));
-    border: 1px solid var(--color-border);
+    color: var(--llm-inline-code-text);
+    background: var(--llm-inline-code-bg);
+    border: 1px solid var(--llm-inline-code-border);
     border-radius: 6px;
     padding: 0.08rem 0.33rem;
     white-space: break-spaces;
@@ -756,8 +761,8 @@ body.theme-dark .llm-copy-btn:hover:not(:disabled) {
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
-    background: color-mix(in srgb, var(--color-surface-soft) 70%, var(--color-surface));
-    border: 1px solid var(--color-border);
+    background: var(--llm-code-block-bg);
+    border: 1px solid var(--llm-code-block-border);
     border-radius: 8px;
     padding: 0.6rem 0.7rem;
 }
@@ -1640,8 +1645,8 @@ body:not(.theme-dark) .course-time__value {
 .c-pdf-page__text-layer span,
 .c-pdf-page__text-layer br {
   position: absolute;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: rgba(0, 0, 0, 0.01);
+  -webkit-text-fill-color: rgba(0, 0, 0, 0.01);
   white-space: pre;
   transform-origin: 0 0;
   cursor: text;
@@ -1651,52 +1656,43 @@ body:not(.theme-dark) .course-time__value {
 
 .c-pdf-page__text-layer::selection,
 .c-pdf-page__text-layer *::selection {
-  /* Stronger default highlight so selected text is clearly visible. */
-  background: rgba(54, 148, 255, 0.46) !important;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background: rgba(66, 133, 244, 0.35) !important;
 }
 
 .c-pdf-page__text-layer *::-moz-selection {
-  background: rgba(54, 148, 255, 0.46) !important;
-  color: transparent;
+  background: rgba(66, 133, 244, 0.35) !important;
+  color: rgba(0, 0, 0, 0.01);
 }
 
-.c-pdf-page__text-layer--not-selectable {
-  /* Avoid implying selectable text on image-only PDF pages. */
-  pointer-events: none;
-  cursor: default;
-}
-
-.c-pdf-page__text-layer--selectable {
-  pointer-events: auto;
-  cursor: text;
-}
-
-/* Dark mode PDF eye-comfort mode:
-   convert bright white pages into a softer dark-paper look to reduce glare. */
+/* Dark-mode PDF surface:
+   use a warm dark-paper treatment instead of pure black/white contrast so long
+   reading sessions feel less harsh while the text remains distinct. */
 body.theme-dark .c-pdf-viewer__scroll {
-  background: #0a1320;
-  border-color: color-mix(in srgb, #6c85a4 30%, #0a1320);
+  background:
+    radial-gradient(circle at top, rgba(94, 119, 145, 0.08), transparent 34%),
+    linear-gradient(180deg, #0f1724 0%, #0a121d 100%);
+  border-color: color-mix(in srgb, #6f8aa6 28%, #0a121d);
 }
 
 body.theme-dark .c-pdf-page {
-  background: #111b29;
+  background: #171d22;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 14px 30px rgba(2, 6, 12, 0.28);
 }
 
 body.theme-dark .c-pdf-page__canvas {
-  /* Keep text readable while reducing high luminance from white PDF backgrounds. */
-  filter: invert(0.92) hue-rotate(180deg) brightness(0.96) contrast(0.93) saturate(0.84);
+  /* Slight warm-paper tint with softened luminance, while preserving contrast. */
+  filter: invert(0.93) hue-rotate(180deg) brightness(0.99) contrast(0.95) sepia(0.16) saturate(0.82);
 }
 
 body.theme-dark .c-pdf-page__text-layer::selection,
 body.theme-dark .c-pdf-page__text-layer *::selection {
-  /* Warm highlight tone that remains visible on dark-adjusted PDF pages. */
-  background: rgba(255, 212, 102, 0.42) !important;
+  background: rgba(255, 211, 107, 0.44) !important;
 }
 
 body.theme-dark .c-pdf-page__text-layer *::-moz-selection {
-  background: rgba(255, 212, 102, 0.42) !important;
+  background: rgba(255, 211, 107, 0.44) !important;
 }
 .c-focus-modules {
     display: grid;
