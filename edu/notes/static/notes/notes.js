@@ -507,6 +507,18 @@ document.addEventListener("DOMContentLoaded", function () {
         loadNotesList(activeTagSlug);
     };
 
+    // Toggle the notes panel open/close (Alt+N shortcut).
+    const toggleNotesPanel = () => {
+        // Check current open state.
+        const isOpen = bodyEl.classList.contains("notes-open");
+        // Close when open, otherwise open.
+        if (isOpen) {
+            handleClose();
+        } else {
+            handleOpen();
+        }
+    };
+
     // Handle closing the notes panel.
     const handleClose = () => {
         // Prompt for save when a new note has content.
@@ -618,8 +630,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (openBtn) openBtn.addEventListener("click", handleOpen);
     // Attach close button handler.
     if (closeBtn) closeBtn.addEventListener("click", handleClose);
-    // Attach backdrop click to close.
-    if (backdropEl) backdropEl.addEventListener("click", handleClose);
+    // Do not close on backdrop click (close only via Close button).
     // Attach delete button handler.
     if (deleteBtn) deleteBtn.addEventListener("click", deleteCurrentNote);
     // Attach sidebar toggle handler.
@@ -648,5 +659,21 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!saveModalEl || saveModalEl.hidden) return;
         event.preventDefault();
         handleExit();
+    });
+
+    // Toggle notes panel with Alt+N.
+    document.addEventListener("keydown", function (event) {
+        // Use Alt+N without Ctrl/Shift/Meta.
+        const isAltN = event.altKey
+            && !event.ctrlKey
+            && !event.shiftKey
+            && !event.metaKey
+            && String(event.key).toLowerCase() === "n";
+        // Ignore non-matching keys.
+        if (!isAltN) return;
+        // Prevent browser default behavior.
+        event.preventDefault();
+        // Toggle the notes panel.
+        toggleNotesPanel();
     });
 });
