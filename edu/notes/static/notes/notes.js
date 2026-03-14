@@ -41,6 +41,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const exitBtn = panelEl.querySelector("[data-notes-exit]");
     // Grab the save error message element.
     const saveErrorEl = panelEl.querySelector("[data-notes-save-error]");
+    // Collect the color buttons for text color selection.
+    const colorButtons = Array.from(panelEl.querySelectorAll("[data-notes-color]"));
 
     // Read the list endpoint URL from data attributes.
     const listUrl = panelEl.dataset.notesListUrl || "";
@@ -59,6 +61,12 @@ document.addEventListener("DOMContentLoaded", function () {
     let autosaveTimer = null;
     // Track the active tag filter slug.
     let activeTagSlug = "";
+    // Remember the last known editor selection to restore focus safely.
+    let lastSelection = null;
+    // Track the overlay layer for code copy buttons.
+    let copyOverlayLayer = null;
+    // Track a pending overlay update frame.
+    let copyOverlayRaf = null;
 
     // Return true when shortcuts should be ignored (mobile).
     const shortcutsDisabled = () => {
@@ -115,10 +123,16 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!quill) return;
         // Clear the editor contents.
         quill.setText("");
+        // Reset text color formatting to default.
+        quill.format("color", false);
+        // Clear any active color button state.
+        colorButtons.forEach((btn) => btn.classList.remove("is-active"));
         // Reset current note tracking.
         currentNoteId = null;
         // Reset dirty state.
         isDirty = false;
+        // Clear last known selection on reset.
+        lastSelection = null;
         // Disable delete button for new notes.
         if (deleteBtn) deleteBtn.disabled = true;
     };
@@ -294,7 +308,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // Inject HTML into the editor.
         quill.setText("");
         // Paste HTML content from the note.
-        quill.clipboard.dangerouslyPasteHTML(note.content_html || "");
+        quill.clipboard.dangerouslyPasteHTML(
+            sanitizeNoteHtml(note.content_html || "")
+        );
         // Reset typed state because this is a programmatic load.
         hasUserTyped = false;
             // Reload list to highlight active note.
@@ -302,6 +318,242 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (error) {
             // Ignore load failures.
         }
+    };
+
+    // Apply a selected text color to the editor.
+    const applyTextColor = (color, buttonEl) => {
+        // Guard against missing editor.
+        if (!quill) return;
+        // Apply the color format to the editor.
+        quill.format("color", color);
+        // Update active button state.
+        colorButtons.forEach((btn) => {
+            btn.classList.toggle("is-active", btn === buttonEl);
+        });
+        // Refocus the editor for typing.
+        quill.focus();
+    };
+
+    // Enter a code block at the current cursor position.
+    const enterCodeBlock = () => {
+        // Guard against missing editor.
+        if (!quill) return;
+        // Ensure the editor is focused before reading selection.
+        quill.focus();
+        // Read the current selection (or fall back to the last known one).
+        let range = quill.getSelection();
+        if (!range && lastSelection) {
+            range = { index: lastSelection.index, length: lastSelection.length };
+        }
+        // When no selection exists, move the cursor to the end.
+        if (!range) {
+            const length = quill.getLength();
+            range = { index: Math.max(0, length - 1), length: 0 };
+        }
+        // Exit if selection still fails to resolve.
+        if (!range) return;
+        // Restore the selection so the caret stays visible.
+        quill.setSelection(range.index, range.length, "api");
+        // Skip if already inside a code block.
+        const formats = quill.getFormat(range);
+        if (formats["code-block"]) {
+            // Keep focus and selection visible when already in code mode.
+            quill.focus();
+            quill.setSelection(range.index, range.length, "api");
+            return;
+        }
+        // Use a mutable index for inserting a new line.
+        let index = range.index;
+        // Determine line offset at the cursor.
+        const lineInfo = quill.getLine(index);
+        const offset = lineInfo ? lineInfo[1] : 0;
+        // Insert a newline when not at the line start.
+        if (offset !== 0) {
+            quill.insertText(index, "\n", "user");
+            index += 1;
+        }
+        // Clear any inline color before entering code block.
+        quill.format("color", false);
+        // Apply code block formatting on the current line.
+        quill.formatLine(index, 1, "code-block", true);
+        // Move cursor into the code block.
+        quill.setSelection(index, 0, "api");
+        // Ensure the editor keeps focus after the shortcut.
+        quill.focus();
+    };
+
+    // Indent code block lines at the current selection.
+    const indentCodeBlockRange = (range) => {
+        if (!quill || !range) return;
+        const indent = "    ";
+        if (range.length === 0) {
+            quill.insertText(range.index, indent, "user");
+            quill.setSelection(range.index + indent.length, 0, "silent");
+            return;
+        }
+        // Avoid including the next line when selection ends at its start.
+        const effectiveLength = Math.max(0, range.length - 1);
+        const lines = quill.getLines(range.index, effectiveLength);
+        if (!lines || lines.length === 0) return;
+        const lineStarts = lines.map((line) => quill.getIndex(line));
+        for (let i = lineStarts.length - 1; i >= 0; i -= 1) {
+            quill.insertText(lineStarts[i], indent, "user");
+        }
+        const firstLineStart = lineStarts[0];
+        let newIndex = range.index;
+        if (range.index > firstLineStart) {
+            newIndex += indent.length;
+        }
+        const newLength = range.length + indent.length * lineStarts.length;
+        quill.setSelection(newIndex, newLength, "silent");
+    };
+
+    // Create the copy icon markup (matches AI response copy button).
+    const copyIconMarkup = `
+        <span class="llm-copy-btn__icon llm-copy-btn__icon--copy" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </span>
+        <span class="llm-copy-btn__icon llm-copy-btn__icon--check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.2 4.2L19 7.2"></path>
+          </svg>
+        </span>
+    `.trim();
+
+    // Copy text to clipboard with fallback.
+    const copyTextToClipboard = async (text) => {
+        // Prefer modern clipboard API.
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+        // Fallback to a hidden textarea.
+        const helper = document.createElement("textarea");
+        helper.value = text;
+        helper.setAttribute("readonly", "");
+        helper.style.position = "fixed";
+        helper.style.top = "-9999px";
+        helper.style.left = "-9999px";
+        document.body.appendChild(helper);
+        helper.focus();
+        helper.select();
+        const success = document.execCommand("copy");
+        helper.remove();
+        if (!success) {
+            throw new Error("copy-failed");
+        }
+    };
+
+    // Remove empty paragraphs that Quill may insert around code blocks.
+    const sanitizeNoteHtml = (html) => {
+        if (!html) return "";
+        let cleaned = html;
+        // Drop empty paragraphs that appear right before code blocks.
+        cleaned = cleaned.replace(
+            /(?:<p>\s*(?:&nbsp;|<br\s*\/?>)\s*<\/p>\s*)+(?=<pre\b[^>]*class=["'][^"']*\bql-syntax\b[^"']*["'][^>]*>)/gi,
+            ""
+        );
+        // Drop trailing empty paragraphs at the end.
+        cleaned = cleaned.replace(
+            /(?:<p>\s*(?:&nbsp;|<br\s*\/?>)\s*<\/p>\s*)+$/gi,
+            ""
+        );
+        return cleaned;
+    };
+
+    // Provide feedback on copy success/failure.
+    const setCopyButtonFeedback = (button, copied) => {
+        // Guard against missing button.
+        if (!button) return;
+        // Clear any existing feedback timer.
+        if (button._copyFeedbackTimer) {
+            window.clearTimeout(button._copyFeedbackTimer);
+        }
+        // Reset state and apply new status.
+        button.classList.remove("is-copied", "is-copy-failed");
+        button.classList.add(copied ? "is-copied" : "is-copy-failed");
+        // Update labels for accessibility.
+        const defaultLabel = button.getAttribute("data-copy-default") || "Copy";
+        const copiedLabel = button.getAttribute("data-copy-copied") || "Copied";
+        const failedLabel = button.getAttribute("data-copy-failed") || "Copy failed";
+        const activeLabel = copied ? copiedLabel : failedLabel;
+        button.setAttribute("aria-label", activeLabel);
+        button.setAttribute("title", activeLabel);
+        // Restore label after a short delay.
+        button._copyFeedbackTimer = window.setTimeout(() => {
+            button.classList.remove("is-copied", "is-copy-failed");
+            button.setAttribute("aria-label", defaultLabel);
+            button.setAttribute("title", defaultLabel);
+        }, 1200);
+    };
+
+    // Ensure the overlay layer exists above the editor.
+    const ensureCopyOverlayLayer = () => {
+        if (!editorMountEl) return null;
+        const wrap = editorMountEl.closest(".notes-editor-wrap") || editorMountEl.parentElement;
+        if (!wrap) return null;
+        if (!copyOverlayLayer) {
+            copyOverlayLayer = document.createElement("div");
+            copyOverlayLayer.className = "notes-code-copy-layer";
+            wrap.appendChild(copyOverlayLayer);
+        }
+        return copyOverlayLayer;
+    };
+
+    // Update overlay copy buttons without mutating the editor DOM.
+    const updateCopyOverlay = () => {
+        if (!quill) return;
+        const layer = ensureCopyOverlayLayer();
+        if (!layer) return;
+        // Clear existing overlay buttons.
+        layer.innerHTML = "";
+        // Locate code blocks inside the editor.
+        const codeBlocks = Array.from(quill.root.querySelectorAll("pre.ql-syntax"));
+        if (codeBlocks.length === 0) return;
+        const layerRect = layer.getBoundingClientRect();
+        codeBlocks.forEach((codeEl) => {
+            const codeRect = codeEl.getBoundingClientRect();
+            // Skip blocks outside the visible area.
+            if (codeRect.bottom < layerRect.top || codeRect.top > layerRect.bottom) return;
+            // Create an overlay button positioned above the code block.
+            const copyBtn = document.createElement("button");
+            copyBtn.type = "button";
+            copyBtn.className = "notes-copy-code llm-copy-btn";
+            copyBtn.innerHTML = copyIconMarkup;
+            copyBtn.setAttribute("aria-label", "Copy code");
+            copyBtn.setAttribute("title", "Copy code");
+            copyBtn.setAttribute("data-copy-default", "Copy code");
+            copyBtn.setAttribute("data-copy-copied", "Copied");
+            copyBtn.setAttribute("data-copy-failed", "Copy failed");
+            copyBtn.style.position = "absolute";
+            copyBtn.style.top = `${Math.max(0, codeRect.top - layerRect.top) + 8}px`;
+            copyBtn.style.left = `${Math.max(0, codeRect.right - layerRect.left) - 8}px`;
+            copyBtn.style.transform = "translate(-100%, 0)";
+            // Attach copy handler.
+            copyBtn.addEventListener("click", async function () {
+                const textToCopy = (codeEl.textContent || "").trim();
+                if (!textToCopy) return;
+                try {
+                    await copyTextToClipboard(textToCopy);
+                    setCopyButtonFeedback(copyBtn, true);
+                } catch (error) {
+                    setCopyButtonFeedback(copyBtn, false);
+                }
+            });
+            layer.appendChild(copyBtn);
+        });
+    };
+
+    // Schedule a safe overlay refresh.
+    const scheduleCopyOverlayUpdate = () => {
+        if (copyOverlayRaf) return;
+        copyOverlayRaf = window.requestAnimationFrame(() => {
+            copyOverlayRaf = null;
+            updateCopyOverlay();
+        });
     };
 
     // Create a new note on the server.
@@ -312,7 +564,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const payload = {
             title: title,
             tag: tagText,
-            content_html: quill.root.innerHTML || "",
+            content_html: sanitizeNoteHtml(quill.root.innerHTML || ""),
         };
         // Send POST request to list endpoint.
         try {
@@ -347,7 +599,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const detailUrl = buildDetailUrl(currentNoteId);
         // Build update payload.
         const payload = {
-            content_html: quill.root.innerHTML || "",
+            content_html: sanitizeNoteHtml(quill.root.innerHTML || ""),
         };
         // Send POST request to update endpoint.
         try {
@@ -388,6 +640,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const deleteCurrentNote = async () => {
         // Guard against missing note ID.
         if (!currentNoteId) return;
+        // Ask for confirmation before permanent delete.
+        const confirmDelete = window.confirm(
+            "Delete this note? This action cannot be undone."
+        );
+        // Exit when the user cancels.
+        if (!confirmDelete) return;
         // Build detail URL for deletion.
         const detailUrl = buildDetailUrl(currentNoteId);
         // Send DELETE request.
@@ -421,6 +679,8 @@ document.addEventListener("DOMContentLoaded", function () {
             theme: "snow",
             modules: {
                 toolbar: false,
+                // Enable syntax highlighting for code blocks.
+                syntax: true,
                 keyboard: {
                     bindings: {
                         heading1: {
@@ -442,8 +702,8 @@ document.addEventListener("DOMContentLoaded", function () {
                             },
                         },
                         paragraph: {
-                            key: "0",
-                            shortKey: true,
+                            key: "P",
+                            altKey: true,
                             handler: function () {
                                 if (shortcutsDisabled()) return true;
                                 this.quill.format("header", false);
@@ -463,12 +723,73 @@ document.addEventListener("DOMContentLoaded", function () {
                                 return false;
                             },
                         },
-                        inlineCode: {
-                            key: "K",
-                            shortKey: true,
+                        codeBlock: {
+                            key: "X",
+                            // shortKey: true,
+                            shiftKey: true,
                             handler: function (range, context) {
+                                // Skip shortcut handling on mobile.
                                 if (shortcutsDisabled()) return true;
-                                this.quill.format("code", !context.format.code);
+                                // Enter a code block at the cursor.
+                                enterCodeBlock();
+                                return false;
+                            },
+                        },
+                        codeBlockTab: {
+                            key: 9,
+                            shiftKey: false,
+                            format: ["code-block"],
+                            handler: function (range, context) {
+                                // Skip shortcut handling on mobile.
+                                if (shortcutsDisabled()) return true;
+                                // Only handle when inside a code block.
+                                if (!context.format["code-block"]) return true;
+                                indentCodeBlockRange(range);
+                                return false;
+                            },
+                        },
+                        codeBlockEnter: {
+                            key: 13,
+                            shiftKey: false,
+                            format: ["code-block"],
+                            handler: function (range, context) {
+                                // Skip shortcut handling on mobile.
+                                if (shortcutsDisabled()) return true;
+                                // Only handle when inside a code block.
+                                if (!context.format["code-block"]) return true;
+                                // Remove any selected text first.
+                                if (range.length > 0) {
+                                    this.quill.deleteText(range.index, range.length, "user");
+                                }
+                                // Read the current line indentation.
+                                const lineInfo = this.quill.getLine(range.index);
+                                const line = lineInfo ? lineInfo[0] : null;
+                                let indent = "";
+                                if (line) {
+                                    const lineStart = this.quill.getIndex(line);
+                                    const lineText = this.quill.getText(lineStart, line.length());
+                                    const match = lineText.match(/^[\t ]+/);
+                                    if (match) indent = match[0];
+                                }
+                                this.quill.insertText(range.index, `\n${indent}`, "user");
+                                this.quill.setSelection(range.index + 1 + indent.length, 0, "silent");
+                                return false;
+                            },
+                        },
+                        exitCodeBlock: {
+                            key: "Enter",
+                            shiftKey: true,
+                            handler: function (range, context) {
+                                // Skip shortcut handling on mobile.
+                                if (shortcutsDisabled()) return true;
+                                // Only handle exit when currently in a code block.
+                                if (!context.format["code-block"]) return true;
+                                // Insert a newline.
+                                this.quill.insertText(range.index, "\n", "user");
+                                // Remove code block formatting on the next line.
+                                this.quill.formatLine(range.index + 1, 1, "code-block", false);
+                                // Move cursor to the new normal line.
+                                this.quill.setSelection(range.index + 1, 0, "silent");
                                 return false;
                             },
                         },
@@ -490,7 +811,35 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Schedule autosave for existing notes.
                 scheduleAutosave();
             }
+            // Refresh overlay copy buttons after changes.
+            scheduleCopyOverlayUpdate();
         });
+        // Track the last known selection so shortcuts can restore focus.
+        quill.on("selection-change", function (range) {
+            if (range) {
+                lastSelection = { index: range.index, length: range.length };
+            }
+        });
+        // Force Tab to indent only at the caret inside code blocks.
+        quill.root.addEventListener("keydown", function (event) {
+            if (shortcutsDisabled()) return;
+            if (!quill) return;
+            if (event.key !== "Tab") return;
+            const range = quill.getSelection();
+            if (!range) return;
+            const formats = quill.getFormat(range);
+            if (!formats["code-block"]) return;
+            // Stop Quill's default multi-line indent handler.
+            event.preventDefault();
+            event.stopPropagation();
+            indentCodeBlockRange(range);
+        }, true);
+        // Keep overlay buttons aligned while scrolling inside the editor.
+        quill.root.addEventListener("scroll", scheduleCopyOverlayUpdate, { passive: true });
+        // Update overlay on window resize.
+        window.addEventListener("resize", scheduleCopyOverlayUpdate);
+        // Ensure overlay is attached on init.
+        scheduleCopyOverlayUpdate();
     };
 
     // Handle opening the notes panel.
@@ -653,6 +1002,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (saveBtn) saveBtn.addEventListener("click", handleSave);
     // Attach save modal exit handler.
     if (exitBtn) exitBtn.addEventListener("click", handleExit);
+    // Attach color button handlers for text color.
+    colorButtons.forEach((buttonEl) => {
+        buttonEl.addEventListener("click", function () {
+            // Read the color value from the data attribute.
+            const colorValue = buttonEl.dataset.notesColor || "";
+            // Skip when no color is provided.
+            if (!colorValue) return;
+            // Apply the selected color to the editor.
+            applyTextColor(colorValue, buttonEl);
+        });
+    });
     // Close modal on Escape key.
     document.addEventListener("keydown", function (event) {
         if (event.key !== "Escape") return;

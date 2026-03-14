@@ -238,6 +238,62 @@ body.notes-open .notes-backdrop {
     margin: 0;
 }
 
+/* Color toolbar container. */
+.notes-panel__colors {
+    /* Arrange color buttons in a row. */
+    display: inline-flex;
+    /* Add spacing between color buttons. */
+    gap: 0.4rem;
+    /* Align buttons vertically. */
+    align-items: center;
+}
+
+/* Base color button style. */
+.notes-color-btn {
+    /* Use a small circular size. */
+    width: 26px;
+    /* Match height to width for a circle. */
+    height: 26px;
+    /* Remove default button border. */
+    border: 1px solid var(--notes-panel-border);
+    /* Make the button circular. */
+    border-radius: 999px;
+    /* Apply the swatch color. */
+    background: var(--swatch, #ffffff);
+    /* Set the icon color for contrast. */
+    color: var(--swatch-text, #1b2630);
+    /* Center the icon. */
+    display: inline-flex;
+    /* Align icon horizontally. */
+    align-items: center;
+    /* Align icon vertically. */
+    justify-content: center;
+    /* Use pointer cursor for interaction. */
+    cursor: pointer;
+    /* Add a subtle inset ring for visibility. */
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+/* Active color button state. */
+.notes-color-btn.is-active {
+    /* Highlight the active color with an outline. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset outline for clarity. */
+    outline-offset: 2px;
+}
+
+/* Color button icon styling. */
+.notes-color-btn__icon {
+    /* Use a compact font size for the icon. */
+    font-size: 0.7rem;
+    /* Make the icon bold for clarity. */
+    font-weight: 700;
+    /* Disable pointer events on the icon. */
+    pointer-events: none;
+    /* Keep text crisp. */
+    line-height: 1;
+}
+
 /* Action button group. */
 .notes-panel__actions {
     /* Lay out action buttons horizontally. */
@@ -538,6 +594,8 @@ body.notes-open .notes-backdrop {
 .notes-editor-wrap {
     /* Fill available height. */
     height: 100%;
+    /* Anchor overlay buttons to the editor area. */
+    position: relative;
     /* Allow scrolling inside editor area. */
     overflow: hidden;
     /* Use background that matches panel. */
@@ -570,12 +628,14 @@ body.notes-open .notes-backdrop {
     line-height: var(--lh-reading);
     /* Ensure the editor has a minimum height. */
     min-height: 100%;
+    /* Force a visible caret for normal text. */
+    caret-color: var(--color-text);
 }
 
 /* Explicit paragraph font size for normal text. */
 .notes-editor .ql-editor p {
     /* Increase paragraph font size for readability. */
-    font-size: 1.1rem;
+    font-size: 1rem;
 }
 
 /* Quill placeholder styling for visibility. */
@@ -632,12 +692,110 @@ body.notes-open .notes-backdrop {
     background: var(--notes-code-bg);
     /* Use code text color. */
     color: var(--notes-code-text);
+    /* Force a visible caret inside code blocks. */
+    caret-color: var(--notes-code-text);
     /* Add a border for separation. */
     border: 1px solid var(--notes-code-border);
     /* Add rounding to code blocks. */
     border-radius: 8px;
     /* Add padding inside code blocks. */
     padding: var(--space-3);
+}
+
+/* Overlay layer for code copy buttons (outside Quill DOM). */
+.notes-code-copy-layer {
+    /* Cover the editor area. */
+    position: absolute;
+    /* Stretch across the editor wrap. */
+    inset: 0;
+    /* Keep overlay above the editor content. */
+    z-index: 2;
+    /* Allow clicks only on buttons. */
+    pointer-events: none;
+}
+
+/* Copy button styling (match AI response copy icon). */
+.notes-code-copy-layer .llm-copy-btn {
+    /* Re-enable clicks on buttons. */
+    pointer-events: auto;
+    /* Remove default button styles. */
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    /* Match AI icon color tone. */
+    color: var(--color-text-muted);
+    /* Layout for icon. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.14s ease, opacity 0.14s ease;
+}
+
+.notes-code-copy-layer .llm-copy-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.notes-code-copy-layer .llm-copy-btn__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notes-code-copy-layer .llm-copy-btn__icon--check {
+    display: none;
+}
+
+.notes-code-copy-layer .llm-copy-btn:hover:not(:disabled) {
+    color: var(--color-text);
+}
+
+.notes-code-copy-layer .llm-copy-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.notes-code-copy-layer .llm-copy-btn.is-copied {
+    color: #2D9D64;
+}
+
+.notes-code-copy-layer .llm-copy-btn.is-copied .llm-copy-btn__icon--copy {
+    display: none;
+}
+
+.notes-code-copy-layer .llm-copy-btn.is-copied .llm-copy-btn__icon--check {
+    display: inline-flex;
+}
+
+.notes-code-copy-layer .llm-copy-btn.is-copy-failed {
+    color: #ef6363;
+}
+
+/* Focus ring for copy button accessibility. */
+.notes-code-copy-layer .llm-copy-btn:focus-visible {
+    /* Apply accent outline. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset for visibility. */
+    outline-offset: 2px;
+}
+
+/* Code block wrapper for copy button layout. */
+.notes-code-block-wrap {
+    /* Stack copy button above the code block. */
+    display: grid;
+    /* Add spacing between button and code block. */
+    gap: 0.35rem;
+    /* Provide top spacing around blocks. */
+    margin: 0.5rem 0;
+}
+
+/* Place copy button at the top of each code block. */
+.notes-copy-code {
+    /* Align copy button to the right. */
+    justify-self: end;
 }
 
 /* ============================================= */
