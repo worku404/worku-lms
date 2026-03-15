@@ -6,23 +6,6 @@
     --workspace-modules-max-current: var(--course-modules-max);
 }
 
-.app-body.has-assistant.assistant-hidden {
-    --util-width: 0px;
-}
-
-.app-body.has-assistant.assistant-sidebar-open {
-    /* Reclaim horizontal space from left rails when chat sidebar is open. */
-    --rail-left-current: var(--rail-left-compact);
-    --workspace-modules-min-current: var(--course-modules-min-compact);
-    --workspace-modules-max-current: var(--course-modules-max-compact);
-}
-
-.app-body.has-assistant.assistant-sidebar-open .l-shell {
-    /* Match left-side tightness: no extra grid spacer when AI rail is open. */
-    column-gap: 0;
-    /* Remove right shell padding so the fixed AI panel aligns with grid edge. */
-    padding-right: 0;
-}
 
 .skip-link {
     position: absolute;
@@ -168,21 +151,6 @@
 
 }
 
-.app-body.has-assistant.assistant-hidden .l-util {
-    overflow: visible;
-    pointer-events: none;
-}
-
-.app-body.has-assistant.assistant-hidden .l-util > * {
-    pointer-events: auto;
-}
-@media (min-width: 1024px) {
-    .app-body.has-assistant {
-        /* Match a Copilot-like sidebar width on desktop. */
-        --rail-right: 500px;
-    }
-}
-
 @media (max-width: 1200px) {
     :root {
         --rail-left: 240px;
@@ -243,14 +211,4 @@
         position: static;
     }
 
-    .app-body.has-assistant.assistant-sidebar-open .l-util .assistance {
-        position: fixed;
-        top: var(--assistant-top-offset, var(--topbar-height));
-        right: 0;
-        width: min(95vw, 420px);
-        max-height: calc(100vh - var(--assistant-top-offset, var(--topbar-height)));
-        z-index: 1200;
-        border-left: 1px solid var(--color-border);
-        box-shadow: -8px 0 24px rgba(var(--color-shadow), 0.12);
-    }
 }
