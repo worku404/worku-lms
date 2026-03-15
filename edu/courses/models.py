@@ -96,6 +96,69 @@ class CourseSearchIndex(models.Model):
         return f"SearchIndex(course={self.course_id})"
 
 
+class ContentSearchEntry(models.Model):
+    # Each row represents a searchable unit of content (or a PDF page).
+    content = models.ForeignKey(
+        "Content",
+        related_name="search_entries",
+        on_delete=models.CASCADE,
+    )
+    course = models.ForeignKey(
+        "Course",
+        related_name="content_search_entries",
+        on_delete=models.CASCADE,
+    )
+    module = models.ForeignKey(
+        "Module",
+        related_name="content_search_entries",
+        on_delete=models.CASCADE,
+    )
+    # Cache the content model name (text/video/image/file).
+    kind = models.CharField(max_length=24)
+    # Cache the content title for display.
+    item_title = models.CharField(max_length=250, blank=True, default="")
+    # Searchable document text (plain text).
+    document = models.TextField(blank=True, default="")
+    # Optional page number when the entry maps to a PDF page.
+    page_number = models.PositiveIntegerField(null=True, blank=True)
+    # Auto-updated timestamp for ranking/maintenance.
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(
+                SearchVector(
+                    Func(
+                        F("document"),
+                        function="immutable_unaccent",
+                        output_field=models.TextField(),
+                    ),
+                    config="simple",
+                ),
+                name="content_idx_doc_tsv_gin",
+            ),
+            GinIndex(
+                fields=["document"],
+                opclasses=["gin_trgm_ops"],
+                name="content_idx_doc_trgm_gin",
+            ),
+            models.Index(
+                fields=["course", "module", "content"],
+                name="content_idx_course_module",
+            ),
+            models.Index(
+                fields=["kind", "page_number"],
+                name="content_idx_kind_page",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        label = f"content={self.content_id}"
+        if self.page_number:
+            label = f"{label}, page={self.page_number}"
+        return f"ContentSearchEntry({label})"
+
+
 class Module(models.Model):
     # Module belongs to a course; deleting course deletes its modules
     course = models.ForeignKey(

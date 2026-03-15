@@ -24,6 +24,7 @@ class PdfIndexResult:
     text: str
     page_count: int
     error: str
+    page_texts: list[str]
 
 
 def _normalize_text(value: str) -> str:
@@ -36,7 +37,7 @@ def _is_pdf_path(name: str) -> bool:
 
 def extract_pdf_index_data(file_obj: File) -> PdfIndexResult:
     if not file_obj.file or not _is_pdf_path(file_obj.file.name):
-        return PdfIndexResult(status="skipped", text="", page_count=0, error="")
+        return PdfIndexResult(status="skipped", text="", page_count=0, error="", page_texts=[])
 
     if PdfReader is None:
         return PdfIndexResult(
@@ -44,6 +45,7 @@ def extract_pdf_index_data(file_obj: File) -> PdfIndexResult:
             text="",
             page_count=0,
             error="pypdf not installed",
+            page_texts=[],
         )
 
     try:
@@ -53,18 +55,22 @@ def extract_pdf_index_data(file_obj: File) -> PdfIndexResult:
             max_pages = max(1, min(page_total, PDF_INDEX_MAX_PAGES))
 
             chunks = []
+            page_texts: list[str] = []
             current_chars = 0
             for idx in range(max_pages):
                 raw = reader.pages[idx].extract_text() or ""
                 clean = _normalize_text(raw)
                 if not clean:
+                    page_texts.append("")
                     continue
                 remaining = PDF_INDEX_MAX_CHARS - current_chars
                 if remaining <= 0:
-                    break
+                    page_texts.append("")
+                    continue
                 if len(clean) > remaining:
                     clean = clean[:remaining]
                 chunks.append(clean)
+                page_texts.append(clean)
                 current_chars += len(clean)
 
             return PdfIndexResult(
@@ -72,6 +78,7 @@ def extract_pdf_index_data(file_obj: File) -> PdfIndexResult:
                 text="\n".join(chunks),
                 page_count=page_total,
                 error="",
+                page_texts=page_texts,
             )
     except Exception as exc:
         return PdfIndexResult(
@@ -79,6 +86,7 @@ def extract_pdf_index_data(file_obj: File) -> PdfIndexResult:
             text="",
             page_count=0,
             error=str(exc)[:PDF_INDEX_ERROR_MAX],
+            page_texts=[],
         )
 
 

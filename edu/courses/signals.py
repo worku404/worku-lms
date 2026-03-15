@@ -3,9 +3,12 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from rest_framework.authtoken.models import Token
 
-from .models import Content, Course, File, Module, Subject
+from .models import Content, Course, File, Module, Subject, Text, Video, Image, ContentSearchEntry
 from .pdf_indexing import update_pdf_index_for_file
 from .search import (
+    refresh_content_search_entries_for_content,
+    refresh_content_search_entries_for_file,
+    refresh_content_search_entries_for_item,
     refresh_course_search_index,
     refresh_file_related_course_indexes,
     refresh_subject_course_indexes,
@@ -36,15 +39,34 @@ def update_subject_courses_search_indexes(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Content)
-@receiver(post_delete, sender=Content)
-def refresh_course_index_for_content_mutation(sender, instance, **kwargs):
+def refresh_course_index_for_content_save(sender, instance, **kwargs):
     if instance.module_id:
         course_id = Module.objects.filter(id=instance.module_id).values_list("course_id", flat=True).first()
         if course_id:
             refresh_course_search_index(course_id)
+    refresh_content_search_entries_for_content(instance)
+
+
+@receiver(post_delete, sender=Content)
+def refresh_course_index_for_content_delete(sender, instance, **kwargs):
+    if instance.module_id:
+        course_id = Module.objects.filter(id=instance.module_id).values_list("course_id", flat=True).first()
+        if course_id:
+            refresh_course_search_index(course_id)
+    # Ensure content-level entries are removed on delete.
+    ContentSearchEntry.objects.filter(content_id=instance.id).delete()
 
 
 @receiver(post_save, sender=File)
 def update_pdf_index_and_refresh_search(sender, instance, **kwargs):
-    update_pdf_index_for_file(instance.id)
+    result = update_pdf_index_for_file(instance.id)
+    if result:
+        refresh_content_search_entries_for_file(instance.id, page_texts=result.page_texts)
     refresh_file_related_course_indexes(instance.id)
+
+
+@receiver(post_save, sender=Text)
+@receiver(post_save, sender=Video)
+@receiver(post_save, sender=Image)
+def refresh_content_entries_for_items(sender, instance, **kwargs):
+    refresh_content_search_entries_for_item(instance)
