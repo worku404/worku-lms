@@ -9,7 +9,6 @@ class LLMForm(forms.Form):
             'rows': 1,
             'class': 'llm--textarea',
             'placeholder': 'Ask anything',
-            'id': 'id_prompt',
-            'style': 'resize:none;overflow:hidden;'
+            'id': 'id_prompt'
         })
     )

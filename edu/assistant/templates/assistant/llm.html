@@ -1,3 +1,5 @@
+<div class="assistant-resize-handle" data-assistant-resize-handle aria-hidden="true"></div>
+
 <div class="assistance-toolbar">
   <span class="assistance-title">AI Assistant</span>
   <div class="assistance-toolbar-actions">
@@ -61,6 +63,10 @@
   {% comment %} const assistantHideBtn = document.getElementById("assistant-hide-btn"); {% endcomment %}
   const assistantCloseBtn = document.getElementById("assistant-close-btn");
   const assistantUiStateKey = "assistant_ui_state";
+  const assistantSidebarWidthKey = "assistant_sidebar_width";
+  const desktopMediaQuery = window.matchMedia
+    ? window.matchMedia("(min-width: 901px)")
+    : null;
 
   const persistAssistantState = (state) => {
     try {
@@ -68,6 +74,18 @@
     } catch (error) {
       // Ignore storage failures (private mode / blocked storage).
     }
+  };
+
+  const readAssistantState = () => {
+    try {
+      const stored = localStorage.getItem(assistantUiStateKey);
+      if (stored === "hidden" || stored === "inline" || stored === "sidebar") {
+        return stored;
+      }
+    } catch (error) {
+      // Ignore storage failures.
+    }
+    return "hidden";
   };
 
   const updateAssistantOffset = () => {
@@ -82,26 +100,33 @@
     assistantLauncher.setAttribute("aria-expanded", String(!isHidden));
   };
 
-  const showInlineAssistant = () => {
-    bodyEl.classList.remove("assistant-hidden");
-    bodyEl.classList.remove("assistant-sidebar-open");
-    persistAssistantState("inline");
+  const setAssistantState = (state, { persist = true } = {}) => {
+    const nextState = state === "sidebar" || state === "inline" ? state : "hidden";
+    bodyEl.classList.toggle("assistant-hidden", nextState === "hidden");
+    bodyEl.classList.toggle("assistant-sidebar-open", nextState === "sidebar");
+    if (nextState !== "sidebar") {
+      bodyEl.classList.remove("assistant-resizing");
+    }
+    if (persist) {
+      persistAssistantState(nextState);
+    }
     syncAssistantLauncher();
+    if (nextState === "sidebar") {
+      window.requestAnimationFrame(updateScrollBottomVisibility);
+    }
+  };
+
+  const showInlineAssistant = () => {
+    setAssistantState("inline");
   };
 
   const hideAssistant = () => {
-    bodyEl.classList.add("assistant-hidden");
-    bodyEl.classList.remove("assistant-sidebar-open");
-    persistAssistantState("hidden");
-    syncAssistantLauncher();
+    setAssistantState("hidden");
   };
 
   const openAssistantSidebar = () => {
-    bodyEl.classList.remove("assistant-hidden");
-    bodyEl.classList.add("assistant-sidebar-open");
-    persistAssistantState("sidebar");
-    syncAssistantLauncher();
-    window.requestAnimationFrame(updateScrollBottomVisibility);
+    setAssistantState("sidebar");
+    restoreAssistantSidebarWidth();
   };
 
   const focusAssistantPrompt = () => {
@@ -134,41 +159,70 @@
     focusAssistantPrompt();
   };
 
-  document.addEventListener("keydown", function (event) {
-    const isToggleShortcut =
-      (event.ctrlKey || event.metaKey) &&
-      !event.altKey &&
-      !event.shiftKey &&
-      String(event.key).toLowerCase() === "b";
+  const parseCssPx = (value, fallback) => {
+    const parsed = Number.parseFloat(String(value || "").trim());
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
 
-    if (!isToggleShortcut) return;
-    // Allow toggle inside the assistant prompt itself so Ctrl/Cmd+B can also close.
-    if (isEditableTarget(event.target) && event.target?.id !== "id_prompt") return;
-    // Prevent browser default (for example bookmarks toggle) and handle sidebar toggle.
-    event.preventDefault();
-    toggleAssistantSidebar();
-  });
+  const getAssistantSidebarLimits = () => {
+    const styles = getComputedStyle(document.documentElement);
+    const minWidth = parseCssPx(styles.getPropertyValue("--assistant-sidebar-min-width"), 320);
+    const maxWidth = parseCssPx(styles.getPropertyValue("--assistant-sidebar-max-width"), 720);
+    return { minWidth, maxWidth };
+  };
 
-  if (assistantPanel) {
-    updateAssistantOffset();
-    window.addEventListener("resize", updateAssistantOffset);
+  const clampValue = (value, min, max) => Math.min(Math.max(value, min), max);
 
-    //if (assistantHideBtn) {
-    //  assistantHideBtn.addEventListener("click", hideAssistant);
-    //}
-    if (assistantCloseBtn) {
-      assistantCloseBtn.addEventListener("click", hideAssistant);
+  const getStoredAssistantWidth = () => {
+    try {
+      const stored = localStorage.getItem(assistantSidebarWidthKey);
+      const parsed = Number.parseFloat(stored);
+      return Number.isFinite(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
     }
-    if (assistantLauncher) {
-      assistantLauncher.addEventListener("click", () => {
-        openAssistantSidebar();
-        focusAssistantPrompt();
-      });
-    }
+  };
 
-    // Always start collapsed: show only AI launcher button until user opens it.
-    hideAssistant();
-  }
+  const clearAssistantSidebarWidth = () => {
+    document.documentElement.style.removeProperty("--assistant-sidebar-width");
+  };
+
+  const applyAssistantSidebarWidth = (value, { persist = false } = {}) => {
+    if (desktopMediaQuery && !desktopMediaQuery.matches) return;
+    const { minWidth, maxWidth } = getAssistantSidebarLimits();
+    const viewportMax = Math.max(minWidth, Math.min(maxWidth, window.innerWidth - 80));
+    const clamped = clampValue(value, minWidth, viewportMax);
+    document.documentElement.style.setProperty("--assistant-sidebar-width", `${clamped}px`);
+    if (persist) {
+      try {
+        localStorage.setItem(assistantSidebarWidthKey, String(Math.round(clamped)));
+      } catch (error) {
+        // Ignore storage failures.
+      }
+    }
+  };
+
+  const restoreAssistantSidebarWidth = () => {
+    if (desktopMediaQuery && !desktopMediaQuery.matches) {
+      clearAssistantSidebarWidth();
+      return;
+    }
+    const storedWidth = getStoredAssistantWidth();
+    if (storedWidth) {
+      applyAssistantSidebarWidth(storedWidth);
+    }
+  };
+
+  const getCurrentSidebarWidth = () => {
+    const styles = getComputedStyle(document.documentElement);
+    const fromVar = parseCssPx(styles.getPropertyValue("--assistant-sidebar-width"), null);
+    if (fromVar) return fromVar;
+    if (assistantPanel) {
+      const rect = assistantPanel.getBoundingClientRect();
+      if (rect && rect.width) return rect.width;
+    }
+    return parseCssPx(styles.getPropertyValue("--assistant-sidebar-min-width"), 360);
+  };
 
   const historyEl = document.getElementById("llm-history");
   const historyContainerEl = document.getElementById("history-container");
@@ -219,18 +273,141 @@
     </span>
   `.trim();
 
-const isHistoryNearBottom = (container, threshold = 14) => {
-  if (!container) return true;
-  return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
-};
+  const isHistoryNearBottom = (container, threshold = 14) => {
+    if (!container) return true;
+    return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+  };
 
-const updateScrollBottomVisibility = () => {
-  if (!historyContainerEl || !scrollBottomBtn) return;
-  const hasOverflow = historyContainerEl.scrollHeight > historyContainerEl.clientHeight + 2;
-  const shouldShow = hasOverflow && !isHistoryNearBottom(historyContainerEl);
-  scrollBottomBtn.hidden = !shouldShow;
-  scrollBottomBtn.classList.toggle("is-visible", shouldShow);
-};
+  const updateScrollBottomVisibility = () => {
+    if (!historyContainerEl || !scrollBottomBtn) return;
+    const hasOverflow = historyContainerEl.scrollHeight > historyContainerEl.clientHeight + 2;
+    const shouldShow = hasOverflow && !isHistoryNearBottom(historyContainerEl);
+    scrollBottomBtn.hidden = !shouldShow;
+    scrollBottomBtn.classList.toggle("is-visible", shouldShow);
+  };
+
+  const handleViewportChange = () => {
+    if (desktopMediaQuery && !desktopMediaQuery.matches) {
+      bodyEl.classList.remove("assistant-resizing");
+      clearAssistantSidebarWidth();
+      return;
+    }
+    restoreAssistantSidebarWidth();
+  };
+
+  const setupResizeHandle = () => {
+    if (!assistantPanel) return;
+    const resizeHandle = assistantPanel.querySelector("[data-assistant-resize-handle]");
+    if (!resizeHandle) return;
+
+    const getHandleWidth = () => {
+      const styles = getComputedStyle(document.documentElement);
+      return parseCssPx(styles.getPropertyValue("--assistant-resize-handle-width"), 10);
+    };
+
+    let startX = 0;
+    let startWidth = 0;
+    let activePointerId = null;
+
+    const startResize = (event) => {
+      if (event.button !== 0) return;
+      if (!bodyEl.classList.contains("assistant-sidebar-open")) return;
+      if (desktopMediaQuery && !desktopMediaQuery.matches) return;
+      event.preventDefault();
+      activePointerId = event.pointerId;
+      startX = event.clientX;
+      startWidth = getCurrentSidebarWidth();
+      bodyEl.classList.add("assistant-resizing");
+      if (resizeHandle.setPointerCapture) {
+        resizeHandle.setPointerCapture(event.pointerId);
+      }
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", stopResize);
+      window.addEventListener("pointercancel", stopResize);
+    };
+
+    const onPointerMove = (event) => {
+      if (activePointerId === null) return;
+      const delta = startX - event.clientX;
+      applyAssistantSidebarWidth(startWidth + delta);
+    };
+
+    const stopResize = () => {
+      if (activePointerId === null) return;
+      if (resizeHandle.hasPointerCapture && resizeHandle.hasPointerCapture(activePointerId)) {
+        resizeHandle.releasePointerCapture(activePointerId);
+      }
+      activePointerId = null;
+      bodyEl.classList.remove("assistant-resizing");
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      applyAssistantSidebarWidth(getCurrentSidebarWidth(), { persist: true });
+    };
+
+    const isInResizeZone = (event) => {
+      const rect = assistantPanel.getBoundingClientRect();
+      const handleWidth = getHandleWidth();
+      return event.clientX - rect.left <= handleWidth + 2;
+    };
+
+    resizeHandle.addEventListener("pointerdown", startResize);
+    assistantPanel.addEventListener("pointerdown", (event) => {
+      if (!isInResizeZone(event)) return;
+      startResize(event);
+    });
+  };
+
+  document.addEventListener("keydown", function (event) {
+    const isToggleShortcut =
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      String(event.key).toLowerCase() === "b";
+
+    if (!isToggleShortcut) return;
+    // Allow toggle inside the assistant prompt itself so Ctrl/Cmd+B can also close.
+    if (isEditableTarget(event.target) && event.target?.id !== "id_prompt") return;
+    // Prevent browser default (for example bookmarks toggle) and handle sidebar toggle.
+    event.preventDefault();
+    toggleAssistantSidebar();
+  });
+
+  if (assistantPanel) {
+    updateAssistantOffset();
+    const handleWindowResize = () => {
+      updateAssistantOffset();
+      handleViewportChange();
+    };
+    window.addEventListener("resize", handleWindowResize);
+
+    //if (assistantHideBtn) {
+    //  assistantHideBtn.addEventListener("click", hideAssistant);
+    //}
+    if (assistantCloseBtn) {
+      assistantCloseBtn.addEventListener("click", hideAssistant);
+    }
+    if (assistantLauncher) {
+      assistantLauncher.addEventListener("click", () => {
+        openAssistantSidebar();
+        focusAssistantPrompt();
+      });
+    }
+
+    setupResizeHandle();
+
+    const initialState = readAssistantState();
+    setAssistantState(initialState, { persist: false });
+    handleViewportChange();
+
+    if (desktopMediaQuery) {
+      if (typeof desktopMediaQuery.addEventListener === "function") {
+        desktopMediaQuery.addEventListener("change", handleViewportChange);
+      } else if (typeof desktopMediaQuery.addListener === "function") {
+        desktopMediaQuery.addListener(handleViewportChange);
+      }
+    }
+  }
 
 const copyTextToClipboard = async (text) => {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
