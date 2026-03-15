@@ -133,7 +133,12 @@
                 {% if module %}
                     {% for content in module_contents %}
                         {% with item=content.item %}
-                            <article class="c-card c-content-block" data-content-model="{{ content.content_type.model }}">
+                            <article
+                                class="c-card c-content-block"
+                                data-content-model="{{ content.content_type.model }}"
+                                data-content-id="{{ content.id }}"
+                                id="content-{{ content.id }}"
+                            >
                                 <h2 class="c-card__title">{{ item.title }}</h2>
                                 <div class="c-content-render">
                                     {% if content.content_type.model == "text" %}
@@ -946,8 +951,85 @@ window.addEventListener("resize", function () {
     refreshPdfLayouts();
 }, { passive: true });
 
+const searchParams = new URLSearchParams(window.location.search);
+const targetContentId = Number(searchParams.get("content_id") || 0);
+const searchQuery = (searchParams.get("q") || "").trim();
+const targetPage = Number(searchParams.get("page") || 0);
+
+const targetContentEl = targetContentId
+    ? document.querySelector(`[data-content-id="${targetContentId}"]`)
+    : null;
+
+if (targetContentEl && targetPage) {
+    const pdfViewer = targetContentEl.querySelector(".js-pdf-viewer");
+    if (pdfViewer) {
+        pdfViewer.dataset.startPage = String(targetPage);
+        pdfViewer.dataset.maxPageSeen = String(targetPage);
+    }
+}
+
+function escapeSearchRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightMatchesInElement(root, query) {
+    if (!root || !query) return;
+    const normalized = String(query || "").trim();
+    if (!normalized) return;
+    const regex = new RegExp(escapeSearchRegExp(normalized), "gi");
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+            if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+            if (parent.closest("script, style, mark, pre, code")) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        },
+    });
+    const nodes = [];
+    while (walker.nextNode()) {
+        nodes.push(walker.currentNode);
+    }
+    nodes.forEach((textNode) => {
+        const text = textNode.nodeValue;
+        if (!regex.test(text)) return;
+        regex.lastIndex = 0;
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+        text.replace(regex, (match, offset) => {
+            if (offset > lastIndex) {
+                fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+            }
+            const mark = document.createElement("mark");
+            mark.className = "search-highlight";
+            mark.textContent = match;
+            fragment.appendChild(mark);
+            lastIndex = offset + match.length;
+        });
+        if (lastIndex < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+        textNode.parentNode.replaceChild(fragment, textNode);
+    });
+}
+
+function applySearchTarget() {
+    if (!targetContentEl) return;
+    targetContentEl.classList.add("is-search-target");
+    targetContentEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (searchQuery) {
+        const renderEl = targetContentEl.querySelector(".c-content-render") || targetContentEl;
+        highlightMatchesInElement(renderEl, searchQuery);
+        const firstMark = renderEl.querySelector("mark.search-highlight");
+        if (firstMark) {
+            firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+}
+
 trackVisibleText(false);
 initPdfViewers();
+window.requestAnimationFrame(applySearchTarget);
 
 if (document.body && typeof MutationObserver === "function") {
     // Listen for body class toggles (assistant sidebar open/close) and refresh PDF layout.

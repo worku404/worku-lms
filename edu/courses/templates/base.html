@@ -61,7 +61,7 @@
                 {% endif %}
             </div>
 
-            <form class="c-search topbar__search" action="{% url 'course_list' %}" method="get" role="search" aria-label="Search courses">
+            <form class="c-search topbar__search" action="{% url 'global_search' %}" method="get" role="search" aria-label="Search courses">
                 <label class="u-sr-only" for="global-search">Search courses</label>
                 <input
                     id="global-search"
@@ -69,7 +69,7 @@
                     name="q"
                     type="search"
                     value="{{ request.GET.q|default:'' }}"
-                    placeholder="Search courses, topics, instructors"
+                    placeholder="Search courses, topics, notes"
                 >
                 <button type="submit" class="c-btn c-btn--ghost">Search</button>
             </form>

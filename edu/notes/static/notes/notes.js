@@ -1021,6 +1021,22 @@ document.addEventListener("DOMContentLoaded", function () {
         handleExit();
     });
 
+    // Open a note directly from search params (note_id + note_q).
+    const openNoteFromSearchParams = async () => {
+        const params = new URLSearchParams(window.location.search);
+        const noteId = Number(params.get("note_id") || 0);
+        const noteQuery = (params.get("note_q") || params.get("q") || "").trim();
+        if (!noteId) return;
+        handleOpen();
+        await loadNote(noteId);
+        if (!quill || !noteQuery) return;
+        const fullText = quill.getText() || "";
+        const index = fullText.toLowerCase().indexOf(noteQuery.toLowerCase());
+        if (index < 0) return;
+        quill.focus();
+        quill.setSelection(index, noteQuery.length, "api");
+    };
+
     // Toggle notes panel with Alt+N.
     document.addEventListener("keydown", function (event) {
         // Use Alt+N without Ctrl/Shift/Meta.
@@ -1036,4 +1052,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Toggle the notes panel.
         toggleNotesPanel();
     });
+
+    // Auto-open notes when coming from search results.
+    openNoteFromSearchParams();
 });

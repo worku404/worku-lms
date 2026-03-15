@@ -635,7 +635,7 @@ body.notes-open .notes-backdrop {
 /* Explicit paragraph font size for normal text. */
 .notes-editor .ql-editor p {
     /* Increase paragraph font size for readability. */
-    font-size: 1rem;
+    font-size: 1.1rem;
 }
 
 /* Quill placeholder styling for visibility. */
