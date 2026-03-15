@@ -1,5 +1,8 @@
 from django.conf import settings  # Django setting access for AUTH_USER_MODEL.
 from django.db import models  # Django ORM base classes and field types.
+from django.db.models import F, Func
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.utils.text import slugify  # Utility to normalize tag names into slugs.
 
 
@@ -80,3 +83,37 @@ class Note(models.Model):
         # Return the note title for admin/debugging.
         # Provide the note title for display.
         return self.title
+
+
+class NoteSearchIndex(models.Model):
+    # One searchable document per note.
+    note = models.OneToOneField(
+        Note,
+        related_name="search_index",
+        on_delete=models.CASCADE,
+    )
+    document = models.TextField(blank=True, default="")
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(
+                SearchVector(
+                    Func(
+                        F("document"),
+                        function="immutable_unaccent",
+                        output_field=models.TextField(),
+                    ),
+                    config="simple",
+                ),
+                name="note_idx_doc_tsv_gin",
+            ),
+            GinIndex(
+                fields=["document"],
+                opclasses=["gin_trgm_ops"],
+                name="note_idx_doc_trgm_gin",
+            ),
+        ]
+
+    def __str__(self):
+        return f"NoteSearchIndex(note={self.note_id})"
