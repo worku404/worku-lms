@@ -35,14 +35,19 @@ from django.core.cache import cache
 from braces.views import CsrfExemptMixin, JsonRequestResponseMixin
 
 # Local models/forms.
-from .models import Course, Subject, Module, Content
+from .models import Course, Subject, Module, Content, ContentSearchEntry
 from .forms import ModuleFormSet
-from .search import search_courses
+from .search import search_courses, search_content_entries
+from notes.models import NoteSearchIndex
+from notes.search import search_notes
 from students.forms import CourseEnrollForm
 
 
 # Shared cache duration for public course list data.
 COURSE_LIST_CACHE_TTL = 60 * 60 * 24 * 7 # 7 days
+SEARCH_CONTENT_LIMIT = 40
+SEARCH_COURSE_LIMIT = 20
+SEARCH_NOTE_LIMIT = 40
 
 
 # -------------------------------------------------------------------
@@ -113,6 +118,52 @@ class CourseListview(TemplateResponseMixin, View):
                 "subject": current_subject,
                 "courses": courses,
                 "query": query,
+            }
+        )
+
+
+class SearchResultsView(TemplateResponseMixin, View):
+    """
+    Global search page for courses, course contents, and notes.
+    """
+    template_name = "courses/search/results.html"
+
+    def get(self, request):
+        query = (request.GET.get("q") or "").strip()
+
+        course_results = []
+        content_results = []
+        note_results = []
+
+        if query:
+            course_qs = Course.objects.select_related("subject", "owner").annotate(
+                total_modules=Count("modules")
+            )
+            course_results = list(search_courses(course_qs, query)[:SEARCH_COURSE_LIMIT])
+
+            if request.user.is_authenticated:
+                content_qs = (
+                    ContentSearchEntry.objects.select_related("course", "module", "content")
+                    .filter(course__students=request.user)
+                )
+                content_results = list(
+                    search_content_entries(content_qs, query)[:SEARCH_CONTENT_LIMIT]
+                )
+
+                note_qs = (
+                    NoteSearchIndex.objects.select_related("note", "note__tag")
+                    .filter(note__user=request.user)
+                )
+                note_results = list(
+                    search_notes(note_qs, query)[:SEARCH_NOTE_LIMIT]
+                )
+
+        return self.render_to_response(
+            {
+                "query": query,
+                "content_results": content_results,
+                "course_results": course_results,
+                "note_results": note_results,
             }
         )
 

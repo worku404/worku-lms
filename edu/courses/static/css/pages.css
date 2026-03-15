@@ -146,6 +146,18 @@ body.modules-sidebar-collapsed .modules-unhide {
     gap: var(--space-3);
 }
 
+.c-content-block.is-search-target {
+    border: 1px solid color-mix(in srgb, var(--color-primary) 65%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+mark.search-highlight {
+    background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    color: inherit;
+    padding: 0 0.12em;
+    border-radius: 0.2em;
+}
+
 .c-filter-panel {
     position: sticky;
     top: calc(var(--topbar-height) + var(--space-4));

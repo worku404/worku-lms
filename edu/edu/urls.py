@@ -20,7 +20,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib.auth import views as auth_views
 
-from courses.views import CourseListview
+from courses.views import CourseListview, SearchResultsView
 
 urlpatterns = [
     path(
@@ -32,6 +32,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('course/', include('courses.urls')),
     path('', CourseListview.as_view(), name='course_list'),
+    path('search/', SearchResultsView.as_view(), name='global_search'),
     path('students/', include('students.urls')),
     path('__debug__/', include('debug_toolbar.urls')),
     path('assistant/', include('assistant.urls', namespace='assistant')),
