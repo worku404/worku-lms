@@ -752,6 +752,7 @@ body:not(.theme-dark) .course-time__value {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  font-size: var(--fs-1);
 }
 
 .c-pdf-progress {
@@ -774,7 +775,7 @@ body:not(.theme-dark) .course-time__value {
 }
 
 .c-pdf-progress__label {
-  font-size: 0.53rem;
+  font-size: 0.6rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -786,7 +787,7 @@ body:not(.theme-dark) .course-time__value {
 }
 
 .c-pdf-progress.is-complete .c-pdf-progress__label {
-  font-size: 0.76rem;
+  font-size: 0.82rem;
 }
 
 .c-pdf-viewer__scroll {
@@ -877,23 +878,22 @@ body:not(.theme-dark) .course-time__value {
    use a warm dark-paper treatment instead of pure black/white contrast so long
    reading sessions feel less harsh while the text remains distinct. */
 body.theme-dark .c-pdf-viewer__scroll {
-  /* Use pure black for maximum contrast. */
-  background: #000000;
-  /* Darken the border to match black background. */
-  border-color: #000000;
+  /* Slightly lifted surface for better edge definition. */
+  background: #0a111a;
+  border-color: #162232;
 }
 
 body.theme-dark .c-pdf-page {
-  /* Use pure black page background. */
-  background: #000000;
+  /* Keep pages distinct from the viewer surface. */
+  background: #0c141f;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 14px 30px rgba(2, 6, 12, 0.28);
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 16px 34px rgba(2, 6, 12, 0.45);
 }
 
 body.theme-dark .c-pdf-page__canvas {
   /* Increase contrast and darken background for stronger readability. */
-  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.25) sepia(0) saturate(1);
+  filter: invert(0.94) hue-rotate(180deg) brightness(1.08) contrast(1.4) saturate(1.05);
 }
 
 body.theme-dark .c-pdf-page__text-layer::selection,
