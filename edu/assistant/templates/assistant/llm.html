@@ -164,10 +164,20 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
+  const readCssVar = (name) => {
+    const rootStyles = getComputedStyle(document.documentElement);
+    const rootValue = rootStyles.getPropertyValue(name);
+    if (rootValue && rootValue.trim()) return rootValue;
+    if (document.body) {
+      const bodyValue = getComputedStyle(document.body).getPropertyValue(name);
+      if (bodyValue && bodyValue.trim()) return bodyValue;
+    }
+    return "";
+  };
+
   const getAssistantSidebarLimits = () => {
-    const styles = getComputedStyle(document.documentElement);
-    const minWidth = parseCssPx(styles.getPropertyValue("--assistant-sidebar-min-width"), 320);
-    const maxWidth = parseCssPx(styles.getPropertyValue("--assistant-sidebar-max-width"), 720);
+    const minWidth = parseCssPx(readCssVar("--assistant-sidebar-min-width"), 320);
+    const maxWidth = parseCssPx(readCssVar("--assistant-sidebar-max-width"), 720);
     return { minWidth, maxWidth };
   };
 
@@ -185,6 +195,9 @@
 
   const clearAssistantSidebarWidth = () => {
     document.documentElement.style.removeProperty("--assistant-sidebar-width");
+    if (document.body) {
+      document.body.style.removeProperty("--assistant-sidebar-width");
+    }
   };
 
   const applyAssistantSidebarWidth = (value, { persist = false } = {}) => {
@@ -193,6 +206,9 @@
     const viewportMax = Math.max(minWidth, Math.min(maxWidth, window.innerWidth - 80));
     const clamped = clampValue(value, minWidth, viewportMax);
     document.documentElement.style.setProperty("--assistant-sidebar-width", `${clamped}px`);
+    if (document.body) {
+      document.body.style.setProperty("--assistant-sidebar-width", `${clamped}px`);
+    }
     if (persist) {
       try {
         localStorage.setItem(assistantSidebarWidthKey, String(Math.round(clamped)));
@@ -214,14 +230,13 @@
   };
 
   const getCurrentSidebarWidth = () => {
-    const styles = getComputedStyle(document.documentElement);
-    const fromVar = parseCssPx(styles.getPropertyValue("--assistant-sidebar-width"), null);
+    const fromVar = parseCssPx(readCssVar("--assistant-sidebar-width"), null);
     if (fromVar) return fromVar;
     if (assistantPanel) {
       const rect = assistantPanel.getBoundingClientRect();
       if (rect && rect.width) return rect.width;
     }
-    return parseCssPx(styles.getPropertyValue("--assistant-sidebar-min-width"), 360);
+    return parseCssPx(readCssVar("--assistant-sidebar-min-width"), 360);
   };
 
   const historyEl = document.getElementById("llm-history");
@@ -301,8 +316,7 @@
     if (!resizeHandle) return;
 
     const getHandleWidth = () => {
-      const styles = getComputedStyle(document.documentElement);
-      return parseCssPx(styles.getPropertyValue("--assistant-resize-handle-width"), 10);
+      return parseCssPx(readCssVar("--assistant-resize-handle-width"), 10);
     };
 
     let startX = 0;
