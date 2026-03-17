@@ -146,6 +146,18 @@ body.modules-sidebar-collapsed .modules-unhide {
     gap: var(--space-3);
 }
 
+.c-content-block[data-content-model="file"] .c-pdf-viewer {
+    margin-inline: calc(var(--space-4) * -1);
+}
+
+.c-content-block[data-content-model="file"] .c-pdf-toolbar {
+    padding-inline: var(--space-4);
+}
+
+.c-content-block[data-content-model="file"] .c-pdf-viewer__scroll {
+    border-radius: calc(var(--radius-md) - 2px);
+}
+
 .c-content-block.is-search-target {
     border: 1px solid color-mix(in srgb, var(--color-primary) 65%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
