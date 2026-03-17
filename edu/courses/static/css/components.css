@@ -1023,59 +1023,6 @@ body.theme-dark .c-focus-modules__time {
     font-weight: 800;
     letter-spacing: 0.01em;
 }
-
-/* Small inline stop control shown next to presence counter for local admin use. */
-.c-presence__stop {
-    /* Keep button compact inside the badge row. */
-    min-width: 22px;
-    min-height: 22px;
-    width: 22px;
-    height: 22px;
-    /* Render a clear close glyph. */
-    line-height: 1;
-    font-size: 0.92rem;
-    font-weight: 800;
-    /* Use pill-like shape to match badge language. */
-    border-radius: 999px;
-    border: 1px solid;
-    /* Center glyph both axes. */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    /* Remove default button chrome. */
-    padding: 0;
-    margin-right: 10px;
-    cursor: pointer;
-    background: transparent;
-}
-
-/* Dark theme stop button colors. */
-.theme-dark .c-presence__stop {
-    color: #ffd6d6;
-    border-color: rgba(255, 120, 120, 0.45) !important;
-    background: rgba(255, 84, 84, 0.18) !important;
-}
-
-/* Light theme stop button colors. */
-body:not(.theme-dark) .c-presence__stop {
-    color: #8b1e1e;
-    border-color: #e9a0a0;
-    background: #ffe9e9;
-}
-
-/* Hover/focus feedback for quick discoverability. */
-.c-presence__stop:hover,
-.c-presence__stop:focus-visible {
-    filter: brightness(1.05);
-    transform: translateY(-0.5px);
-}
-
-/* Disabled state while stop request is being sent. */
-.c-presence__stop:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-
 .c-presence--desktop {
     width: 100%;
     margin-top: auto;
@@ -1134,16 +1081,6 @@ body:not(.theme-dark) .c-presence {
         font-size: 0.76rem;
         letter-spacing: 0;
     }
-
-    /* Keep stop control proportional on compact mobile badge. */
-    .c-presence--mobile .c-presence__stop {
-        min-width: 18px;
-        min-height: 18px;
-        width: 18px;
-        height: 18px;
-        font-size: 0.78rem;
-    }
-}
 
 .c-toast-stack {
     position: fixed;
