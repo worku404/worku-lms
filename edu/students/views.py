@@ -535,3 +535,4 @@ class PresencePingView(LoginRequiredMixin, View):
     def post(self, request):
         online_count = touch_user_presence(request.user.id)
         return JsonResponse({"online_count": online_count})
+    

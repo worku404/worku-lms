@@ -732,7 +732,7 @@ body:not(.theme-dark) .course-time {
 body:not(.theme-dark) .course-time__value {
   color: #102e45;
 }
-
+/* PDF */
 .c-pdf-viewer {
   width: 100%;
   margin: 0 0 0.75rem 0;
@@ -904,6 +904,8 @@ body.theme-dark .c-pdf-page__text-layer *::selection {
 body.theme-dark .c-pdf-page__text-layer *::-moz-selection {
   background: rgba(255, 211, 107, 0.44) !important;
 }
+
+/* END OF PDF */
 .c-focus-modules {
     display: grid;
     gap: 0.55rem;

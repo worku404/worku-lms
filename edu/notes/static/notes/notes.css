@@ -19,7 +19,7 @@
     /* Bold text color inside the editor. */
     --notes-bold-color: #1466b8;
     /* Inline code background color. */
-    --notes-code-bg: color-mix(in srgb, #1b2630 12%, var(--color-surface));
+    --notes-code-bg: color-mix(in srgb, #f5f7fb 92%, #d9e4f1);
     /* Inline code text color. */
     --notes-code-text: #b56600;
     /* Inline code border color. */
@@ -41,7 +41,7 @@ body.theme-dark {
     /* Bold text color for dark theme. */
     --notes-bold-color: #6cc5ff;
     /* Inline code background for dark theme. */
-    --notes-code-bg: #162433;
+    --notes-code-bg: #0C1523;
     /* Inline code text color for dark theme. */
     --notes-code-text: #ffd166;
     /* Inline code border for dark theme. */
