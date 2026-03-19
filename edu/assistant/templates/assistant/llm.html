@@ -253,18 +253,25 @@
     }
   }
 
-  const escapeHtml = (value) =>
-    String(value).replace(/[&<>"']/g, (char) => {
-      const map = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      };
-      return map[char] || char;
-    });
+  const replaceLatexArrows = (value) =>
+    String(value)
+      .replace(/\$\\rightarrow\$/g, "&rarr;")
+      .replace(/\$\\leftarrow\$/g, "&larr;");
 
+  const escapeHtml = (value) =>
+    replaceLatexArrows(
+      String(value).replace(/[&<>"']/g, (char) => {
+        const map = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        };
+        return map[char] || char;
+      })
+    );
+    
   const waitingMarkup = () =>
     `
       <span class="llm-wait" role="status" aria-live="polite" aria-label="Assistant is thinking">
@@ -629,7 +636,7 @@ function renderHistory() {
       </div>
       <div class="llm-chat-row llm-chat-row--ai">
         <div class="llm-chat-bubble llm-chat-bubble--ai">
-          <div class="llm-chat-msg">${item.response}</div>
+          <div class="llm-chat-msg">${replaceLatexArrows(item.response || "")}</div>
           <div class="llm-chat-bubble__actions">
             <button
               class="llm-copy-btn llm-copy-message"
