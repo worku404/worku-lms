@@ -287,11 +287,30 @@ body.theme-dark .c-progress__bar {
     max-width: var(--reading-max);
     font-family: "Source Serif 4", Georgia, serif;
     line-height: var(--lh-reading);
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .page--workspace .c-reader__content {
     max-width: 100%;
     width: 100%;
+}
+
+.c-reader__content pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.c-reader__content pre code {
+    white-space: inherit;
+}
+
+.c-reader__content img,
+.c-reader__content video,
+.c-reader__content iframe {
+    max-width: 100%;
+    height: auto;
 }
 
 .c-reader__content p + p,
