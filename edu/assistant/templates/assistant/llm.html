@@ -252,11 +252,36 @@
       history = [];
     }
   }
-
   const replaceLatexArrows = (value) =>
-    String(value)
-      .replace(/\$\\rightarrow\$/g, "&rarr;")
-      .replace(/\$\\leftarrow\$/g, "&larr;");
+  String(value)
+    .replace(/\$(.*?)\$/g, (match, expr) => {
+      return expr
+        // Greek
+        .replace(/\\mu/g, "&mu;")
+        .replace(/\\sigma/g, "&sigma;")
+        .replace(/\\alpha/g, "&alpha;")
+        .replace(/\\beta/g, "&beta;")
+        .replace(/\\gamma/g, "&gamma;")
+        .replace(/\\lambda/g, "&lambda;")
+
+        // Math
+        .replace(/\\pm/g, "&plusmn;")
+        .replace(/\\times/g, "&times;")
+        .replace(/\\div/g, "&divide;")
+        .replace(/\\cdot/g, "&middot;")
+
+        // Arrows
+        .replace(/\\rightarrow/g, "&rarr;")
+        .replace(/\\leftarrow/g, "&larr;")
+
+        // Comparisons
+        .replace(/\\le/g, "&le;")
+        .replace(/\\ge/g, "&ge;")
+        .replace(/\\neq/g, "&ne;")
+
+        // Special
+        .replace(/\\infty/g, "&infin;");
+    });
 
   const escapeHtml = (value) =>
     replaceLatexArrows(
