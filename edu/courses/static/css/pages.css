@@ -64,6 +64,13 @@ body::-webkit-scrollbar-thumb {
     position: relative;
 }
 
+.course-workspace .module {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    float: none;
+}
+
 .course-workspace .contents {
     position: sticky;
     top: calc(var(--topbar-height) + var(--space-4));
@@ -71,6 +78,8 @@ body::-webkit-scrollbar-thumb {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #54586D #0F1723;
+    width: auto;
+    float: none;
 }
 
 .course-workspace .contents::-webkit-scrollbar {
