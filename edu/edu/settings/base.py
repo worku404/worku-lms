@@ -103,6 +103,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "assistant.context_processors.llm_widget",
                 'students.context_processors.global_progress',
+                "courses.context_processors.daily_motto",
             ],
         },
     },
@@ -164,8 +165,9 @@ INTERNAL_IPS = ["127.0.0.1"]
 CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 60 * 15  # 15 minutes
 CACHE_MIDDLEWARE_KEY_PREFIX = "educa"
-
-
+SESSION_COOKIE_AGE = 60*30
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True 
+SESSION_SAVE_EVERY_REQUEST = True
 # GEMINI API
 API1_KEY = os.getenv("API1_KEY")
 API2_KEY = os.getenv("API2_KEY")

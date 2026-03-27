@@ -1102,6 +1102,7 @@ body:not(.theme-dark) .c-presence {
         font-size: 0.76rem;
         letter-spacing: 0;
     }
+}
 
 .c-toast-stack {
     position: fixed;

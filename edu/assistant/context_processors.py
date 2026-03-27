@@ -1,34 +1,16 @@
 from .forms import LLMForm
-from .markdown_utils import render_llm_markdown
+from .utils import build_chat_state, get_active_chat, serialize_history
 
 
 def llm_widget(request):
     if not request.user.is_authenticated:
-        return {"llm_form": None, "llm_history": []}
+        return {"llm_form": None, "llm_history": [], "llm_chat_state": {}}
 
-    history = request.session.get("llm_history", [])
-    if not isinstance(history, list):
-        history = []
-
-    history_ui = []
-    for entry in history:
-        if not isinstance(entry, dict):
-            continue
-
-        prompt = (entry.get("prompt") or "").strip()
-        response = (entry.get("response") or "").strip()
-
-        if not prompt and not response:
-            continue
-
-        history_ui.append(
-            {
-                "prompt": prompt,
-                "response": render_llm_markdown(response) if response else "",
-            }
-        )
-
+    active_chat = get_active_chat(request)
+    history_ui = serialize_history(active_chat)
+    chat_state = build_chat_state(request.user, active_chat)
     return {
         "llm_form": LLMForm(),
         "llm_history": history_ui,
+        "llm_chat_state": chat_state,
     }
