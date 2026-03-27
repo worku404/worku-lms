@@ -1,7 +1,22 @@
 <div class="assistant-resize-handle" data-assistant-resize-handle aria-hidden="true"></div>
 
 <div class="assistance-toolbar">
-  <span class="assistance-title">AI Assistant</span>
+  <div class="assistance-toolbar__left">
+    <button
+      class="assistant-history-toggle"
+      type="button"
+      aria-label="Toggle chat history"
+      aria-expanded="false"
+      data-assistant-history-toggle
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="4" y1="7" x2="20" y2="7"></line>
+        <line x1="4" y1="12" x2="20" y2="12"></line>
+        <line x1="4" y1="17" x2="20" y2="17"></line>
+      </svg>
+    </button>
+    <span class="assistance-title">AI Assistant</span>
+  </div>
   <div class="assistance-toolbar-actions">
 
     <button id="assistant-close-btn" class="assistance-close" type="button" aria-label="Close AI sidebar">
@@ -10,8 +25,37 @@
   </div>
 </div>
 
-<div id="history-container" class="llm-history"></div>
+<div
+  class="assistant-history-shell"
+  data-assistant-history-shell
+  data-chats-new-url="{% url 'assistant:llm_new_chat' %}"
+  data-chats-detail-url-template="{% url 'assistant:llm_open_chat' 0 %}"
+  data-chats-pin-url-template="{% url 'assistant:llm_toggle_pin' 0 %}"
+>
+  <aside class="assistant-history-sidebar" data-assistant-history-sidebar aria-hidden="true" aria-label="Chat history">
+    <div class="assistant-history-sidebar__header">
+      <span class="assistant-history-sidebar__title">History</span>
+    </div>
+    <button class="assistant-history-new" type="button" data-assistant-new-chat>New chat</button>
+    <div class="assistant-history-scroll">
+      <section class="assistant-history-section" data-assistant-pinned-section>
+        <div class="assistant-history-section__title">Pinned</div>
+        <ul class="assistant-history-list" data-assistant-pinned-list></ul>
+        <p class="assistant-history-empty" data-assistant-pinned-empty hidden>No pinned chats yet.</p>
+      </section>
+      <section class="assistant-history-section" data-assistant-temp-section>
+        <div class="assistant-history-section__title">Current (temporary)</div>
+        <ul class="assistant-history-list" data-assistant-temp-list></ul>
+        <p class="assistant-history-empty" data-assistant-temp-empty hidden>No temporary chat.</p>
+      </section>
+    </div>
+    <p class="assistant-history-error" data-assistant-history-error hidden></p>
+  </aside>
+
+  <div id="history-container" class="llm-history"></div>
+</div>
 {{ llm_history|json_script:"llm-history" }}
+{{ llm_chat_state|json_script:"llm-chat-state" }}
 
 <form id="llm-form" class="llm-form" autocomplete="off">
   <button
@@ -62,8 +106,12 @@
   const assistantLauncher = document.getElementById("assistant-unhide");
   {% comment %} const assistantHideBtn = document.getElementById("assistant-hide-btn"); {% endcomment %}
   const assistantCloseBtn = document.getElementById("assistant-close-btn");
+  const assistantHistoryToggle = document.querySelector("[data-assistant-history-toggle]");
+  const assistantHistoryShell = document.querySelector("[data-assistant-history-shell]");
+  const assistantHistorySidebar = document.querySelector("[data-assistant-history-sidebar]");
   const assistantUiStateKey = "assistant_ui_state";
   const assistantSidebarWidthKey = "assistant_sidebar_width";
+  const assistantHistoryOpenKey = "assistant_history_open";
   const desktopMediaQuery = window.matchMedia
     ? window.matchMedia("(min-width: 901px)")
     : null;
@@ -86,6 +134,40 @@
       // Ignore storage failures.
     }
     return "hidden";
+  };
+
+  const persistHistoryState = (isOpen) => {
+    try {
+      localStorage.setItem(assistantHistoryOpenKey, isOpen ? "open" : "closed");
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  };
+
+  const readHistoryState = () => {
+    try {
+      const stored = localStorage.getItem(assistantHistoryOpenKey);
+      if (stored === "open") return true;
+      if (stored === "closed") return false;
+    } catch (error) {
+      // Ignore storage failures.
+    }
+    return true;
+  };
+
+  const setHistoryState = (isOpen, { persist = true } = {}) => {
+    if (!assistantPanel) return;
+    const nextOpen = Boolean(isOpen);
+    assistantPanel.classList.toggle("assistant-history-open", nextOpen);
+    if (assistantHistorySidebar) {
+      assistantHistorySidebar.setAttribute("aria-hidden", String(!nextOpen));
+    }
+    if (assistantHistoryToggle) {
+      assistantHistoryToggle.setAttribute("aria-expanded", String(nextOpen));
+    }
+    if (persist) {
+      persistHistoryState(nextOpen);
+    }
   };
 
   const updateAssistantOffset = () => {
@@ -252,6 +334,225 @@
       history = [];
     }
   }
+
+  const chatStateEl = document.getElementById("llm-chat-state");
+  const pinnedListEl = document.querySelector("[data-assistant-pinned-list]");
+  const tempListEl = document.querySelector("[data-assistant-temp-list]");
+  const pinnedEmptyEl = document.querySelector("[data-assistant-pinned-empty]");
+  const tempEmptyEl = document.querySelector("[data-assistant-temp-empty]");
+  const tempSectionEl = document.querySelector("[data-assistant-temp-section]");
+  const historyErrorEl = document.querySelector("[data-assistant-history-error]");
+  const assistantNewChatBtn = document.querySelector("[data-assistant-new-chat]");
+  const chatDetailTemplate = assistantHistoryShell?.dataset.chatsDetailUrlTemplate || "";
+  const chatPinTemplate = assistantHistoryShell?.dataset.chatsPinUrlTemplate || "";
+  const chatNewUrl = assistantHistoryShell?.dataset.chatsNewUrl || "";
+
+  const normalizeChatState = (state) => ({
+    pinned_chats: Array.isArray(state?.pinned_chats) ? state.pinned_chats : [],
+    temp_chat: state?.temp_chat || null,
+    active_chat_id: state?.active_chat_id || null,
+    max_pins: Number.isFinite(state?.max_pins) ? state.max_pins : 6,
+  });
+
+  let chatState = normalizeChatState({});
+  if (chatStateEl) {
+    try {
+      chatState = normalizeChatState(JSON.parse(chatStateEl.textContent || "{}"));
+    } catch (error) {
+      chatState = normalizeChatState({});
+    }
+  }
+
+  const showHistoryError = (message) => {
+    if (!historyErrorEl) return;
+    const text = String(message || "").trim();
+    if (!text) {
+      historyErrorEl.textContent = "";
+      historyErrorEl.hidden = true;
+      return;
+    }
+    historyErrorEl.textContent = text;
+    historyErrorEl.hidden = false;
+  };
+
+  const buildChatDetailUrl = (chatId) =>
+    chatDetailTemplate ? chatDetailTemplate.replace("0", String(chatId)) : "";
+  const buildChatPinUrl = (chatId) =>
+    chatPinTemplate ? chatPinTemplate.replace("0", String(chatId)) : "";
+
+  const renderChatLists = () => {
+    if (!pinnedListEl || !tempListEl) return;
+    pinnedListEl.innerHTML = "";
+    tempListEl.innerHTML = "";
+
+    const pinnedChats = Array.isArray(chatState.pinned_chats)
+      ? chatState.pinned_chats
+      : [];
+    const tempChat = chatState.temp_chat;
+
+    pinnedChats.forEach((chat) => {
+      const row = buildChatRow(chat, { isTemp: false });
+      pinnedListEl.appendChild(row);
+    });
+
+    if (tempChat) {
+      const row = buildChatRow(tempChat, { isTemp: true });
+      tempListEl.appendChild(row);
+    }
+
+    if (pinnedEmptyEl) {
+      pinnedEmptyEl.hidden = pinnedChats.length > 0;
+    }
+    if (tempEmptyEl) {
+      tempEmptyEl.hidden = Boolean(tempChat);
+    }
+    if (tempSectionEl) {
+      tempSectionEl.hidden = !tempChat;
+    }
+  };
+
+  const buildChatRow = (chat, { isTemp }) => {
+    const row = document.createElement("li");
+    row.className = "assistant-history-row";
+
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "assistant-history-item";
+    item.dataset.assistantChatId = String(chat.id);
+    if (chatState.active_chat_id === chat.id) {
+      item.classList.add("is-active");
+    }
+
+    const titleEl = document.createElement("span");
+    titleEl.className = "assistant-history-item__title";
+    titleEl.textContent = chat.title || "New chat";
+    const metaEl = document.createElement("span");
+    metaEl.className = "assistant-history-item__meta";
+    metaEl.textContent = isTemp ? "Temporary" : "Pinned";
+
+    item.appendChild(titleEl);
+    item.appendChild(metaEl);
+
+    const pinBtn = document.createElement("button");
+    pinBtn.type = "button";
+    pinBtn.className = "assistant-history-pin";
+    pinBtn.dataset.assistantPinId = String(chat.id);
+    pinBtn.setAttribute(
+      "aria-label",
+      chat.is_pinned ? "Unpin chat" : "Pin chat"
+    );
+    pinBtn.innerHTML = chat.is_pinned
+      ? `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+          <path d="M9 3h6l1.2 6.4-2.6 2.6v5.5l-2.6-1.8-2.6 1.8V12L7.8 9.4 9 3z"></path>
+        </svg>
+      `
+      : `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M9 3h6l1.2 6.4-2.6 2.6v5.5l-2.6-1.8-2.6 1.8V12L7.8 9.4 9 3z"></path>
+        </svg>
+      `;
+
+    if (chat.is_pinned) {
+      pinBtn.classList.add("is-pinned");
+    }
+
+    row.appendChild(item);
+    row.appendChild(pinBtn);
+    return row;
+  };
+
+  const applyChatState = (payload) => {
+    if (!payload || !payload.chat_state) return;
+    chatState = normalizeChatState(payload.chat_state);
+    renderChatLists();
+  };
+
+  const getCsrfToken = () => {
+    const input = document.querySelector(
+      "#llm-form input[name='csrfmiddlewaretoken']"
+    );
+    if (input && input.value) return input.value;
+    const cookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("csrftoken="));
+    return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+  };
+
+  const requestChatPayload = async (url, options = {}) => {
+    if (!url) throw new Error("Missing endpoint.");
+    const response = await fetch(url, options);
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) {
+      const message = data.error || "Request failed.";
+      throw new Error(message);
+    }
+    return data;
+  };
+
+  const handleNewChat = async () => {
+    showHistoryError("");
+    setHistoryState(false);
+    try {
+      const data = await requestChatPayload(chatNewUrl, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      });
+      if (Array.isArray(data.history)) {
+        history = data.history;
+        renderHistory();
+      }
+      applyChatState(data);
+    } catch (error) {
+      showHistoryError(error.message || "Unable to create chat.");
+    }
+  };
+
+  const handleOpenChat = async (chatId) => {
+    showHistoryError("");
+    setHistoryState(false);
+    const url = buildChatDetailUrl(chatId);
+    try {
+      const data = await requestChatPayload(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      if (Array.isArray(data.history)) {
+        history = data.history;
+        renderHistory();
+      }
+      applyChatState(data);
+    } catch (error) {
+      showHistoryError(error.message || "Unable to open chat.");
+    }
+  };
+
+  const handleTogglePin = async (chatId) => {
+    showHistoryError("");
+    const url = buildChatPinUrl(chatId);
+    try {
+      const data = await requestChatPayload(url, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      });
+      applyChatState(data);
+    } catch (error) {
+      showHistoryError(error.message || "Unable to pin chat.");
+    }
+  };
   const replaceLatexArrows = (value) =>
   String(value)
     .replace(/\$(.*?)\$/g, (match, expr) => {
@@ -433,6 +734,12 @@
     if (assistantCloseBtn) {
       assistantCloseBtn.addEventListener("click", hideAssistant);
     }
+    if (assistantHistoryToggle) {
+      assistantHistoryToggle.addEventListener("click", () => {
+        const isOpen = assistantPanel.classList.contains("assistant-history-open");
+        setHistoryState(!isOpen);
+      });
+    }
     if (assistantLauncher) {
       assistantLauncher.addEventListener("click", () => {
         openAssistantSidebar();
@@ -444,6 +751,7 @@
 
     const initialState = readAssistantState();
     setAssistantState(initialState, { persist: false });
+    setHistoryState(readHistoryState(), { persist: false });
     handleViewportChange();
 
     if (desktopMediaQuery) {
@@ -711,6 +1019,25 @@ function renderHistory() {
 
 
   renderHistory();
+  renderChatLists();
+  if (assistantHistorySidebar) {
+    assistantHistorySidebar.addEventListener("click", (event) => {
+      const pinBtn = event.target.closest("[data-assistant-pin-id]");
+      if (pinBtn) {
+        event.preventDefault();
+        handleTogglePin(pinBtn.dataset.assistantPinId);
+        return;
+      }
+      const chatBtn = event.target.closest("[data-assistant-chat-id]");
+      if (chatBtn) {
+        event.preventDefault();
+        handleOpenChat(chatBtn.dataset.assistantChatId);
+      }
+    });
+  }
+  if (assistantNewChatBtn) {
+    assistantNewChatBtn.addEventListener("click", handleNewChat);
+  }
   const form = document.getElementById("llm-form");
   const promptInput = document.getElementById("id_prompt");
   if (form && promptInput) {
@@ -804,6 +1131,7 @@ function renderHistory() {
         } else {
           aiResponse = data.generated || escapeHtml(data.error || "Something went wrong.");
         }
+        applyChatState(data);
       } catch (error) {
         if (error && error.name === "AbortError") {
           aiResponse = "Response stopped.";
