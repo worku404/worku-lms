@@ -103,6 +103,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "assistant.context_processors.llm_widget",
                 'students.context_processors.global_progress',
+                "courses.context_processors.daily_motto",
             ],
         },
     },
