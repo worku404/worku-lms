@@ -135,11 +135,19 @@
                         issue is not what we know but what we do with what we know. The great end of life is not
                         knowledge but action. It is the father of the world depends on.
                     </strong> {% endcomment %}
-                    <strong style="color: #FFD166; ">
-                       {# Slow is smooth, and smooth is fast.#}
-                       If it is easy do it easy, 
-                       if it is hard do it hard, just get it done(Jim Rohn)✍
+                    {% if daily_motto and daily_motto.text %}
+                    <strong style="color: #FFD166;">
+                        {{ daily_motto.text }}
                     </strong>
+                    <p class="c-card__meta">
+                        — {{ daily_motto.author|default:"Unknown" }}
+                        {% comment %} <span class="c-card__meta">AI-suggested --{{daily_motto.source}}</span> {% endcomment %}
+                    </p>
+                    {% else %}
+                    <strong style="color: #FFD166;">
+                        Daily motto unavailable.
+                    </strong>
+                    {% endif %}
                 <div class="c-progress"
                     role="progressbar"
                     aria-valuemin="0"
