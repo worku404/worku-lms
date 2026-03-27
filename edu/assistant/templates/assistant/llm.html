@@ -553,50 +553,61 @@
       showHistoryError(error.message || "Unable to pin chat.");
     }
   };
-  const replaceLatexArrows = (value) =>
-  String(value)
-    .replace(/\$(.*?)\$/g, (match, expr) => {
-      return expr
-        // Greek
-        .replace(/\\mu/g, "&mu;")
-        .replace(/\\sigma/g, "&sigma;")
-        .replace(/\\alpha/g, "&alpha;")
-        .replace(/\\beta/g, "&beta;")
-        .replace(/\\gamma/g, "&gamma;")
-        .replace(/\\lambda/g, "&lambda;")
-
-        // Math
-        .replace(/\\pm/g, "&plusmn;")
-        .replace(/\\times/g, "&times;")
-        .replace(/\\div/g, "&divide;")
-        .replace(/\\cdot/g, "&middot;")
-
-        // Arrows
-        .replace(/\\rightarrow/g, "&rarr;")
-        .replace(/\\leftarrow/g, "&larr;")
-
-        // Comparisons
-        .replace(/\\le/g, "&le;")
-        .replace(/\\ge/g, "&ge;")
-        .replace(/\\neq/g, "&ne;")
-
-        // Special
-        .replace(/\\infty/g, "&infin;");
+  const escapeHtml = (value) =>
+    String(value).replace(/[&<>"']/g, (char) => {
+      const map = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return map[char] || char;
     });
 
-  const escapeHtml = (value) =>
-    replaceLatexArrows(
-      String(value).replace(/[&<>"']/g, (char) => {
-        const map = {
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        };
-        return map[char] || char;
-      })
-    );
+  const latexCommandPattern =
+    /\\(frac|sqrt|Delta|alpha|beta|gamma|sigma|mu|lambda|approx|le|ge|neq|pm|times|div|cdot|rightarrow|leftarrow)/;
+
+  const shouldAutoWrapLatex = (text) => {
+    if (!text) return false;
+    if (text.includes("$") || text.includes("\\(") || text.includes("\\[")) return false;
+    if (!latexCommandPattern.test(text)) return false;
+    const hasPlainWords = /(^|[^\\])([A-Za-z]{3,})/.test(text);
+    return !hasPlainWords;
+  };
+
+  const isInsideIgnoredMathNode = (node) => {
+    if (!node || !node.parentElement) return false;
+    return Boolean(node.parentElement.closest("code, pre, .katex"));
+  };
+
+  const wrapBareLatexTextNodes = (root) => {
+    if (!root || typeof document === "undefined") return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    let current = walker.nextNode();
+    while (current) {
+      const text = current.nodeValue || "";
+      if (!isInsideIgnoredMathNode(current) && shouldAutoWrapLatex(text)) {
+        current.nodeValue = `$${text}$`;
+      }
+      current = walker.nextNode();
+    }
+  };
+
+  const renderChatMath = (container) => {
+    if (!container || typeof renderMathInElement !== "function") return;
+    const aiMessages = container.querySelectorAll(".llm-chat-row--ai .llm-chat-msg");
+    aiMessages.forEach((messageEl) => wrapBareLatexTextNodes(messageEl));
+    renderMathInElement(container, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "\\[", right: "\\]", display: true },
+      ],
+      throwOnError: false,
+    });
+  };
     
   const waitingMarkup = () =>
     `
@@ -969,7 +980,7 @@ function renderHistory() {
       </div>
       <div class="llm-chat-row llm-chat-row--ai">
         <div class="llm-chat-bubble llm-chat-bubble--ai">
-          <div class="llm-chat-msg">${replaceLatexArrows(item.response || "")}</div>
+          <div class="llm-chat-msg">${String(item.response || "")}</div>
           <div class="llm-chat-bubble__actions">
             <button
               class="llm-copy-btn llm-copy-message"
@@ -992,6 +1003,8 @@ function renderHistory() {
     container.appendChild(entry);
   });
 
+  // Render LaTeX after messages are added to the DOM.
+  renderChatMath(container);
   // Normalize AI tables after each render so layout stays responsive.
   enhanceChatTables(container);
   // Attach copy controls to AI-generated code blocks.
@@ -1020,6 +1033,9 @@ function renderHistory() {
 
   renderHistory();
   renderChatLists();
+  window.addEventListener("load", () => {
+    renderChatMath(historyContainerEl);
+  });
   if (assistantHistorySidebar) {
     assistantHistorySidebar.addEventListener("click", (event) => {
       const pinBtn = event.target.closest("[data-assistant-pin-id]");
