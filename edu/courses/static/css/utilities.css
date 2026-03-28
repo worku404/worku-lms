@@ -18,3 +18,39 @@
 .hidden {
     display: none !important;
 }
+
+.motto-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.motto-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.motto-refresh {
+    min-height: 28px;
+    min-width: 28px;
+    padding: 0.2rem;
+    font-size: 0.7rem;
+    border-radius: 999px;
+    line-height: 1;
+}
+
+.motto-refresh.is-loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.motto-refresh svg {
+    display: block;
+}
+
+.motto-refresh.is-error {
+    border-color: color-mix(in srgb, var(--color-error) 70%, transparent);
+    color: var(--color-error);
+}
