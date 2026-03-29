@@ -17,8 +17,10 @@ from django.views.generic.edit import CreateView, UpdateView, DeleteView
 
 # Request/response helpers.
 from django.shortcuts import get_object_or_404, redirect
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 
 # Auth and permission guards.
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -38,6 +40,7 @@ from braces.views import CsrfExemptMixin, JsonRequestResponseMixin
 from .models import Course, Subject, Module, Content, ContentSearchEntry
 from .forms import ModuleFormSet
 from .search import search_courses, search_content_entries
+from .motto import get_daily_motto
 from notes.models import NoteSearchIndex
 from notes.search import search_notes
 from students.forms import CourseEnrollForm
@@ -442,3 +445,10 @@ class ContentOrderview(CsrfExemptMixin, JsonRequestResponseMixin, View):
                 module__course__owner=request.user,
             ).update(order=order)
         return self.render_json_response({"saved": "OK"})
+
+
+@require_POST
+@login_required
+def refresh_daily_motto(request):
+    motto_data = get_daily_motto(force_refresh=True)
+    return JsonResponse({"motto": motto_data})

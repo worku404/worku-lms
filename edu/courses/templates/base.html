@@ -125,28 +125,55 @@
             {% if request.user.is_authenticated %}
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
                 <h2 class="c-card__title">Today's Motto🔥</h2>
-                <!-- <p class="c-card__meta" style="color: #D9E2EC;">ምንም ከማድረግህ በፊት እናትህን አስብ።<br> የምትኖረው የወደፊት ህይወትህ ከሰው ልጆች ጋር ሳይሆን ከማይደክሙ machine ጋር የምትወዳደርበት መሆኑን አስታውስ።<br><strong> በቂ ብቻ ሳይሆን እጅግ የላቀ መሆን አለብህ😡</strong><br> ጊዜ የምታባክንበትም ሆነ የምታርፍበት ጊዜ የለም። ለእናትህ ስትል ጠንክረህ ማጥናት አለብህ። <br>
-                    <strong style="color: #FFD166; text-decoration: underline;">እማ ስለ ወደፊትህ ምን ትመኝ እንደነበር አስብ...</strong></p> text-decoration: underline;-->
-                    {% comment %} <strong style="color: #FFD166; ">Boom ሻካላካ... 😎🔥<br>ነቃ በል 😡😡😡</br></strong> {% endcomment %}
-                    {% comment %} <strong style="color: #FFD166; ">
-                        Man has a large capacity for effort. In fact, it is so much greater than we think it is, that few
-                        ever reach this capacity. We should value the faculty of knowing what we ought to do and
-                        having the will to do it. But understanding is easy. It is the doing that is difficult. The critical
-                        issue is not what we know but what we do with what we know. The great end of life is not
-                        knowledge but action. It is the father of the world depends on.
-                    </strong> {% endcomment %}
                     {% if daily_motto and daily_motto.text %}
-                    <strong style="color: #FFD166;">
+                    <strong style="color: #FFD166;" data-motto-text>
                         {{ daily_motto.text }}
                     </strong>
                     <p class="c-card__meta">
-                        — {{ daily_motto.author|default:"Unknown" }}
-                        {% comment %} <span class="c-card__meta">AI-suggested --{{daily_motto.source}}</span> {% endcomment %}
+                        — <span data-motto-author>{{ daily_motto.author|default:"Unknown" }}</span>
                     </p>
+                    <div class="motto-actions">
+                        <button
+                            type="button"
+                            class="c-btn c-btn--ghost motto-refresh"
+                            data-motto-refresh
+                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-url="{% url 'motto_refresh' %}"
+                            aria-label="Refresh daily motto"
+                            title="Refresh daily motto"
+                        >
+                            <span class="u-sr-only">Refresh daily motto</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
+                            </svg>
+                        </button>
+                    </div>
                     {% else %}
-                    <strong style="color: #FFD166;">
+                    <strong style="color: #FFD166;" data-motto-text>
                         Daily motto unavailable.
                     </strong>
+                    <p class="c-card__meta">
+                        — <span data-motto-author>Unknown</span>
+                        <span class="c-card__meta" data-motto-note>AI-suggested</span>
+                    </p>
+                    <div class="motto-actions">
+                        <button
+                            type="button"
+                            class="c-btn c-btn--ghost motto-refresh"
+                            data-motto-refresh
+                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-url="{% url 'motto_refresh' %}"
+                            aria-label="Refresh daily motto"
+                            title="Refresh daily motto"
+                        >
+                            <span class="u-sr-only">Refresh daily motto</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
+                            </svg>
+                        </button>
+                    </div>
                     {% endif %}
                 <div class="c-progress"
                     role="progressbar"
@@ -547,6 +574,81 @@
         }
 
         connectNotificationSocket();
+    })();
+
+    (function () {
+        const refreshBtn = document.querySelector("[data-motto-refresh]");
+        if (!refreshBtn) return;
+
+        const textEl = document.querySelector("[data-motto-text]");
+        const authorEl = document.querySelector("[data-motto-author]");
+        const noteEl = document.querySelector("[data-motto-note]");
+        const refreshUrl = refreshBtn.getAttribute("data-motto-refresh-url");
+        const defaultLabel =
+            refreshBtn.getAttribute("data-motto-refresh-label") || "Refresh daily motto";
+        const defaultAriaLabel = refreshBtn.getAttribute("aria-label") || defaultLabel;
+        const defaultTitle = refreshBtn.getAttribute("title") || defaultLabel;
+
+        function getCookie(name) {
+            const cookie = document.cookie
+                .split("; ")
+                .find((row) => row.startsWith(name + "="));
+            return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+        }
+
+        function setLoading(isLoading) {
+            refreshBtn.classList.toggle("is-loading", isLoading);
+            refreshBtn.disabled = isLoading;
+            refreshBtn.setAttribute(
+                "aria-label",
+                isLoading ? "Refreshing daily motto" : defaultAriaLabel
+            );
+            refreshBtn.setAttribute("title", isLoading ? "Refreshing..." : defaultTitle);
+        }
+
+        function applyMotto(motto) {
+            if (!motto) return;
+            if (textEl && motto.text) {
+                textEl.textContent = motto.text;
+            }
+            if (authorEl) {
+                authorEl.textContent = motto.author || "Unknown";
+            }
+            if (noteEl) {
+                noteEl.textContent = motto.source_note || "AI-suggested";
+            }
+        }
+
+        refreshBtn.addEventListener("click", async () => {
+            if (!refreshUrl) return;
+            setLoading(true);
+            try {
+                const response = await fetch(refreshUrl, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Unable to refresh.");
+                }
+                applyMotto(data.motto);
+            } catch (error) {
+                refreshBtn.classList.add("is-error");
+                refreshBtn.setAttribute("aria-label", "Refresh failed");
+                refreshBtn.setAttribute("title", "Refresh failed");
+                window.setTimeout(() => {
+                    refreshBtn.classList.remove("is-error");
+                    refreshBtn.setAttribute("aria-label", defaultAriaLabel);
+                    refreshBtn.setAttribute("title", defaultTitle);
+                }, 1400);
+            } finally {
+                setLoading(false);
+            }
+        });
     })();
 
     document.addEventListener("DOMContentLoaded", function () {

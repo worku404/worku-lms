@@ -173,6 +173,7 @@ API1_KEY = os.getenv("API1_KEY")
 API2_KEY = os.getenv("API2_KEY")
 API3_KEY = os.getenv("API3_KEY")
 API4_KEY = os.getenv("API4_KEY")
+DAILY_QUOTE_API_KEY = os.getenv("DAILY_QUOTE_API_KEY")
 
 # API
 REST_FRAMEWORK = {
