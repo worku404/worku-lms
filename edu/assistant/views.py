@@ -73,7 +73,7 @@ def llm_generate(request):
             "x-goog-api-key": api_key
         }
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=60)
+            response = requests.post(url, headers=headers, json=data, timeout=120)
             if response.status_code == 200:
                 payload = response.json()
                 generated = payload["candidates"][0]["content"]["parts"][0]["text"]
