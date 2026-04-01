@@ -263,7 +263,22 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
             )
             content_item.student_completed = bool(progress_row.completed) if progress_row else False
             # For PDF resume support we expose the stored JSON position to the template.
-            content_item.student_last_position = progress_row.last_position if progress_row else {}
+            # Ensure expected keys exist to avoid template lookup errors.
+            default_position = {
+                "page": 1,
+                "current_page": 1,
+                "page_offset_ratio": 0,
+                "doc_y_ratio": 0,
+                "zoom": 0,
+                "max_page_seen": 1,
+            }
+            if progress_row and isinstance(progress_row.last_position, dict):
+                content_item.student_last_position = {
+                    **default_position,
+                    **progress_row.last_position,
+                }
+            else:
+                content_item.student_last_position = default_position
 
         context["module"] = module
         context["modules"] = modules
