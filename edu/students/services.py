@@ -199,14 +199,44 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
         max_seen = max(previous_max, incoming_max, current_page)
         max_seen = max(1, min(max_seen, total_pages))
 
+        doc_progress = payload.get("doc_progress")
+        doc_percent = None
+        if doc_progress is not None:
+            try:
+                doc_progress = float(doc_progress)
+                doc_percent = _clamp_percent(doc_progress * 100.0 if doc_progress <= 1 else doc_progress)
+            except (TypeError, ValueError):
+                doc_percent = None
+
         pdf_percent = _clamp_percent((max_seen / total_pages) * 100.0)
-        next_percent = max(progress.progress_percent, pdf_percent)
+        next_percent = max(progress.progress_percent, doc_percent if doc_percent is not None else pdf_percent)
+
+        try:
+            doc_y_ratio = float(payload.get("doc_y_ratio") or 0)
+        except (TypeError, ValueError):
+            doc_y_ratio = 0.0
+        try:
+            page_offset_ratio = float(payload.get("page_offset_ratio") or 0)
+        except (TypeError, ValueError):
+            page_offset_ratio = 0.0
+        try:
+            zoom = float(payload.get("zoom") or 0)
+        except (TypeError, ValueError):
+            zoom = 0.0
+
         next_position = {
+            "page": current_page,
             "current_page": current_page,
             "total_pages": total_pages,
             "max_page_seen": max_seen,
+            "page_offset_ratio": _clamp_percent(page_offset_ratio * 100.0) / 100.0,
+            "doc_y_ratio": _clamp_percent(doc_y_ratio * 100.0) / 100.0,
+            "zoom": zoom,
+            "viewport_w": payload.get("viewport_w"),
+            "viewport_h": payload.get("viewport_h"),
+            "doc_progress": doc_percent,
         }
-        completed = max_seen >= total_pages and next_percent >= CONTENT_COMPLETION_THRESHOLD
+        completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
     else:
         incoming_percent = _clamp_percent(float(payload.get("percent") or 0.0))
         next_percent = max(progress.progress_percent, incoming_percent)

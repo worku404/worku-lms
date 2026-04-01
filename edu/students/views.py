@@ -11,6 +11,7 @@ import json
 import os
 import mimetypes
 import subprocess
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,7 +39,8 @@ from django.views.generic import TemplateView, DetailView, View
 
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
-from courses.models import Content, Course, File, Image, Module
+from courses.models import Content, Course, File, Image, Module, ContentSearchEntry
+from courses.search import search_content_entries
 from .models import ContentProgress, CourseProgress, ModuleProgress
 from .services import (add_time_spent, mark_module_completed, 
                        get_overall_progress, get_course_time_spent,
@@ -528,6 +530,89 @@ class ModuleFilePreviewView(LoginRequiredMixin, View):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         patch_response_headers(response, cache_timeout=0)
         return response
+
+
+class ModuleFileSearchView(LoginRequiredMixin, View):
+    """
+    Search within an enrolled PDF using the server-side ContentSearchEntry index.
+    """
+    def get(self, request, file_id):
+        query = (request.GET.get("q") or "").strip()
+        if not query:
+            return JsonResponse({"query": "", "total_matches": 0, "matches": []})
+
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+
+        qs = ContentSearchEntry.objects.filter(content=content, page_number__isnull=False)
+        results = list(search_content_entries(qs, query)[:500])
+
+        page_map = {}
+        for row in results:
+            page = int(row.page_number or 1)
+            document = row.document or ""
+            match_count = len(re.findall(re.escape(query), document, flags=re.IGNORECASE))
+            if page not in page_map:
+                page_map[page] = {
+                    "page": page,
+                    "count": 0,
+                    "snippet": "",
+                }
+            page_map[page]["count"] += max(1, match_count) if document else 1
+            if not page_map[page]["snippet"] and document:
+                snippet = document[:160]
+                if len(document) > 160:
+                    snippet = f"{snippet}…"
+                page_map[page]["snippet"] = snippet
+
+        matches = [page_map[key] for key in sorted(page_map.keys())]
+        total_matches = sum(item["count"] for item in matches)
+
+        return JsonResponse(
+            {
+                "query": query,
+                "total_matches": total_matches,
+                "matches": matches,
+            }
+        )
+
+
+class ModuleFilePageTextView(LoginRequiredMixin, View):
+    """
+    Return indexed PDF page text for on-demand highlighting.
+    """
+    def get(self, request, file_id):
+        pages_param = (request.GET.get("pages") or "").strip()
+        if not pages_param:
+            return JsonResponse({"pages": {}}, status=400)
+
+        pages = []
+        for token in pages_param.split(","):
+            token = token.strip()
+            if token.isdigit():
+                pages.append(int(token))
+        if not pages:
+            return JsonResponse({"pages": {}}, status=400)
+
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+
+        rows = (
+            ContentSearchEntry.objects.filter(content=content, page_number__in=pages)
+            .values_list("page_number", "document")
+        )
+        page_map = {int(page): (doc or "") for page, doc in rows}
+        return JsonResponse({"pages": page_map})
 
 
 # Online count
