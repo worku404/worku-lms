@@ -128,7 +128,11 @@ body::-webkit-scrollbar-thumb {
 }
 
 body.assistant-sidebar-open .c-content-block[data-content-model="file"] .c-pdf-viewer {
-    margin-right: calc(var(--space-5) * -1);
+    margin-right: 0;
+}
+
+body.assistant-sidebar-open:not(.modules-sidebar-collapsed) .c-content-block[data-content-model="file"] .c-pdf-viewer {
+    margin-right: var(--space-2);
 }
 
 .c-content-block[data-content-model="file"] .c-pdf-toolbar {
