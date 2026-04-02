@@ -146,6 +146,7 @@
 {% block include_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="{% static 'js/pdf_viewer.js' %}"></script>
+<script src="{% static 'js/video_zoom.js' %}"></script>
 <script>
 window.addEventListener("pageshow", function (event) {
     if (event.persisted) window.location.reload();
@@ -167,7 +168,20 @@ const courseProgressBarEl = document.querySelector("[data-course-progress-bar]")
 const courseProgressValueEl = document.querySelector("[data-course-progress-value]");
 const textTrackElements = Array.from(document.querySelectorAll(".js-track-text"));
 const pdfViewerElements = Array.from(document.querySelectorAll(".js-pdf-viewer"));
-const hasTrackableContent = textTrackElements.length > 0 || pdfViewerElements.length > 0;
+const videoTrackElements = Array.from(document.querySelectorAll(".js-track-video"))
+    .map((wrapper) => {
+        if (!wrapper) return null;
+        const video = wrapper.querySelector("video");
+        if (!video) return null;
+        const contentId = wrapper.dataset.contentId;
+        const progressUrl = wrapper.dataset.progressUrl;
+        if (!contentId || !progressUrl) return null;
+        return { wrapper, video, contentId, progressUrl };
+    })
+    .filter(Boolean);
+const hasTrackableContent = textTrackElements.length > 0
+    || pdfViewerElements.length > 0
+    || videoTrackElements.length > 0;
 const contentProgressState = new Map();
 const contentCompletionThreshold = 95;
 
@@ -206,6 +220,17 @@ window.toggleModulesCollapsed = function () {
     window.setModulesCollapsed(!isCollapsed);
 };
 
+window.addEventListener("keydown", function (event) {
+    if (!event.ctrlKey || !event.shiftKey || event.code !== "KeyX") return;
+    const target = event.target;
+    const tag = target && target.tagName ? target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || tag === "select" || (target && target.isContentEditable)) {
+        return;
+    }
+    event.preventDefault();
+    window.toggleModulesCollapsed();
+});
+
 function getCookie(name) {
     const cookies = document.cookie ? document.cookie.split("; ") : [];
     for (const c of cookies) {
@@ -230,6 +255,69 @@ function getStateForContent(contentId) {
     }
     return contentProgressState.get(key);
 }
+
+function trackVideoProgress(entry, force = false) {
+    if (!entry || !entry.video) return;
+    const duration = Number(entry.video.duration || 0);
+    if (!duration || !Number.isFinite(duration)) return;
+
+    const currentTime = Number(entry.video.currentTime || 0);
+    const state = getStateForContent(entry.contentId);
+    const previousMax = Number(state.maxTimeSeen || 0);
+    const maxTimeSeen = Math.max(previousMax, currentTime, 0);
+    state.maxTimeSeen = maxTimeSeen;
+
+    const computedPercent = clampPercent((maxTimeSeen / duration) * 100);
+    state.highestPercent = Math.max(Number(state.highestPercent || 0), computedPercent);
+
+    const shouldSend = force
+        || state.highestPercent >= contentCompletionThreshold
+        || (state.highestPercent - state.lastSentPercent) >= 2;
+    if (!shouldSend) return;
+
+    const previousMediaTime = Number(state.lastSentMediaTime || 0);
+    const secondsDelta = Math.max(0, Math.floor(maxTimeSeen - previousMediaTime));
+    state.lastSentMediaTime = Math.max(previousMediaTime, maxTimeSeen);
+    state.lastSentAt = Date.now();
+    state.lastSentPercent = state.highestPercent;
+
+    postContentProgress(entry.progressUrl, {
+        kind: "video",
+        duration: Number(duration.toFixed(3)),
+        current_time: Number(currentTime.toFixed(3)),
+        max_time_seen: Number(maxTimeSeen.toFixed(3)),
+        percent: Number(state.highestPercent.toFixed(2)),
+        seconds_delta: secondsDelta,
+    });
+}
+
+function trackAllVideos(force = false) {
+    videoTrackElements.forEach((entry) => trackVideoProgress(entry, force));
+}
+
+videoTrackElements.forEach((entry) => {
+    const video = entry.video;
+    if (!video) return;
+
+    video.addEventListener("loadedmetadata", function () {
+        trackVideoProgress(entry, true);
+    });
+    video.addEventListener("timeupdate", function () {
+        trackVideoProgress(entry, false);
+    });
+    video.addEventListener("pause", function () {
+        trackVideoProgress(entry, true);
+    });
+    video.addEventListener("ended", function () {
+        const duration = Number(video.duration || 0);
+        if (duration && Number.isFinite(duration)) {
+            const state = getStateForContent(entry.contentId);
+            state.maxTimeSeen = Math.max(Number(state.maxTimeSeen || 0), duration);
+            state.highestPercent = 100;
+        }
+        trackVideoProgress(entry, true);
+    });
+});
 
 function updateModuleProgressUI(moduleId, percent) {
     // Keep module list progress bars synchronized with backend progress updates.
@@ -412,6 +500,7 @@ document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
         sendTime();
         trackVisibleText(true);
+        trackAllVideos(true);
         if (window.PdfViewer) window.PdfViewer.flushAll();
     } else {
         startTime = Date.now();
@@ -431,6 +520,7 @@ function sendTime() {
 window.addEventListener("beforeunload", sendTime);
 window.addEventListener("beforeunload", function () {
     trackVisibleText(true);
+    trackAllVideos(true);
     if (window.PdfViewer) window.PdfViewer.flushAll();
 });
 
@@ -516,6 +606,7 @@ function applySearchTarget() {
 }
 
 trackVisibleText(false);
+trackAllVideos(false);
 if (window.PdfViewer) {
     window.PdfViewer.initAll({
         postProgress: postContentProgress,
