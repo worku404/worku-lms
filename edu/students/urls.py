@@ -57,6 +57,11 @@ urlpatterns = [
         name="student_module_image",
     ),
     path(
+        "video/<int:video_id>/stream/",
+        views.ModuleVideoStreamView.as_view(),
+        name="student_video_stream",
+    ),
+    path(
         'module/<int:module_id>/complete/',
         MarkModuleCompleteView.as_view(),
         name='mark_module_complete',
