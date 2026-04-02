@@ -210,7 +210,7 @@ body.assistant-sidebar-open .assistance {
     border-left: 1px solid var(--assistant-panel-border);
     border-radius: var(--assistant-radius-lg) 0 0 var(--assistant-radius-lg);
     box-shadow: var(--assistant-panel-shadow);
-    z-index: 1200;
+    z-index: 2000;
     display: flex;
     flex-direction: column;
     gap: var(--assistant-element-gap);
