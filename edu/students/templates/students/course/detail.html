@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load course %}
+{% load course static %}
 
 {% block title %}
     {{ object.title }}
@@ -18,38 +18,9 @@
         </header>
 
         <div class="course-workspace">
-            <button
-                id="modules-unhide"
-                class="modules-unhide"
-                type="button"
-                aria-label="Show modules sidebar"
-                aria-controls="module-sidebar"
-                aria-expanded="true"
-            >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                    <line x1="4" y1="7" x2="20" y2="7"></line>
-                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                    <line x1="4" y1="17" x2="20" y2="17"></line>
-                </svg>
-            </button>
-
             <aside id="module-sidebar" class="contents c-card" aria-label="Module navigation">
                 <div class="modules-toolbar">
                     <h2 class="c-card__title">Modules</h2>
-                    <button
-                        id="modules-collapse-btn"
-                        class="modules-collapse-btn"
-                        type="button"
-                        aria-label="Collapse modules sidebar"
-                        aria-controls="module-sidebar"
-                        aria-expanded="true"
-                    >
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                            <line x1="4" y1="7" x2="20" y2="7"></line>
-                            <line x1="4" y1="12" x2="20" y2="12"></line>
-                            <line x1="4" y1="17" x2="20" y2="17"></line>
-                        </svg>
-                    </button>
                 </div>
                 <ul id="modules" class="c-module-list">
                     <p class="course-time">
@@ -174,6 +145,7 @@
 
 {% block include_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="{% static 'js/pdf_viewer.js' %}"></script>
 <script>
 window.addEventListener("pageshow", function (event) {
     if (event.persisted) window.location.reload();
@@ -190,10 +162,6 @@ const timeUrl = "{% if module %}{% url 'track_time' module.id %}{% endif %}";
 const activeModuleId = Number("{{ module.id|default:'0' }}") || null;
 const workspaceEl = document.querySelector(".course-workspace");
 const moduleSidebarEl = document.getElementById("module-sidebar");
-const moduleCollapseBtn = document.getElementById("modules-collapse-btn");
-const moduleUnhideBtn = document.getElementById("modules-unhide");
-const moduleContentEl = document.querySelector(".course-workspace .module");
-const weeklyFocusCardEl = document.querySelector(".l-rail--left .c-progress-card");
 const courseProgressWrapEl = document.querySelector("[data-course-progress]");
 const courseProgressBarEl = document.querySelector("[data-course-progress-bar]");
 const courseProgressValueEl = document.querySelector("[data-course-progress-value]");
@@ -201,26 +169,7 @@ const textTrackElements = Array.from(document.querySelectorAll(".js-track-text")
 const pdfViewerElements = Array.from(document.querySelectorAll(".js-pdf-viewer"));
 const hasTrackableContent = textTrackElements.length > 0 || pdfViewerElements.length > 0;
 const contentProgressState = new Map();
-const pdfViewerState = new Map();
 const contentCompletionThreshold = 95;
-
-function updateModulesLauncherPosition() {
-    if (!moduleUnhideBtn || !moduleContentEl) return;
-    const moduleRect = moduleContentEl.getBoundingClientRect();
-    const buttonWidth = moduleUnhideBtn.offsetWidth || 40;
-    const buttonHeight = moduleUnhideBtn.offsetHeight || 40;
-    const gap = 8;
-    const left = Math.max(8, Math.round(moduleRect.left - buttonWidth - gap));
-    const header = document.getElementById("header");
-    const minTop = (header ? header.offsetHeight : 0) + 8;
-    const rawTop = weeklyFocusCardEl
-        ? Math.round(weeklyFocusCardEl.getBoundingClientRect().bottom + 10)
-        : Math.round(moduleRect.top + 12);
-    const maxTop = window.innerHeight - buttonHeight - 8;
-    const top = Math.max(minTop, Math.min(rawTop, maxTop));
-    document.documentElement.style.setProperty("--modules-unhide-left", `${left}px`);
-    document.documentElement.style.setProperty("--modules-unhide-top", `${top}px`);
-}
 
 function persistModulesState(state) {
     try {
@@ -230,22 +179,11 @@ function persistModulesState(state) {
     }
 }
 
-function syncModulesToggle(expanded) {
-    if (moduleCollapseBtn) {
-        moduleCollapseBtn.setAttribute("aria-expanded", String(expanded));
-    }
-    if (moduleUnhideBtn) {
-        moduleUnhideBtn.setAttribute("aria-expanded", String(expanded));
-    }
-}
-
-function setModulesCollapsed(collapsed) {
+function applyModulesCollapsed(collapsed) {
     if (!workspaceEl || !moduleSidebarEl) return;
     workspaceEl.classList.toggle("modules-collapsed", collapsed);
     document.body.classList.toggle("modules-sidebar-collapsed", collapsed);
     moduleSidebarEl.setAttribute("aria-hidden", String(collapsed));
-    syncModulesToggle(!collapsed);
-    updateModulesLauncherPosition();
 }
 
 if (workspaceEl && moduleSidebarEl) {
@@ -255,25 +193,18 @@ if (workspaceEl && moduleSidebarEl) {
     } catch (error) {
         storedState = "expanded";
     }
-    setModulesCollapsed(storedState === "collapsed");
-    updateModulesLauncherPosition();
-    window.addEventListener("resize", updateModulesLauncherPosition);
-    window.addEventListener("scroll", updateModulesLauncherPosition, { passive: true });
+    applyModulesCollapsed(storedState === "collapsed");
 }
 
-if (moduleCollapseBtn) {
-    moduleCollapseBtn.addEventListener("click", function () {
-        setModulesCollapsed(true);
-        persistModulesState("collapsed");
-    });
-}
+window.setModulesCollapsed = function (collapsed) {
+    applyModulesCollapsed(Boolean(collapsed));
+    persistModulesState(collapsed ? "collapsed" : "expanded");
+};
 
-if (moduleUnhideBtn) {
-    moduleUnhideBtn.addEventListener("click", function () {
-        setModulesCollapsed(false);
-        persistModulesState("expanded");
-    });
-}
+window.toggleModulesCollapsed = function () {
+    const isCollapsed = document.body.classList.contains("modules-sidebar-collapsed");
+    window.setModulesCollapsed(!isCollapsed);
+};
 
 function getCookie(name) {
     const cookies = document.cookie ? document.cookie.split("; ") : [];
@@ -437,445 +368,6 @@ function trackVisibleText(force = false) {
     });
 }
 
-function initPdfViewer(viewerEl) {
-    if (!window.pdfjsLib || !viewerEl) return;
-
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-    const sourceUrl = viewerEl.dataset.pdfUrl;
-    const contentId = viewerEl.dataset.contentId;
-    const progressUrl = viewerEl.dataset.progressUrl;
-    const scrollEl = viewerEl.querySelector(".js-pdf-scroll");
-    const currentEl = viewerEl.querySelector(".js-pdf-current");
-    const totalEl = viewerEl.querySelector(".js-pdf-total");
-    const progressEl = viewerEl.querySelector(".js-pdf-progress");
-    const progressLabelEl = viewerEl.querySelector(".js-pdf-progress-label");
-    const persistedStartPage = Math.max(1, Number(viewerEl.dataset.startPage || 1) || 1);
-    const persistedMaxPage = Math.max(1, Number(viewerEl.dataset.maxPageSeen || persistedStartPage) || persistedStartPage);
-
-    if (!sourceUrl || !scrollEl) return;
-
-    const state = {
-        doc: null,
-        currentPage: persistedStartPage,
-        totalPages: 1,
-        maxPageSeen: persistedMaxPage,
-        lastRenderWidth: 0,
-        lastSentAt: Date.now(),
-        progressUrl,
-        contentId,
-        renderedPages: new Set(),
-        pageNodes: new Map(),
-    };
-    pdfViewerState.set(viewerEl, state);
-
-    const updatePdfProgressBadge = () => {
-        if (!progressEl) return;
-        const total = Math.max(1, Number(state.totalPages) || 1);
-        const seen = Math.max(0, Math.min(Number(state.maxPageSeen) || 0, total));
-        const percent = Math.max(0, Math.min(100, Math.round((seen / total) * 100)));
-
-        progressEl.style.setProperty("--pdf-progress", `${percent}%`);
-        progressEl.setAttribute("aria-valuenow", String(percent));
-        progressEl.classList.toggle("is-complete", percent >= 100);
-        progressEl.setAttribute("title", percent >= 100 ? "PDF completed" : `PDF progress: ${percent}%`);
-
-        if (progressLabelEl) {
-            progressLabelEl.textContent = percent >= 100 ? "\u2714" : `${percent}%`;
-        }
-    };
-
-    const sendPdfProgress = (pdfState, force) => {
-        if (!pdfState.progressUrl || !pdfState.contentId) return;
-        const now = Date.now();
-        const secondsDelta = Math.max(0, Math.floor((now - pdfState.lastSentAt) / 1000));
-        const shouldSend = force
-            || pdfState.maxPageSeen >= pdfState.totalPages
-            || secondsDelta >= 5;
-        if (!shouldSend) return;
-        pdfState.lastSentAt = now;
-        postContentProgress(
-            pdfState.progressUrl,
-            {
-                kind: "pdf",
-                current_page: pdfState.currentPage,
-                total_pages: pdfState.totalPages,
-                max_page_seen: pdfState.maxPageSeen,
-                seconds_delta: secondsDelta,
-            },
-            { keepalive: force }
-        );
-    };
-
-    const markVisiblePage = (pageNumber, force) => {
-        const normalized = Math.max(1, Math.min(Number(pageNumber) || 1, state.totalPages));
-        state.currentPage = normalized;
-        state.maxPageSeen = Math.max(state.maxPageSeen, normalized);
-        if (currentEl) currentEl.textContent = String(state.currentPage);
-        if (totalEl) totalEl.textContent = String(state.totalPages);
-        updatePdfProgressBadge();
-        sendPdfProgress(state, force);
-    };
-
-    const renderTextLayerFallback = (textLayerEl, textContent, viewport) => {
-        const util = window.pdfjsLib && window.pdfjsLib.Util;
-        if (!util || !textLayerEl || !textContent || !Array.isArray(textContent.items)) return;
-
-        const styles = textContent.styles || {};
-        const fragment = document.createDocumentFragment();
-
-        textContent.items.forEach((item) => {
-            if (!item || typeof item.str !== "string" || item.str.length === 0) return;
-
-            const style = styles[item.fontName] || {};
-            const tx = util.transform(
-                util.transform(viewport.transform, item.transform),
-                [1, 0, 0, -1, 0, 0]
-            );
-            const fontHeight = Math.hypot(tx[2], tx[3]);
-            if (!Number.isFinite(fontHeight) || fontHeight <= 0) return;
-
-            let fontAscent = fontHeight;
-            if (Number.isFinite(style.ascent)) {
-                fontAscent = style.ascent * fontHeight;
-            } else if (Number.isFinite(style.descent)) {
-                fontAscent = (1 + style.descent) * fontHeight;
-            }
-
-            const span = document.createElement("span");
-            span.textContent = item.str;
-            span.dir = item.dir || "ltr";
-            span.style.position = "absolute";
-            span.style.whiteSpace = "pre";
-            span.style.transformOrigin = "0 0";
-            // Keep glyphs almost invisible while preserving robust browser selection behavior.
-            span.style.color = "rgba(0, 0, 0, 0.001)";
-            span.style.webkitTextFillColor = "rgba(0, 0, 0, 0.001)";
-            span.style.cursor = "text";
-            span.style.userSelect = "text";
-            span.style.webkitUserSelect = "text";
-            span.style.left = `${tx[4]}px`;
-            span.style.top = `${tx[5] - fontAscent}px`;  
-            span.style.fontSize = `${fontHeight}px`;
-            span.style.fontFamily = style.fontFamily || "sans-serif";
-            fragment.appendChild(span);
-        });
-
-        textLayerEl.appendChild(fragment);
-    };
-
-    const renderSelectableTextLayer = async (page, viewport, textLayerEl) => {
-        if (!textLayerEl || !page || !viewport) return;
-
-        textLayerEl.textContent = "";
-        textLayerEl.style.width = `${Math.floor(viewport.width)}px`;
-        textLayerEl.style.height = `${Math.floor(viewport.height)}px`;
-        textLayerEl.classList.remove("c-pdf-page__text-layer--selectable", "c-pdf-page__text-layer--not-selectable");
-
-        const textContent = await page.getTextContent();
-        if (!textContent || !Array.isArray(textContent.items) || textContent.items.length === 0) {
-            // This page is image-based (or has no text runs), so disable text selection affordances.
-            textLayerEl.classList.add("c-pdf-page__text-layer--not-selectable");
-            return;
-        }
-
-        // Mark this layer selectable so CSS can show proper highlight feedback.
-        textLayerEl.classList.add("c-pdf-page__text-layer--selectable");
-
-        let rendered = false;
-        if (typeof window.pdfjsLib.TextLayer === "function") {
-            try {
-                // Prefer PDF.js TextLayer when available because it produces the most
-                // reliable text geometry and browser selection behavior.
-                const textLayer = new window.pdfjsLib.TextLayer({
-                    textContentSource: textContent,
-                    container: textLayerEl,
-                    viewport,
-                });
-                const maybePromise = textLayer.render();
-                if (maybePromise && typeof maybePromise.then === "function") {
-                    await maybePromise;
-                }
-                rendered = textLayerEl.childElementCount > 0;
-            } catch (error) {
-                rendered = false;
-            }
-        }
-
-        if (!rendered && typeof window.pdfjsLib.renderTextLayer === "function") {
-            try {
-                // Support both renderTextLayer signatures used across PDF.js versions.
-                // Some builds expect `textContent`, others `textContentSource`.
-                const renderArgs = {
-                    container: textLayerEl,
-                    viewport,
-                    enhanceTextSelection: true,
-                    textContent,
-                    textContentSource: textContent,
-                };
-                const textLayerTask = window.pdfjsLib.renderTextLayer({
-                    ...renderArgs,
-                });
-                if (textLayerTask && textLayerTask.promise) {
-                    await textLayerTask.promise;
-                } else if (textLayerTask && typeof textLayerTask.then === "function") {
-                    await textLayerTask;
-                }
-                rendered = textLayerEl.childElementCount > 0;
-            } catch (error) {
-                rendered = false;
-            }
-        }
-
-        if (!rendered) {
-            renderTextLayerFallback(textLayerEl, textContent, viewport);
-        }
-    };
-
-    const renderPageCanvas = async (pageNumber) => {
-        if (!state.doc || state.renderedPages.has(pageNumber)) return;
-        const pageNode = state.pageNodes.get(pageNumber);
-        if (!pageNode || pageNode.dataset.rendering === "1") return;
-
-        const canvasEl = pageNode.querySelector(".js-pdf-canvas");
-        const textLayerEl = pageNode.querySelector(".js-pdf-text-layer");
-        if (!canvasEl) return;
-
-        pageNode.dataset.rendering = "1";
-        try {
-            const page = await state.doc.getPage(pageNumber);
-            const baseViewport = page.getViewport({ scale: 1 });
-            const availableWidth = Math.max(
-                1,
-                scrollEl.clientWidth || scrollEl.offsetWidth || baseViewport.width
-            );
-            state.lastRenderWidth = availableWidth;
-            const scale = availableWidth / Math.max(1, baseViewport.width);
-            const viewport = page.getViewport({ scale });
-            canvasEl.width = Math.floor(viewport.width);
-            canvasEl.height = Math.floor(viewport.height);
-            canvasEl.style.width = `${Math.floor(viewport.width)}px`;
-            canvasEl.style.height = `${Math.floor(viewport.height)}px`;
-            canvasEl.style.pointerEvents = "none";
-            const ctx = canvasEl.getContext("2d");
-            if (!ctx) throw new Error("Unable to initialize canvas context");
-            await page.render({
-                canvasContext: ctx,
-                viewport,
-            }).promise;
-
-            if (textLayerEl) {
-                await renderSelectableTextLayer(page, viewport, textLayerEl);
-            }
-
-            state.renderedPages.add(pageNumber);
-            pageNode.classList.add("is-rendered");
-        } catch (error) {
-            pageNode.classList.add("is-error");
-        } finally {
-            delete pageNode.dataset.rendering;
-        }
-    };
-
-    const resetRenderedPagesForNewWidth = () => {
-        // Clear cached rendered canvases so pages can be regenerated at new container width.
-        state.renderedPages.clear();
-        state.pageNodes.forEach((pageNode) => {
-            const canvasEl = pageNode.querySelector(".js-pdf-canvas");
-            const textLayerEl = pageNode.querySelector(".js-pdf-text-layer");
-            if (canvasEl) {
-                canvasEl.width = 0;
-                canvasEl.height = 0;
-                canvasEl.style.width = "";
-                canvasEl.style.height = "";
-            }
-            if (textLayerEl) {
-                textLayerEl.textContent = "";
-                textLayerEl.style.width = "";
-                textLayerEl.style.height = "";
-            }
-            pageNode.classList.remove("is-rendered", "is-error");
-            delete pageNode.dataset.rendering;
-        });
-    };
-
-    const rerenderForLayoutChange = () => {
-        // Sidebar open/close changes available width; re-render to avoid clipped PDF pages.
-        if (!state.doc) return;
-        const newWidth = Math.max(1, scrollEl.clientWidth || scrollEl.offsetWidth || 1);
-        if (Math.abs(newWidth - state.lastRenderWidth) < 2) return;
-        state.lastRenderWidth = newWidth;
-        resetRenderedPagesForNewWidth();
-
-        const candidates = [state.currentPage - 1, state.currentPage, state.currentPage + 1]
-            .filter((value) => value >= 1 && value <= state.totalPages);
-        candidates.forEach((pageNumber) => {
-            renderPageCanvas(pageNumber);
-        });
-    };
-
-    let layoutRefreshTimerId = null;
-    const scheduleLayoutRefresh = () => {
-        // Debounce repeated width changes during CSS transitions.
-        if (layoutRefreshTimerId !== null) {
-            window.clearTimeout(layoutRefreshTimerId);
-        }
-        layoutRefreshTimerId = window.setTimeout(() => {
-            layoutRefreshTimerId = null;
-            rerenderForLayoutChange();
-        }, 180);
-    };
-
-    const visiblePages = new Map();
-    let visibilityFrame = null;
-    const queueVisiblePageUpdate = () => {
-        if (visibilityFrame !== null) return;
-        visibilityFrame = window.requestAnimationFrame(() => {
-            visibilityFrame = null;
-            let bestPage = state.currentPage;
-            let bestRatio = 0;
-            visiblePages.forEach((ratio, pageNumber) => {
-                if (ratio > bestRatio || (ratio === bestRatio && pageNumber < bestPage)) {
-                    bestRatio = ratio;
-                    bestPage = pageNumber;
-                }
-            });
-            if (bestRatio > 0) {
-                markVisiblePage(bestPage, false);
-            }
-        });
-    };
-
-    const trackingObserver = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                const pageNumber = Number(entry.target.dataset.pageNumber || 0);
-                if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
-                if (entry.isIntersecting && entry.intersectionRatio > 0) {
-                    visiblePages.set(pageNumber, entry.intersectionRatio);
-                } else {
-                    visiblePages.delete(pageNumber);
-                }
-            });
-            queueVisiblePageUpdate();
-        },
-        {
-            root: scrollEl,
-            threshold: [0, 0.2, 0.45, 0.65, 0.85, 1],
-        }
-    );
-
-    const renderObserver = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (!entry.isIntersecting) return;
-                const pageNumber = Number(entry.target.dataset.pageNumber || 0);
-                if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
-                renderPageCanvas(pageNumber);
-            });
-        },
-        {
-            root: scrollEl,
-            threshold: 0.01,
-            rootMargin: "500px 0px",
-        }
-    );
-
-    const buildPageNodes = () => {
-        scrollEl.innerHTML = "";
-        const fragment = document.createDocumentFragment();
-        for (let pageNumber = 1; pageNumber <= state.totalPages; pageNumber += 1) {
-            const pageNode = document.createElement("div");
-            pageNode.className = "c-pdf-page js-pdf-page";
-            pageNode.dataset.pageNumber = String(pageNumber);
-            pageNode.style.position = "relative";
-            pageNode.style.overflow = "hidden";
-
-            const canvasEl = document.createElement("canvas");
-            canvasEl.className = "c-pdf-page__canvas js-pdf-canvas";
-            canvasEl.setAttribute("aria-label", `PDF page ${pageNumber}`);
-            pageNode.appendChild(canvasEl);
-
-            const textLayerEl = document.createElement("div");
-            textLayerEl.className = "c-pdf-page__text-layer js-pdf-text-layer";
-            textLayerEl.style.position = "absolute";
-            textLayerEl.style.top = "0";
-            textLayerEl.style.left = "0";
-            textLayerEl.style.zIndex = "2";
-            textLayerEl.style.overflow = "hidden";
-            textLayerEl.style.lineHeight = "1";
-            textLayerEl.style.pointerEvents = "auto";
-            textLayerEl.style.cursor = "text";
-            textLayerEl.style.userSelect = "text";
-            textLayerEl.style.webkitUserSelect = "text";
-            pageNode.appendChild(textLayerEl);
-
-            state.pageNodes.set(pageNumber, pageNode);
-            fragment.appendChild(pageNode);
-        }
-        scrollEl.appendChild(fragment);
-
-        state.pageNodes.forEach((pageNode) => {
-            trackingObserver.observe(pageNode);
-            renderObserver.observe(pageNode);
-        });
-    };
-
-    const scrollToPage = (pageNumber) => {
-        // Resume reading from the persisted page when the viewer is opened again.
-        const targetNode = state.pageNodes.get(pageNumber);
-        if (!targetNode) return;
-        const offsetTop = targetNode.offsetTop || 0;
-        scrollEl.scrollTo({ top: offsetTop, behavior: "auto" });
-    };
-
-    updatePdfProgressBadge();
-
-    window.pdfjsLib.getDocument(sourceUrl).promise
-        .then((doc) => {
-            state.doc = doc;
-            state.totalPages = doc.numPages || 1;
-            state.currentPage = Math.max(1, Math.min(state.currentPage, state.totalPages));
-            state.maxPageSeen = Math.max(state.currentPage, Math.min(state.maxPageSeen, state.totalPages));
-            state.lastRenderWidth = Math.max(1, scrollEl.clientWidth || scrollEl.offsetWidth || 1);
-            if (totalEl) totalEl.textContent = String(state.totalPages);
-            updatePdfProgressBadge();
-            buildPageNodes();
-            markVisiblePage(state.currentPage, false);
-            renderPageCanvas(state.currentPage);
-            window.requestAnimationFrame(() => scrollToPage(state.currentPage));
-        })
-        .catch(() => {
-            if (totalEl) totalEl.textContent = "error";
-        });
-
-    if (typeof window.ResizeObserver === "function") {
-        // Observe only this viewer container so it reflows when sidebars change layout width.
-        const resizeObserver = new ResizeObserver(() => {
-            scheduleLayoutRefresh();
-        });
-        resizeObserver.observe(scrollEl);
-        state.resizeObserver = resizeObserver;
-    }
-
-    state.refreshLayout = scheduleLayoutRefresh;
-    state.flush = () => markVisiblePage(state.currentPage, true);
-}
-
-function initPdfViewers() {
-    pdfViewerElements.forEach((viewerEl) => initPdfViewer(viewerEl));
-}
-
-function refreshPdfLayouts() {
-    // Trigger layout refresh for all active PDF viewers on shell/sidebar layout changes.
-    pdfViewerState.forEach((state) => {
-        if (state && typeof state.refreshLayout === "function") {
-            state.refreshLayout();
-        }
-    });
-}
-
 function isAtBottom() {
     if (moduleContainer && moduleContainer.scrollHeight > moduleContainer.clientHeight + 2) {
         return moduleContainer.scrollTop + moduleContainer.clientHeight >= moduleContainer.scrollHeight - 8;
@@ -920,9 +412,7 @@ document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
         sendTime();
         trackVisibleText(true);
-        pdfViewerState.forEach((state) => {
-            if (state.flush) state.flush();
-        });
+        if (window.PdfViewer) window.PdfViewer.flushAll();
     } else {
         startTime = Date.now();
     }
@@ -941,14 +431,12 @@ function sendTime() {
 window.addEventListener("beforeunload", sendTime);
 window.addEventListener("beforeunload", function () {
     trackVisibleText(true);
-    pdfViewerState.forEach((state) => {
-        if (state.flush) state.flush();
-    });
+    if (window.PdfViewer) window.PdfViewer.flushAll();
 });
 
 window.addEventListener("resize", function () {
     trackVisibleText(false);
-    refreshPdfLayouts();
+    if (window.PdfViewer) window.PdfViewer.refreshAll();
 }, { passive: true });
 
 const searchParams = new URLSearchParams(window.location.search);
@@ -1028,14 +516,25 @@ function applySearchTarget() {
 }
 
 trackVisibleText(false);
-initPdfViewers();
+if (window.PdfViewer) {
+    window.PdfViewer.initAll({
+        postProgress: postContentProgress,
+        onProgressPayload: applyProgressPayload,
+        urlState: true,
+    });
+}
 window.requestAnimationFrame(applySearchTarget);
 
 if (document.body && typeof MutationObserver === "function") {
     // Listen for body class toggles (assistant sidebar open/close) and refresh PDF layout.
     const bodyClassObserver = new MutationObserver((mutations) => {
         const changed = mutations.some((mutation) => mutation.attributeName === "class");
-        if (changed) refreshPdfLayouts();
+        if (changed && window.PdfViewer) {
+            if (typeof window.PdfViewer.setAutoZoomAll === "function") {
+                window.PdfViewer.setAutoZoomAll();
+            }
+            window.PdfViewer.refreshAll();
+        }
     });
     bodyClassObserver.observe(document.body, {
         attributes: true,
