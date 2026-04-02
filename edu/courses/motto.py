@@ -58,72 +58,61 @@ def _normalize_motto(payload):
 
 import random
 
-# High-signal domains
-philosophy = [
-    "ancient philosophy (Stoicism, Aristotle, Plato)",
-    "modern philosophy (existentialism, Nietzsche, Camus)",
-    "ethics and moral philosophy",
-    "logic and rational thinking",
+whimsical_wonders = [
+    "weird but true life observations",
+    "funny animal behavior",
+    "strange but real historical moments",
+    "objects acting like humans"
 ]
 
-religion_spirituality = [
-    "Orthodox Christianity teachings",
-    "Biblical wisdom and teachings",
-    "early Church Fathers",
-    "spiritual discipline and asceticism",
+everyday_absurdities = [
+    "overthinking simple things",
+    "awkward social situations",
+    "procrastination struggles",
+    "losing things for no reason"
 ]
 
-literature = [
-    "classic literature wisdom",
-    "Russian literature (Dostoevsky, Tolstoy)",
-    "poetry and human nature",
-    "themes of suffering and meaning in literature",
+internet_culture = [
+    "memes and online behavior",
+    "group chat chaos",
+    "funny texting habits",
+    "social media contradictions"
 ]
 
-# Cognitive domains
-psychology = [
-    "human behavior and psychology",
-    "cognitive biases and decision making",
-    "emotional intelligence",
-    "habit formation and discipline",
+playful_thoughts = [
+    "funny philosophical thoughts",
+    "life expectations vs reality",
+    "lazy logic that makes sense",
+    "random thoughts that feel true"
 ]
 
-self_mastery = [
-    "discipline and self-control",
-    "focus and deep work",
-    "resilience and perseverance",
-    "personal responsibility and growth",
-]
-
-# Strategic domains
-strategy = [
-    "strategic thinking and decision making",
-    "military strategy (Sun Tzu, Clausewitz)",
-    "power dynamics and leadership",
-    "long-term thinking and planning",
+wordplay = [
+    "clever one-liners",
+    "dad jokes",
+    "puns and wordplay",
+    "sarcastic comebacks"
 ]
 
 topics = [
-    philosophy,
-    religion_spirituality,
-    literature,
-    psychology,
-    self_mastery,
-    strategy,
+    whimsical_wonders,
+    everyday_absurdities,
+    internet_culture,
+    playful_thoughts,
+    wordplay,
 ]
 
 def _build_prompt():
-    daily_topic = random.choice(topics)      # pick category
-    daily_quote = random.choice(daily_topic) # pick specific topic
+    category = random.choice(topics)
+    topic = random.choice(category)
 
     return (
-        f"Return ONE real, short quote about {daily_quote}. "
-        "Reply ONLY with valid JSON (no markdown, no commentary) in this exact shape: "
+        f"Return ONE short, funny or witty quote about {topic}. "
+        "Reply ONLY with valid JSON (no markdown, no commentary): "
         "{\"text\":\"...\",\"author\":\"...\",\"source\":\"...\"}. "
-        "Keep the quote under 240 characters. Ensure the author is a real person. "
-        "If uncertain about the source, set \"source\" to \"Unknown\"."
+        "Keep it under 240 characters. "
+        "Author can be real or 'Unknown'. "
+        "If unsure, set source to \"Unknown\"."
     )
-
 def _call_gemini():
     api_keys = [
         settings.API1_KEY,

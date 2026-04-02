@@ -74,9 +74,11 @@ class ModuleProgress(models.Model):
 class ContentProgress(models.Model):
     CONTENT_KIND_TEXT = "text"
     CONTENT_KIND_PDF = "pdf"
+    CONTENT_KIND_VIDEO = "video"
     CONTENT_KIND_CHOICES = (
         (CONTENT_KIND_TEXT, "Text"),
         (CONTENT_KIND_PDF, "PDF"),
+        (CONTENT_KIND_VIDEO, "Video"),
     )
 
     user = models.ForeignKey(

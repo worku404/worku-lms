@@ -3,6 +3,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Func
 from django.template.loader import render_to_string
@@ -263,4 +264,17 @@ class Image(ItemBase):
 
 class Video(ItemBase):
     # External video link (URL validation included)
-    url = models.URLField()
+    url = models.URLField(
+        blank=True,
+        help_text="Optional video URL (YouTube/Vimeo). Leave blank if uploading a file.",
+    )
+    file = models.FileField(
+        upload_to="videos",
+        blank=True,
+        help_text="Upload a video file for local playback (MP4/WebM/OGG).",
+    )
+
+    def clean(self):
+        super().clean()
+        if not self.file and not self.url:
+            raise ValidationError("Provide either a video URL or upload a video file.")

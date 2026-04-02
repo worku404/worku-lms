@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import F, Sum
 from django.utils import timezone
 
-from courses.models import Content, Course, File, Module, Text
+from courses.models import Content, Course, File, Module, Text, Video
 from .models import ContentProgress, CourseProgress, ModuleProgress
 
 ONLINE_USERS_KEY = "presence:online_users"
@@ -50,6 +50,7 @@ def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECOND
 def _trackable_content_ids_for_module(module: Module) -> list[int]:
     text_ct = _content_type_id(Text)
     file_ct = _content_type_id(File)
+    video_ct = _content_type_id(Video)
 
     text_ids = list(
         Content.objects.filter(module=module, content_type_id=text_ct).values_list("id", flat=True)
@@ -61,7 +62,17 @@ def _trackable_content_ids_for_module(module: Module) -> list[int]:
         File.objects.filter(id__in=file_ids, file__iendswith=".pdf").values_list("id", flat=True)
     )
     pdf_content_ids = list(file_contents.filter(object_id__in=pdf_file_ids).values_list("id", flat=True))
-    return text_ids + pdf_content_ids
+
+    video_contents = Content.objects.filter(module=module, content_type_id=video_ct)
+    video_ids = list(video_contents.values_list("object_id", flat=True))
+    trackable_video_ids = set(
+        Video.objects.filter(id__in=video_ids).exclude(file="").values_list("id", flat=True)
+    )
+    video_content_ids = list(
+        video_contents.filter(object_id__in=trackable_video_ids).values_list("id", flat=True)
+    )
+
+    return text_ids + pdf_content_ids + video_content_ids
 
 
 def recompute_module_progress(user, module: Module) -> ModuleProgress:
@@ -170,7 +181,11 @@ def mark_module_completed(user, module):
 
 def update_content_progress(user, content, kind: str, payload: dict, seconds_delta: int = 0) -> dict:
     kind = (kind or "").lower().strip()
-    if kind not in {ContentProgress.CONTENT_KIND_TEXT, ContentProgress.CONTENT_KIND_PDF}:
+    if kind not in {
+        ContentProgress.CONTENT_KIND_TEXT,
+        ContentProgress.CONTENT_KIND_PDF,
+        ContentProgress.CONTENT_KIND_VIDEO,
+    }:
         raise ValueError("Unsupported content kind")
 
     progress, _ = ContentProgress.objects.get_or_create(
@@ -235,6 +250,47 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
             "viewport_w": payload.get("viewport_w"),
             "viewport_h": payload.get("viewport_h"),
             "doc_progress": doc_percent,
+        }
+        completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
+    elif kind == ContentProgress.CONTENT_KIND_VIDEO:
+        try:
+            duration = float(payload.get("duration") or 0)
+        except (TypeError, ValueError):
+            duration = 0.0
+        try:
+            current_time = float(payload.get("current_time") or 0)
+        except (TypeError, ValueError):
+            current_time = 0.0
+        try:
+            incoming_max = float(payload.get("max_time_seen") or current_time)
+        except (TypeError, ValueError):
+            incoming_max = current_time
+
+        previous_max = float(last_position.get("max_time_seen") or 0)
+        max_seen = max(previous_max, incoming_max, current_time, 0.0)
+
+        percent_from_payload = None
+        if payload.get("percent") is not None:
+            try:
+                percent_from_payload = _clamp_percent(float(payload.get("percent") or 0))
+            except (TypeError, ValueError):
+                percent_from_payload = None
+
+        if duration > 0:
+            video_percent = _clamp_percent((max_seen / duration) * 100.0)
+        else:
+            video_percent = percent_from_payload or 0.0
+
+        next_percent = max(
+            progress.progress_percent,
+            video_percent,
+            percent_from_payload or 0.0,
+        )
+        next_position = {
+            "duration": duration,
+            "current_time": current_time,
+            "max_time_seen": max_seen,
+            "percent": round(next_percent, 2),
         }
         completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
     else:

@@ -326,13 +326,29 @@ body.theme-dark .c-progress__bar {
 }
 
 .c-video__frame iframe,
-.c-video iframe {
+.c-video iframe,
+.c-video__frame video,
+.c-video video {
     width: 100%;
     height: auto;
     min-height: 220px;
     aspect-ratio: 16 / 9;
     border: 0;
     border-radius: var(--radius-sm);
+}
+
+.c-video.is-zoom-fill .c-video__frame {
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+}
+
+.c-video.is-zoom-fill .c-video__frame video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0;
 }
 
 .c-media {
