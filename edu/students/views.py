@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from django.conf import settings
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib.contenttypes.models import ContentType
@@ -39,7 +39,7 @@ from django.views.generic import TemplateView, DetailView, View
 
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
-from courses.models import Content, Course, File, Image, Module, ContentSearchEntry
+from courses.models import Content, Course, File, Image, Module, ContentSearchEntry, Video
 from courses.search import search_content_entries
 from .models import ContentProgress, CourseProgress, ModuleProgress
 from .services import (add_time_spent, mark_module_completed, 
@@ -58,6 +58,7 @@ r = redis.Redis(
     db=settings.REDIS_DB,
 )
 
+VIDEO_CACHE_SECONDS = 60 * 60 * 24 * 7  # 7 days
 
 def _course_progress_table_ready() -> bool:
     """
@@ -374,6 +375,8 @@ class TrackContentProgressView(LoginRequiredMixin, View):
                 filename = str(getattr(file_obj, "file", "") or "")
                 if filename.lower().endswith(".pdf"):
                     kind = "pdf"
+            elif model_name == "video":
+                kind = "video"
 
         try:
             seconds_delta = int(payload.get("seconds_delta", 0))
@@ -505,6 +508,105 @@ class ModuleImageView(LoginRequiredMixin, View):
             )
         except FileNotFoundError as exc:
             raise Http404("Image not found.") from exc
+
+
+def _parse_byte_range(range_header: str | None, file_size: int):
+    if not range_header:
+        return None
+    if not range_header.startswith("bytes="):
+        return None
+
+    range_spec = range_header.replace("bytes=", "", 1).split(",")[0].strip()
+    if "-" not in range_spec:
+        return None
+
+    start_str, end_str = range_spec.split("-", 1)
+    try:
+        if start_str == "":
+            # Suffix range: "-500" means last 500 bytes
+            suffix_len = int(end_str)
+            if suffix_len <= 0:
+                return None
+            start = max(file_size - suffix_len, 0)
+            end = file_size - 1
+        else:
+            start = int(start_str)
+            end = int(end_str) if end_str else file_size - 1
+            if start < 0:
+                return None
+            end = min(end, file_size - 1)
+        if start > end or start >= file_size:
+            return None
+        return start, end
+    except (TypeError, ValueError):
+        return None
+
+
+def _stream_file_range(file_obj, start: int, length: int, chunk_size: int = 1024 * 512):
+    file_obj.seek(start)
+    remaining = length
+    try:
+        while remaining > 0:
+            chunk = file_obj.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+    finally:
+        try:
+            file_obj.close()
+        except Exception:
+            pass
+
+
+class ModuleVideoStreamView(LoginRequiredMixin, View):
+    """
+    Stream module videos with HTTP Range support to allow seeking.
+    """
+    def get(self, request, video_id):
+        video_type = ContentType.objects.get_for_model(Video)
+        content = get_object_or_404(
+            Content,
+            content_type=video_type,
+            object_id=video_id,
+            module__course__students=request.user,
+        )
+        video_obj = content.item
+
+        if not video_obj or not video_obj.file:
+            raise Http404("Video not found.")
+
+        try:
+            video_obj.file.open("rb")
+        except FileNotFoundError as exc:
+            raise Http404("Video not found.") from exc
+
+        file_obj = video_obj.file.file
+        file_size = getattr(video_obj.file, "size", None) or 0
+        content_type, _ = mimetypes.guess_type(video_obj.file.name)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        range_header = request.headers.get("Range") or request.META.get("HTTP_RANGE")
+        byte_range = _parse_byte_range(range_header, file_size)
+
+        if byte_range:
+            start, end = byte_range
+            length = end - start + 1
+            response = StreamingHttpResponse(
+                _stream_file_range(file_obj, start, length),
+                status=206,
+                content_type=content_type,
+            )
+            response["Content-Length"] = str(length)
+            response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        else:
+            response = FileResponse(file_obj, content_type=content_type)
+            response["Content-Length"] = str(file_size)
+
+        response["Accept-Ranges"] = "bytes"
+        patch_response_headers(response, cache_timeout=VIDEO_CACHE_SECONDS)
+        return response
 
 # pdf previw page
 
