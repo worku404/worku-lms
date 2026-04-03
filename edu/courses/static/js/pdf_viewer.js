@@ -1066,12 +1066,10 @@
 
         _updateProgress(force) {
             const state = this.store.getState();
-            const scrollTop = this.scrollEl.scrollTop || 0;
-            const viewportH = this.scrollEl.clientHeight || 1;
-            const anchorDocY = scrollTop + viewportH * 0.35;
-            const docHeight = this.layout.getDocHeight();
-            this.maxDocYSeen = Math.max(this.maxDocYSeen, anchorDocY);
-            const progressPercent = clamp((this.maxDocYSeen / docHeight) * 100, 0, 100);
+            const totalPages = state.doc.numPages || 1;
+            const currentPage = state.nav.currentPage || 1;
+            this.maxPageSeen = Math.max(this.maxPageSeen, currentPage);
+            const progressPercent = clamp((this.maxPageSeen / totalPages) * 100, 0, 100);
             if (this.progressEl) {
                 this.progressEl.style.setProperty("--pdf-progress", `${Math.round(progressPercent)}%`);
                 this.progressEl.setAttribute("aria-valuenow", String(Math.round(progressPercent)));

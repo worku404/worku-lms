@@ -4,6 +4,7 @@
     {% if content %}
     data-content-id="{{ content.id }}"
     data-progress-url="{% url 'track_content_progress' content.id %}"
+    data-resume-time="{{ content.student_last_position.current_time|default:0 }}"
     {% endif %}
 >
     <div class="c-video__frame">

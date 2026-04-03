@@ -17,6 +17,7 @@ from django.db.models.functions import Coalesce, Greatest, Substr
 from django.db.models import Func
 from django.db import transaction
 from django.utils.html import strip_tags
+from django.db import IntegrityError
 
 try:
     from django.contrib.postgres.search import SearchHeadline
@@ -93,20 +94,24 @@ def build_course_search_document(course: Course) -> str:
 
 
 def refresh_course_search_index(course_id: int) -> bool:
-    try:
-        course = (
-            Course.objects.select_related("subject")
-            .prefetch_related("modules")
-            .get(id=course_id)
-        )
-    except Course.DoesNotExist:
+    course = (
+        Course.objects.select_related("subject")
+        .prefetch_related("modules")
+        .filter(id=course_id)
+        .first()
+    )
+    if not course:
         return False
 
     document = build_course_search_document(course)
-    CourseSearchIndex.objects.update_or_create(
-        course_id=course_id,
-        defaults={"document": document},
-    )
+    try:
+        CourseSearchIndex.objects.update_or_create(
+            course_id=course_id,
+            defaults={"document": document},
+        )
+    except IntegrityError:
+        # Course vanished during delete cascade
+        return False
     return True
 
 
