@@ -214,17 +214,8 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
         max_seen = max(previous_max, incoming_max, current_page)
         max_seen = max(1, min(max_seen, total_pages))
 
-        doc_progress = payload.get("doc_progress")
-        doc_percent = None
-        if doc_progress is not None:
-            try:
-                doc_progress = float(doc_progress)
-                doc_percent = _clamp_percent(doc_progress * 100.0 if doc_progress <= 1 else doc_progress)
-            except (TypeError, ValueError):
-                doc_percent = None
-
         pdf_percent = _clamp_percent((max_seen / total_pages) * 100.0)
-        next_percent = max(progress.progress_percent, doc_percent if doc_percent is not None else pdf_percent)
+        next_percent = max(progress.progress_percent, pdf_percent)
 
         try:
             doc_y_ratio = float(payload.get("doc_y_ratio") or 0)
@@ -249,7 +240,7 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
             "zoom": zoom,
             "viewport_w": payload.get("viewport_w"),
             "viewport_h": payload.get("viewport_h"),
-            "doc_progress": doc_percent,
+            "doc_progress": pdf_percent,
         }
         completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
     elif kind == ContentProgress.CONTENT_KIND_VIDEO:
