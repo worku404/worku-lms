@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from rest_framework.authtoken.models import Token
@@ -13,6 +14,17 @@ from .search import (
     refresh_file_related_course_indexes,
     refresh_subject_course_indexes,
 )
+
+def _safe_refresh_course_index(course_id):
+    if not course_id:
+        return
+
+    def _refresh():
+        if Course.objects.filter(id=course_id).exists():
+            refresh_course_search_index(course_id)
+
+    transaction.on_commit(_refresh)
+
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
@@ -29,8 +41,7 @@ def update_course_search_index(sender, instance, **kwargs):
 @receiver(post_save, sender=Module)
 @receiver(post_delete, sender=Module)
 def update_module_course_search_index(sender, instance, **kwargs):
-    if instance.course_id:
-        refresh_course_search_index(instance.course_id)
+    _safe_refresh_course_index(instance.course_id)
 
 
 @receiver(post_save, sender=Subject)
@@ -49,11 +60,8 @@ def refresh_course_index_for_content_save(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=Content)
 def refresh_course_index_for_content_delete(sender, instance, **kwargs):
-    if instance.module_id:
-        course_id = Module.objects.filter(id=instance.module_id).values_list("course_id", flat=True).first()
-        if course_id:
-            refresh_course_search_index(course_id)
-    # Ensure content-level entries are removed on delete.
+    course_id = Module.objects.filter(id=instance.module_id).values_list("course_id", flat=True).first()
+    _safe_refresh_course_index(course_id)
     ContentSearchEntry.objects.filter(content_id=instance.id).delete()
 
 
