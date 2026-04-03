@@ -175,8 +175,16 @@ const videoTrackElements = Array.from(document.querySelectorAll(".js-track-video
         if (!video) return null;
         const contentId = wrapper.dataset.contentId;
         const progressUrl = wrapper.dataset.progressUrl;
+        const resumeTime = Number(wrapper.dataset.resumeTime || 0);
         if (!contentId || !progressUrl) return null;
-        return { wrapper, video, contentId, progressUrl };
+        return {
+            wrapper,
+            video,
+            contentId,
+            progressUrl,
+            resumeTime,
+            resumeApplied: false,
+        };
     })
     .filter(Boolean);
 const hasTrackableContent = textTrackElements.length > 0
@@ -300,6 +308,17 @@ videoTrackElements.forEach((entry) => {
     if (!video) return;
 
     video.addEventListener("loadedmetadata", function () {
+        if (!entry.resumeApplied) {
+            const duration = Number(video.duration || 0);
+            const resumeTime = Number(entry.resumeTime || 0);
+            if (duration && Number.isFinite(duration) && resumeTime > 0) {
+                const safeTime = Math.min(resumeTime, Math.max(0, duration - 0.5));
+                if (safeTime > 0) {
+                    video.currentTime = safeTime;
+                }
+            }
+            entry.resumeApplied = true;
+        }
         trackVideoProgress(entry, true);
     });
     video.addEventListener("timeupdate", function () {
