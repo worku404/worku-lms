@@ -177,6 +177,15 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
             course.student_progress_percent = round(row.progress_percent, 2)
             course.student_completed = row.completed
 
+        # Order by progress percent (lowest first, 100% at bottom).
+        # Secondary sort keeps ordering stable/readable when percents match.
+        courses.sort(
+            key=lambda course: (
+                float(course.student_progress_percent or 0.0),
+                (course.title or "").lower(),
+            )
+        )
+
         context["courses"] = courses
         return context
 

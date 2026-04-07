@@ -55,50 +55,41 @@ def _normalize_motto(payload):
         "source": source,
     }
     
-
 import random
 
-whimsical_wonders = [
-    "weird but true life observations",
-    "funny animal behavior",
-    "strange but real historical moments",
-    "objects acting like humans"
-]
-
-everyday_absurdities = [
-    "overthinking simple things",
-    "awkward social situations",
-    "procrastination struggles",
-    "losing things for no reason"
-]
-
-internet_culture = [
-    "memes and online behavior",
-    "group chat chaos",
-    "funny texting habits",
-    "social media contradictions"
-]
-
-playful_thoughts = [
-    "funny philosophical thoughts",
-    "life expectations vs reality",
-    "lazy logic that makes sense",
-    "random thoughts that feel true"
-]
-
-wordplay = [
-    "clever one-liners",
+classic_jokes = [
     "dad jokes",
-    "puns and wordplay",
-    "sarcastic comebacks"
+    "knock-knock jokes",
+    "lightbulb jokes",
+    "bar jokes (e.g., a horse walks into a bar)"
+]
+
+wordplay_jokes = [
+    "terrible but hilarious puns",
+    "food based puns",
+    "animal puns",
+    "grammar and spelling jokes"
+]
+
+situational_jokes = [
+    "computer programmer and tech support jokes",
+    "office and workplace jokes",
+    "school and teacher jokes",
+    "doctor and hospital jokes"
+]
+
+quick_laughs = [
+    "funny one-liners",
+    "clever two-line jokes",
+    "witty anti-jokes",
+    "funny riddles with unexpected answers"
 ]
 
 topics = [
-    whimsical_wonders,
-    everyday_absurdities,
-    internet_culture,
-    playful_thoughts,
-    wordplay,
+    classic_jokes,
+    wordplay_jokes,
+    situational_jokes,
+    quick_laughs,
 ]
 
 def _build_prompt():
@@ -106,13 +97,14 @@ def _build_prompt():
     topic = random.choice(category)
 
     return (
-        f"Return ONE short, funny or witty quote about {topic}. "
+        f"Return ONE very funny {topic}. "
         "Reply ONLY with valid JSON (no markdown, no commentary): "
         "{\"text\":\"...\",\"author\":\"...\",\"source\":\"...\"}. "
         "Keep it under 240 characters. "
-        "Author can be real or 'Unknown'. "
+        "Author can be the comedian's name or 'Unknown'. "
         "If unsure, set source to \"Unknown\"."
     )
+    
 def _call_gemini():
     api_keys = [
         settings.API1_KEY,

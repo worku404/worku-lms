@@ -249,7 +249,7 @@ class Text(ItemBase):
 
 class File(ItemBase):
     # General file upload, stored under MEDIA_ROOT/files/
-    file = models.FileField(upload_to="files")
+    file = models.FileField(upload_to="files", max_length=500)
     pdf_text_index = models.TextField(blank=True, default="")
     pdf_page_count = models.PositiveIntegerField(default=0)
     pdf_index_status = models.CharField(max_length=24, default="pending")
@@ -259,7 +259,7 @@ class File(ItemBase):
 
 class Image(ItemBase):
     # Image upload, stored under MEDIA_ROOT/images/
-    file = models.FileField(upload_to="images")
+    file = models.FileField(upload_to="images", max_length=500)
 
 
 class Video(ItemBase):
@@ -271,6 +271,7 @@ class Video(ItemBase):
     file = models.FileField(
         upload_to="videos",
         blank=True,
+        max_length=500,
         help_text="Upload a video file for local playback (MP4/WebM/OGG).",
     )
 
