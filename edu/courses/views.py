@@ -71,6 +71,11 @@ class CourseListview(TemplateResponseMixin, View):
     def get(self, request, subject=None):
         current_subject = None
         query = (request.GET.get("q") or "").strip()
+        enrolled_course_ids = []
+        if request.user.is_authenticated:
+            enrolled_course_ids = list(
+                request.user.courses_joined.values_list("id", flat=True)
+            )
 
         # 1) Subjects sidebar (with number of courses per subject).
         if settings.DEBUG:
@@ -121,6 +126,7 @@ class CourseListview(TemplateResponseMixin, View):
                 "subject": current_subject,
                 "courses": courses,
                 "query": query,
+                "enrolled_course_ids": enrolled_course_ids,
             }
         )
 
@@ -137,6 +143,11 @@ class SearchResultsView(TemplateResponseMixin, View):
         course_results = []
         content_results = []
         note_results = []
+        enrolled_course_ids = []
+        if request.user.is_authenticated:
+            enrolled_course_ids = list(
+                request.user.courses_joined.values_list("id", flat=True)
+            )
 
         if query:
             course_qs = Course.objects.select_related("subject", "owner").annotate(
@@ -167,6 +178,7 @@ class SearchResultsView(TemplateResponseMixin, View):
                 "content_results": content_results,
                 "course_results": course_results,
                 "note_results": note_results,
+                "enrolled_course_ids": enrolled_course_ids,
             }
         )
 
