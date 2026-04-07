@@ -104,7 +104,13 @@
                                         {{ course.total_modules }} modules
                                     </p>
                                     <div class="c-card__actions">
-                                        <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                        {% if request.user.is_authenticated and course.id in enrolled_course_ids %}
+                                            <a href="{% url 'student_course_detail' course.id %}" class="c-btn c-btn--primary">
+                                                Continue learning
+                                            </a>
+                                        {% else %}
+                                            <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                        {% endif %}
                                     </div>
                                 </li>
                             {% endfor %}
