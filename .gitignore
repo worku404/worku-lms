@@ -2,7 +2,8 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+media
+edu/media/files/Chapter_1_Lecture_1.ppt
 # C extensions
 *.so
 tools/
