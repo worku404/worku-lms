@@ -165,7 +165,8 @@ class SearchResultsView(TemplateResponseMixin, View):
                 )
 
                 note_qs = (
-                    NoteSearchIndex.objects.select_related("note", "note__tag")
+                    NoteSearchIndex.objects.select_related("note")
+                    .prefetch_related("note__tags")
                     .filter(note__user=request.user)
                 )
                 note_results = list(
