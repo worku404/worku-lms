@@ -25,6 +25,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.utils.cache import patch_response_headers
+from django.utils import timezone
 
 # Auth helpers and login-protection mixin.
 from django.contrib.auth import authenticate, login
@@ -173,15 +174,17 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
             if row is None:
                 course.student_progress_percent = 0.0
                 course.student_completed = False
+                course.student_last_accessed = None
                 continue
             course.student_progress_percent = round(row.progress_percent, 2)
             course.student_completed = row.completed
+            course.student_last_accessed = row.last_accessed
 
-        # Order by progress percent (lowest first, 100% at bottom).
-        # Secondary sort keeps ordering stable/readable when percents match.
+        # Order by most recently accessed (newest first).
+        # Secondary sort keeps ordering stable/readable when last_accessed matches.
         courses.sort(
             key=lambda course: (
-                float(course.student_progress_percent or 0.0),
+                -float(getattr(course.student_last_accessed, "timestamp", lambda: 0)() or 0),
                 (course.title or "").lower(),
             )
         )
@@ -255,6 +258,13 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
                 progress_percent=round(fallback_percent, 2),
                 completed=fallback_completed,
             )
+        elif _course_progress_table_ready():
+            try:
+                CourseProgress.objects.filter(id=course_progress.id).update(
+                    last_accessed=timezone.now()
+                )
+            except (ProgrammingError, OperationalError):
+                pass
 
         # Build a concrete list of module contents, and attach content progress state.
         module_contents = list(module.contents.select_related("content_type")) if module else []
