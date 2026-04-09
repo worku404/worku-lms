@@ -8,25 +8,30 @@ from django.views import View  # Base class for simple class-based views.
 
 from .models import Note, Tag  # Import note and tag models for CRUD operations.
 
+# Limit tags per note to keep UI tidy.
+MAX_NOTE_TAGS = 3
+
 
 # Serialize a Note instance into a JSON-safe dict.
 def _serialize_note(note):
-    # Build the tag payload if the note has a tag.
-    tag_payload = None
-    # Only include tag data when the relation exists.
-    if note.tag:
-        # Shape the tag payload for list/detail responses.
-        tag_payload = {
-            "id": note.tag.id,  # Tag primary key for client use.
-            "name": note.tag.name,  # Tag display name for the sidebar.
-            "slug": note.tag.slug,  # Tag slug used for filtering.
+    # Serialize tags into payloads for the UI.
+    tags_payload = [
+        {
+            "id": tag.id,  # Tag primary key for client use.
+            "name": tag.name,  # Tag display name for the sidebar.
+            "slug": tag.slug,  # Tag slug used for filtering.
         }
+        for tag in note.tags.all()
+    ]
+    # Keep a legacy single-tag field for older clients (first tag only).
+    tag_payload = tags_payload[0] if tags_payload else None
     # Return the serialized note payload.
     return {
         "id": note.id,  # Note primary key for future updates.
         "title": note.title,  # Note title shown in the list.
         "content_html": note.content_html,  # Note HTML content for the editor.
-        "tag": tag_payload,  # Optional tag object for UI badges.
+        "tag": tag_payload,  # Optional single tag object for UI badges.
+        "tags": tags_payload,  # Optional tag list for UI badges.
         "created_at": note.created_at.isoformat(),  # Timestamp for ordering.
         "updated_at": note.updated_at.isoformat(),  # Timestamp for autosave display.
     }
@@ -76,6 +81,56 @@ def _normalize_tag(user, tag_text):
     return tag
 
 
+# Split a raw tag string/list into clean tag texts.
+def _split_tag_texts(raw_value):
+    # Return empty list if nothing was provided.
+    if raw_value is None:
+        return []
+    # Accept lists from the client.
+    if isinstance(raw_value, (list, tuple)):
+        items = []
+        for value in raw_value:
+            if value is None:
+                continue
+            items.append(str(value))
+        return items
+    # Coerce single values to string and split by commas.
+    return str(raw_value).split(",")
+
+
+# Normalize and deduplicate tag texts, preserving order.
+def _normalize_tag_texts(tag_texts):
+    cleaned = []
+    seen_slugs = set()
+    for tag_text in tag_texts:
+        text = str(tag_text).strip()
+        if not text:
+            continue
+        slug = slugify(text)[:70] or "tag"
+        if slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        cleaned.append(text)
+    return cleaned
+
+
+# Extract tags from the payload when present.
+def _extract_tag_payload(payload):
+    if "tags" in payload:
+        return True, payload.get("tags")
+    if "tag" in payload:
+        return True, payload.get("tag")
+    return False, None
+
+
+# Resolve multiple tags into Tag instances with validation.
+def _normalize_tags(user, raw_value):
+    tag_texts = _normalize_tag_texts(_split_tag_texts(raw_value))
+    if len(tag_texts) > MAX_NOTE_TAGS:
+        return None, f"Use up to {MAX_NOTE_TAGS} tags."
+    return [_normalize_tag(user, text) for text in tag_texts], None
+
+
 # List and create notes for the current user.
 class NoteListCreateView(LoginRequiredMixin, View):
     # Handle GET requests to list notes, optionally filtered by tag.
@@ -85,12 +140,12 @@ class NoteListCreateView(LoginRequiredMixin, View):
         # Base queryset: only the current user's notes.
         notes_qs = (
             Note.objects.filter(user=request.user)
-            .select_related("tag")
+            .prefetch_related("tags")
             .order_by("-created_at")
         )
         # Apply tag filter when provided.
         if tag_slug:
-            notes_qs = notes_qs.filter(tag__slug=tag_slug)
+            notes_qs = notes_qs.filter(tags__slug=tag_slug).distinct()
         # Serialize notes into a list for JSON output.
         items = [_serialize_note(note) for note in notes_qs]
         # Return the list payload.
@@ -107,20 +162,22 @@ class NoteListCreateView(LoginRequiredMixin, View):
         title = (payload.get("title") or "").strip()
         # Extract the HTML content (default to empty).
         content_html = payload.get("content_html") or ""
-        # Extract tag text for normalization.
-        tag_text = payload.get("tag") or ""
+        # Extract tag payload for normalization.
+        _, raw_tags = _extract_tag_payload(payload)
+        tags, tag_error = _normalize_tags(request.user, raw_tags)
+        if tag_error:
+            return JsonResponse({"error": tag_error}, status=400)
         # Require a title for new notes.
         if not title:
             return JsonResponse({"error": "Title is required."}, status=400)
-        # Resolve tag relation if provided.
-        tag_obj = _normalize_tag(request.user, tag_text)
         # Create the new note record.
         note = Note.objects.create(
             user=request.user,  # Associate note to the current user.
             title=title,  # Store the required title.
             content_html=content_html,  # Store the HTML body.
-            tag=tag_obj,  # Store the optional tag relation.
         )
+        # Attach tags (empty list clears).
+        note.tags.set(tags or [])
         # Return the created note payload.
         return JsonResponse({"note": _serialize_note(note)}, status=201)
 
@@ -130,7 +187,11 @@ class NoteDetailView(LoginRequiredMixin, View):
     # Handle GET requests to fetch a single note.
     def get(self, request, note_id):
         # Load the note or return 404 when missing.
-        note = get_object_or_404(Note, id=note_id, user=request.user)
+        note = get_object_or_404(
+            Note.objects.prefetch_related("tags"),
+            id=note_id,
+            user=request.user,
+        )
         # Return the note payload.
         return JsonResponse({"note": _serialize_note(note)})
 
@@ -147,8 +208,8 @@ class NoteDetailView(LoginRequiredMixin, View):
         title = payload.get("title")
         # Extract optional HTML content.
         content_html = payload.get("content_html")
-        # Extract optional tag text.
-        tag_text = payload.get("tag")
+        # Extract optional tag payload.
+        has_tags, raw_tags = _extract_tag_payload(payload)
         # Update title only when provided.
         if title is not None:
             # Normalize title spacing.
@@ -162,10 +223,12 @@ class NoteDetailView(LoginRequiredMixin, View):
         if content_html is not None:
             # Apply the updated HTML body.
             note.content_html = str(content_html)
-        # Update tag only when provided (empty string clears).
-        if tag_text is not None:
-            # Resolve the tag relation (or None if blank).
-            note.tag = _normalize_tag(request.user, tag_text)
+        # Update tags only when provided (empty clears).
+        if has_tags:
+            tags, tag_error = _normalize_tags(request.user, raw_tags)
+            if tag_error:
+                return JsonResponse({"error": tag_error}, status=400)
+            note.tags.set(tags or [])
         # Persist changes to the database.
         note.save()
         # Return the updated note payload.
