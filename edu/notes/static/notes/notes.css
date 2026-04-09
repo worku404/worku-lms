@@ -502,7 +502,7 @@ body.notes-open .notes-backdrop {
     padding: 0.65rem 0.75rem;
     /* Display items as grid. */
     display: grid;
-    /* Space title and tag. */
+    /* Space title and tags. */
     gap: 0.35rem;
     /* Use pointer cursor. */
     cursor: pointer;
@@ -538,6 +538,16 @@ body.notes-open .notes-backdrop {
     color: var(--color-text);
     /* Ensure long titles wrap nicely. */
     word-break: break-word;
+}
+
+/* Tag group inside the list item. */
+.notes-item__tags {
+    /* Keep multiple tags on one row when possible. */
+    display: flex;
+    /* Allow tags to wrap to the next line. */
+    flex-wrap: wrap;
+    /* Add spacing between tags. */
+    gap: 0.35rem;
 }
 
 /* Tag badge inside the list item. */

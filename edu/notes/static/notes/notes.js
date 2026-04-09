@@ -44,6 +44,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // Collect the color buttons for text color selection.
     const colorButtons = Array.from(panelEl.querySelectorAll("[data-notes-color]"));
 
+    // Limit tags per note to match backend validation.
+    const MAX_NOTE_TAGS = 3;
+
     // Read the list endpoint URL from data attributes.
     const listUrl = panelEl.dataset.notesListUrl || "";
     // Read the detail endpoint URL template from data attributes.
@@ -221,20 +224,27 @@ document.addEventListener("DOMContentLoaded", function () {
             titleEl.textContent = note.title || "Untitled";
             // Append title into item.
             button.appendChild(titleEl);
-            // Add tag badge when present.
-            if (note.tag && note.tag.slug) {
-                // Create tag element.
-                const tagBtn = document.createElement("button");
-                // Apply tag class.
-                tagBtn.className = "notes-item__tag";
-                // Mark as a button for filtering.
-                tagBtn.type = "button";
-                // Store tag slug for click handler.
-                tagBtn.dataset.tagSlug = note.tag.slug;
-                // Set tag label text.
-                tagBtn.textContent = note.tag.name || note.tag.slug;
-                // Append tag badge to item.
-                button.appendChild(tagBtn);
+            // Add tag badges when present.
+            const noteTags = Array.isArray(note.tags)
+                ? note.tags
+                : (note.tag ? [note.tag] : []);
+            if (noteTags.length) {
+                // Create tag group wrapper.
+                const tagsWrap = document.createElement("div");
+                tagsWrap.className = "notes-item__tags";
+                // Add each tag badge.
+                noteTags.forEach((tag) => {
+                    if (!tag || !tag.slug) return;
+                    const tagBtn = document.createElement("button");
+                    tagBtn.className = "notes-item__tag";
+                    tagBtn.type = "button";
+                    tagBtn.dataset.tagSlug = tag.slug;
+                    tagBtn.textContent = tag.name || tag.slug;
+                    tagsWrap.appendChild(tagBtn);
+                });
+                if (tagsWrap.childElementCount) {
+                    button.appendChild(tagsWrap);
+                }
             }
             // Create open indicator.
             const openEl = document.createElement("span");
@@ -464,6 +474,24 @@ document.addEventListener("DOMContentLoaded", function () {
         return cleaned;
     };
 
+    // Split, trim, and dedupe tag input text.
+    const parseTagInput = (rawValue) => {
+        if (!rawValue) return [];
+        const parts = String(rawValue)
+            .split(",")
+            .map((text) => text.trim())
+            .filter(Boolean);
+        const unique = [];
+        const seen = new Set();
+        parts.forEach((tag) => {
+            const key = tag.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            unique.push(tag);
+        });
+        return unique;
+    };
+
     // Provide feedback on copy success/failure.
     const setCopyButtonFeedback = (button, copied) => {
         // Guard against missing button.
@@ -557,13 +585,13 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     // Create a new note on the server.
-    const createNote = async (title, tagText) => {
+    const createNote = async (title, tags) => {
         // Guard against missing editor.
         if (!quill) return null;
         // Build payload for creation.
         const payload = {
             title: title,
-            tag: tagText,
+            tags: Array.isArray(tags) ? tags : [],
             content_html: sanitizeNoteHtml(quill.root.innerHTML || ""),
         };
         // Send POST request to list endpoint.
@@ -895,8 +923,16 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         // Read tag input.
         const tagText = tagInputEl ? tagInputEl.value.trim() : "";
+        const tags = parseTagInput(tagText);
+        if (tags.length > MAX_NOTE_TAGS) {
+            if (saveErrorEl) {
+                saveErrorEl.textContent = `Use up to ${MAX_NOTE_TAGS} tags (comma-separated).`;
+                saveErrorEl.hidden = false;
+            }
+            return;
+        }
         // Create the note in the backend.
-        const createdNote = await createNote(title, tagText);
+        const createdNote = await createNote(title, tags);
         // Handle creation failure.
         if (!createdNote) {
             if (saveErrorEl) {
