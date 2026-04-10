@@ -18,12 +18,51 @@
     --notes-accent: var(--color-accent);
     /* Bold text color inside the editor. */
     --notes-bold-color: #1466b8;
-    /* Inline code background color. */
-    --notes-code-bg: color-mix(in srgb, #f5f7fb 92%, #d9e4f1);
-    /* Inline code text color. */
-    --notes-code-text: #b56600;
-    /* Inline code border color. */
-    --notes-code-border: color-mix(in srgb, #1b2630 22%, var(--color-border));
+
+    /* ============================================= */
+    /* Notes Code Tokens                              */
+    /* ============================================= */
+
+    /* Shared font stack for inline + block code. */
+    --notes-code-font-family: var(
+        --assistant-code-font-family,
+        "IBM Plex Mono",
+        "Cascadia Mono",
+        "Fira Code",
+        "JetBrains Mono",
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace
+    );
+    /* Code line height tuned for dense text. */
+    --notes-code-line-height: var(--assistant-code-line-height, 1.55);
+    /* Slightly larger than assistant code for editor readability. */
+    --notes-code-block-font-size: calc(var(--assistant-code-font-size, var(--fs-0)) + 0.05rem);
+    /* Keep inline code compact and aligned with prose. */
+    --notes-code-inline-font-size: 0.95em;
+    /* Tab width inside code blocks. */
+    --notes-code-tab-size: 4;
+
+    /* Block code (Quill `code-block`) surface. */
+    --notes-code-block-bg: var(--assistant-code-bg);
+    --notes-code-block-border: var(--assistant-code-border);
+    --notes-code-block-text: var(--assistant-code-text-color, var(--color-text));
+    --notes-code-block-radius: var(--radius-md);
+    --notes-code-block-padding: var(--assistant-code-padding, var(--space-3));
+
+    /* Inline code surface. */
+    --notes-code-inline-bg: var(--assistant-inline-code-bg);
+    --notes-code-inline-border: var(--assistant-inline-code-border);
+    --notes-code-inline-text: color-mix(in srgb, var(--color-warning) 88%, var(--color-text));
+
+    /* Legacy aliases (kept so older selectors remain theme-aware). */
+    --notes-code-bg: var(--notes-code-inline-bg);
+    --notes-code-text: var(--notes-code-inline-text);
+    --notes-code-border: var(--notes-code-inline-border);
     /* Modal overlay background. */
     --notes-modal-overlay: rgba(8, 16, 24, 0.45);
 }
@@ -40,12 +79,6 @@ body.theme-dark {
     --notes-sidebar-bg: #111b28;
     /* Bold text color for dark theme. */
     --notes-bold-color: #6cc5ff;
-    /* Inline code background for dark theme. */
-    --notes-code-bg: #0C1523;
-    /* Inline code text color for dark theme. */
-    --notes-code-text: #ffd166;
-    /* Inline code border for dark theme. */
-    --notes-code-border: #243246;
     /* Modal overlay for dark theme. */
     --notes-modal-overlay: rgba(0, 0, 0, 0.65);
 }
@@ -670,36 +703,56 @@ body.notes-open .notes-backdrop {
 
 /* Inline code styling. */
 .notes-editor .ql-editor code {
-    /* Apply code background color. */
-    background: var(--notes-code-bg);
-    /* Apply code text color. */
-    color: var(--notes-code-text);
-    /* Add a subtle border. */
-    border: 1px solid var(--notes-code-border);
+    /* Apply theme-aware inline code surface. */
+    background: var(--notes-code-inline-bg);
+    /* Apply theme-aware inline code text. */
+    color: var(--notes-code-inline-text);
+    /* Add a subtle, theme-aware border. */
+    border: 1px solid var(--notes-code-inline-border);
     /* Add rounding to inline code. */
     border-radius: 6px;
     /* Add padding inside code. */
     padding: 0.12rem 0.35rem;
     /* Use monospace font. */
-    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    /* Slightly reduce size for inline code. */
-    font-size: 1.1em;
+    font-family: var(--notes-code-font-family);
+    /* Keep inline code compact next to prose. */
+    font-size: var(--notes-code-inline-font-size);
 }
 
 /* Code block styling. */
-.notes-editor .ql-editor pre {
-    /* Use code background color. */
-    background: var(--notes-code-bg);
-    /* Use code text color. */
-    color: var(--notes-code-text);
+.notes-panel .notes-editor .ql-editor pre.ql-syntax,
+.notes-panel .notes-editor .ql-editor pre {
+    /* Override Quill's default code-block theme so we control light/dark. */
+    background: var(--notes-code-block-bg);
+    /* Use theme-aware code text for readability. */
+    color: var(--notes-code-block-text);
     /* Force a visible caret inside code blocks. */
-    caret-color: var(--notes-code-text);
+    caret-color: var(--notes-code-block-text);
     /* Add a border for separation. */
-    border: 1px solid var(--notes-code-border);
+    border: 1px solid var(--notes-code-block-border);
     /* Add rounding to code blocks. */
-    border-radius: 8px;
+    border-radius: var(--notes-code-block-radius);
     /* Add padding inside code blocks. */
-    padding: var(--space-3);
+    padding: var(--notes-code-block-padding);
+    /* Use consistent monospace font for blocks. */
+    font-family: var(--notes-code-font-family);
+    /* Comfortable density for code. */
+    font-size: var(--notes-code-block-font-size);
+    line-height: var(--notes-code-line-height);
+    /* Ensure tabs render consistently. */
+    tab-size: var(--notes-code-tab-size);
+    /* Enable horizontal scrolling for long lines. */
+    overflow-x: auto;
+}
+
+/* Prevent inline-code styling from leaking into code blocks if nested markup exists. */
+.notes-panel .notes-editor .ql-editor pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
 }
 
 /* Overlay layer for code copy buttons (outside Quill DOM). */
