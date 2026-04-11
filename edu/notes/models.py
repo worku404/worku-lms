@@ -60,6 +60,8 @@ class Note(models.Model):
     title = models.CharField(max_length=200)
     # Store the note content as HTML (Quill output).
     content_html = models.TextField(blank=True, default="")
+    # Store the first "@" timestamp inserted into the note (immutable once set).
+    date_time_now = models.DateTimeField(null=True, blank=True)
     # Store optional tags for filtering (limit enforced in views/UI).
     tags = models.ManyToManyField(
         Tag,  # Link to the Tag model for optional categorization.
