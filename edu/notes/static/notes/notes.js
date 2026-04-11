@@ -23,6 +23,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const clearFilterBtn = panelEl.querySelector("[data-notes-clear-filter]");
     // Grab the filter label element.
     const filterLabelEl = panelEl.querySelector("[data-notes-filter-label]");
+    // Grab the tag search input (filters notes by tag).
+    const tagSearchInputEl = panelEl.querySelector("[data-notes-tag-search]");
+    // Grab the (optional) tag search clear button.
+    const tagSearchClearBtn = panelEl.querySelector("[data-notes-tag-search-clear]");
+    // Grab the tag search submit button (search icon).
+    const tagSearchSubmitBtn = panelEl.querySelector("[data-notes-tag-search-submit]");
+    // Prefer the explicit submit button; fallback to the legacy clear button.
+    const tagSearchActionBtn = tagSearchSubmitBtn || tagSearchClearBtn;
+    // Only treat a separate element as the "clear" button.
+    const tagSearchEffectiveClearBtn = tagSearchClearBtn && tagSearchClearBtn !== tagSearchActionBtn
+        ? tagSearchClearBtn
+        : null;
+    // Grab the datalist used for tag suggestions.
+    const tagDatalistEl = panelEl.querySelector("[data-notes-tag-datalist]");
     // Grab the notes list container.
     const listEl = panelEl.querySelector("[data-notes-list]");
     // Grab the empty state element.
@@ -70,6 +84,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let copyOverlayLayer = null;
     // Track a pending overlay update frame.
     let copyOverlayRaf = null;
+
+    // Cache known tag slugs to names for search suggestions.
+    const tagNameBySlug = new Map();
+    // Cache known tag names to slugs for quick lookup.
+    const tagSlugByName = new Map();
 
     // Return true when shortcuts should be ignored (mobile).
     const shortcutsDisabled = () => {
@@ -181,10 +200,128 @@ document.addEventListener("DOMContentLoaded", function () {
         return hasContent;
     };
 
+    // Sync tag search clear button state.
+    const syncTagSearchClearButton = () => {
+        if (!tagSearchInputEl || !tagSearchEffectiveClearBtn) return;
+        tagSearchEffectiveClearBtn.hidden = tagSearchInputEl.value.trim().length === 0;
+    };
+
+    // Sync tag search input to reflect the active filter (when not focused).
+    const syncTagSearchInputForActiveFilter = () => {
+        if (!tagSearchInputEl) return;
+        if (document.activeElement === tagSearchInputEl) {
+            syncTagSearchClearButton();
+            return;
+        }
+        if (!activeTagSlug) {
+            tagSearchInputEl.value = "";
+        } else {
+            tagSearchInputEl.value = tagNameBySlug.get(activeTagSlug) || activeTagSlug;
+        }
+        syncTagSearchClearButton();
+    };
+
+    // Render available tags into the datalist for quick selection.
+    const renderTagDatalist = () => {
+        if (!tagDatalistEl) return;
+        tagDatalistEl.innerHTML = "";
+        const tags = Array.from(tagNameBySlug.entries())
+            .map(([slug, name]) => ({ slug, name: String(name || slug) }))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+        tags.forEach(({ slug, name }) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.label = `#${slug}`;
+            tagDatalistEl.appendChild(option);
+        });
+    };
+
+    // Remember tags from a notes payload to power tag suggestions.
+    const rememberTagsFromNotes = (notes) => {
+        if (!Array.isArray(notes) || !notes.length) return;
+        let changed = false;
+        notes.forEach((note) => {
+            const noteTags = Array.isArray(note.tags)
+                ? note.tags
+                : (note.tag ? [note.tag] : []);
+            noteTags.forEach((tag) => {
+                if (!tag || !tag.slug) return;
+                const slug = String(tag.slug);
+                const name = String(tag.name || tag.slug || "");
+                if (!tagNameBySlug.has(slug) || (name && tagNameBySlug.get(slug) !== name)) {
+                    tagNameBySlug.set(slug, name || slug);
+                    changed = true;
+                }
+                if (name) {
+                    const key = name.toLowerCase();
+                    if (!tagSlugByName.has(key)) {
+                        tagSlugByName.set(key, slug);
+                        changed = true;
+                    }
+                }
+            });
+        });
+        if (changed) {
+            renderTagDatalist();
+        }
+    };
+
+    // Basic slugify for tag input to match server-side `slugify`.
+    const slugifyTagText = (value) => {
+        const raw = String(value || "").trim().replace(/^#+/, "");
+        if (!raw) return "";
+        let normalized = raw;
+        try {
+            normalized = normalized.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+        } catch (error) {
+            // Ignore normalize failures (older browsers).
+        }
+        let slug = normalized.toLowerCase();
+        slug = slug.replace(/['"]/g, "");
+        slug = slug.replace(/[^a-z0-9\s_-]/g, "");
+        slug = slug.replace(/[\s_]+/g, "-");
+        slug = slug.replace(/-+/g, "-");
+        slug = slug.replace(/^-+|-+$/g, "");
+        slug = slug.slice(0, 70);
+        return slug || "tag";
+    };
+
+    // Clear tag search input and remove active tag filter when present.
+    const clearTagSearch = () => {
+        if (tagSearchInputEl) {
+            tagSearchInputEl.value = "";
+        }
+        syncTagSearchClearButton();
+        if (activeTagSlug) {
+            loadNotesList("");
+        }
+    };
+
+    // Apply tag search input as a tag filter.
+    const applyTagSearch = () => {
+        if (!tagSearchInputEl) return;
+        const rawValue = tagSearchInputEl.value.trim();
+        if (!rawValue) {
+            if (activeTagSlug) loadNotesList("");
+            return;
+        }
+        const firstTag = (parseTagInput(rawValue)[0] || rawValue || "").trim();
+        const cleaned = firstTag.replace(/^#+/, "").trim();
+        if (!cleaned) {
+            if (activeTagSlug) loadNotesList("");
+            return;
+        }
+        const knownSlug = tagSlugByName.get(cleaned.toLowerCase()) || "";
+        const slug = knownSlug || slugifyTagText(cleaned);
+        loadNotesList(slug);
+    };
+
     // Render the notes list into the sidebar.
     const renderNotesList = (notes) => {
         // Guard against missing list element.
         if (!listEl) return;
+        // Remember tag options for the search suggestions.
+        rememberTagsFromNotes(notes);
         // Clear existing list content.
         listEl.innerHTML = "";
         // Toggle empty state visibility.
@@ -265,6 +402,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const loadNotesList = async (tagSlug) => {
         // Update active tag filter state.
         activeTagSlug = tagSlug || "";
+        // Keep the tag search input in sync with the active filter.
+        syncTagSearchInputForActiveFilter();
         // Build list URL with optional tag filter.
         const url = activeTagSlug
             ? `${listUrl}?tag=${encodeURIComponent(activeTagSlug)}`
@@ -1027,7 +1166,39 @@ document.addEventListener("DOMContentLoaded", function () {
     // Attach clear filter handler.
     if (clearFilterBtn) {
         clearFilterBtn.addEventListener("click", function () {
-            loadNotesList("");
+            clearTagSearch();
+        });
+    }
+    // Attach tag search handlers.
+    if (tagSearchInputEl) {
+        tagSearchInputEl.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                applyTagSearch();
+                return;
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                clearTagSearch();
+            }
+        });
+        tagSearchInputEl.addEventListener("input", function () {
+            syncTagSearchClearButton();
+            if (!tagSearchInputEl.value.trim() && activeTagSlug) {
+                loadNotesList("");
+            }
+        });
+    }
+    if (tagSearchEffectiveClearBtn) {
+        tagSearchEffectiveClearBtn.addEventListener("click", function () {
+            clearTagSearch();
+            if (tagSearchInputEl) tagSearchInputEl.focus();
+        });
+    }
+    if (tagSearchActionBtn) {
+        tagSearchActionBtn.addEventListener("click", function () {
+            applyTagSearch();
+            if (tagSearchInputEl) tagSearchInputEl.focus();
         });
     }
     // Attach list click handler.

@@ -41,7 +41,7 @@ body.theme-dark {
     /* Bold text color for dark theme. */
     --notes-bold-color: #6cc5ff;
     /* Inline code background for dark theme. */
-    --notes-code-bg: #0C1523;
+    --notes-code-bg: red !important;
     /* Inline code text color for dark theme. */
     --notes-code-text: #ffd166;
     /* Inline code border for dark theme. */
@@ -390,8 +390,8 @@ body.notes-open .notes-backdrop {
     border-right: 1px solid var(--notes-panel-border);
     /* Stack sidebar sections vertically. */
     display: grid;
-    /* Space out toolbar, filter, list, and empty state. */
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    /* Space out toolbar, search, filter, list, and empty state. */
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     /* Add spacing between sections. */
     gap: var(--space-2);
     /* Apply internal padding. */
@@ -450,6 +450,98 @@ body.notes-open .notes-backdrop {
     font-size: 0.75rem;
     /* Make text readable. */
     font-weight: 600;
+}
+
+/* Tag search row. */
+.notes-sidebar__search {
+    /* Anchor the clear button inside the input. */
+    position: relative;
+}
+
+/* Tag search input styling. */
+.notes-sidebar__search-input {
+    /* Fill the sidebar width. */
+    width: 100%;
+    /* Compact height to match sidebar UI. */
+    min-height: 34px;
+    /* Use standard border. */
+    border: 1px solid var(--notes-panel-border);
+    /* Use pill shape for consistency. */
+    border-radius: 999px;
+    /* Use surface background. */
+    background: var(--color-surface);
+    /* Use standard text color. */
+    color: var(--color-text);
+    /* Add padding, leaving room for clear button. */
+    padding: 0.35rem 2.1rem 0.35rem 0.75rem;
+    /* Keep font small in the sidebar. */
+    font-size: 0.82rem;
+}
+
+/* Placeholder styling for search input. */
+.notes-sidebar__search-input::placeholder {
+    /* Use muted text color. */
+    color: var(--color-text-muted);
+}
+
+/* Focus state for the search input. */
+.notes-sidebar__search-input:focus-visible {
+    /* Add an outline for accessibility. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset outline slightly. */
+    outline-offset: 2px;
+}
+
+/* Clear button inside the search input. */
+.notes-sidebar__search-clear {
+    /* Position the button inside the input area. */
+    position: absolute;
+    /* Align vertically within the input. */
+    top: 50%;
+    /* Align to the right edge. */
+    right: 0.35rem;
+    /* Center via transform. */
+    transform: translateY(-50%);
+    /* Use square clickable target. */
+    width: 28px;
+    /* Match height for touch. */
+    height: 28px;
+    /* Remove default border. */
+    border: 1px solid transparent;
+    /* Use pill rounding. */
+    border-radius: 999px;
+    /* Keep background transparent by default. */
+    background: transparent;
+    /* Use muted color for subtlety. */
+    color: var(--color-text-muted);
+    /* Center the glyph. */
+    display: inline-flex;
+    /* Center content horizontally. */
+    justify-content: center;
+    /* Center content vertically. */
+    align-items: center;
+    /* Use pointer cursor. */
+    cursor: pointer;
+    /* Keep clear icon readable. */
+    font-size: 1.05rem;
+    /* Keep line-height tight. */
+    line-height: 1;
+}
+
+/* Hover state for clear button. */
+.notes-sidebar__search-clear:hover {
+    /* Add subtle background on hover. */
+    background: color-mix(in srgb, var(--notes-panel-bg) 55%, var(--color-surface));
+    /* Use standard text color for clarity. */
+    color: var(--color-text);
+}
+
+/* Focus state for clear button. */
+.notes-sidebar__search-clear:focus-visible {
+    /* Add an outline for accessibility. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset outline slightly. */
+    outline-offset: 2px;
 }
 
 /* Filter label styling. */
