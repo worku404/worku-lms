@@ -23,6 +23,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const clearFilterBtn = panelEl.querySelector("[data-notes-clear-filter]");
     // Grab the filter label element.
     const filterLabelEl = panelEl.querySelector("[data-notes-filter-label]");
+    // Grab the tag search input (filters notes by tag).
+    const tagSearchInputEl = panelEl.querySelector("[data-notes-tag-search]");
+    // Grab the (optional) tag search clear button.
+    const tagSearchClearBtn = panelEl.querySelector("[data-notes-tag-search-clear]");
+    // Grab the tag search submit button (search icon).
+    const tagSearchSubmitBtn = panelEl.querySelector("[data-notes-tag-search-submit]");
+    // Prefer the explicit submit button; fallback to the legacy clear button.
+    const tagSearchActionBtn = tagSearchSubmitBtn || tagSearchClearBtn;
+    // Only treat a separate element as the "clear" button.
+    const tagSearchEffectiveClearBtn = tagSearchClearBtn && tagSearchClearBtn !== tagSearchActionBtn
+        ? tagSearchClearBtn
+        : null;
+    // Grab the datalist used for tag suggestions.
+    const tagDatalistEl = panelEl.querySelector("[data-notes-tag-datalist]");
     // Grab the notes list container.
     const listEl = panelEl.querySelector("[data-notes-list]");
     // Grab the empty state element.
@@ -70,6 +84,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let copyOverlayLayer = null;
     // Track a pending overlay update frame.
     let copyOverlayRaf = null;
+
+    // Cache known tag slugs to names for search suggestions.
+    const tagNameBySlug = new Map();
+    // Cache known tag names to slugs for quick lookup.
+    const tagSlugByName = new Map();
 
     // Return true when shortcuts should be ignored (mobile).
     const shortcutsDisabled = () => {
@@ -181,10 +200,128 @@ document.addEventListener("DOMContentLoaded", function () {
         return hasContent;
     };
 
+    // Sync tag search clear button state.
+    const syncTagSearchClearButton = () => {
+        if (!tagSearchInputEl || !tagSearchEffectiveClearBtn) return;
+        tagSearchEffectiveClearBtn.hidden = tagSearchInputEl.value.trim().length === 0;
+    };
+
+    // Sync tag search input to reflect the active filter (when not focused).
+    const syncTagSearchInputForActiveFilter = () => {
+        if (!tagSearchInputEl) return;
+        if (document.activeElement === tagSearchInputEl) {
+            syncTagSearchClearButton();
+            return;
+        }
+        if (!activeTagSlug) {
+            tagSearchInputEl.value = "";
+        } else {
+            tagSearchInputEl.value = tagNameBySlug.get(activeTagSlug) || activeTagSlug;
+        }
+        syncTagSearchClearButton();
+    };
+
+    // Render available tags into the datalist for quick selection.
+    const renderTagDatalist = () => {
+        if (!tagDatalistEl) return;
+        tagDatalistEl.innerHTML = "";
+        const tags = Array.from(tagNameBySlug.entries())
+            .map(([slug, name]) => ({ slug, name: String(name || slug) }))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+        tags.forEach(({ slug, name }) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.label = `#${slug}`;
+            tagDatalistEl.appendChild(option);
+        });
+    };
+
+    // Remember tags from a notes payload to power tag suggestions.
+    const rememberTagsFromNotes = (notes) => {
+        if (!Array.isArray(notes) || !notes.length) return;
+        let changed = false;
+        notes.forEach((note) => {
+            const noteTags = Array.isArray(note.tags)
+                ? note.tags
+                : (note.tag ? [note.tag] : []);
+            noteTags.forEach((tag) => {
+                if (!tag || !tag.slug) return;
+                const slug = String(tag.slug);
+                const name = String(tag.name || tag.slug || "");
+                if (!tagNameBySlug.has(slug) || (name && tagNameBySlug.get(slug) !== name)) {
+                    tagNameBySlug.set(slug, name || slug);
+                    changed = true;
+                }
+                if (name) {
+                    const key = name.toLowerCase();
+                    if (!tagSlugByName.has(key)) {
+                        tagSlugByName.set(key, slug);
+                        changed = true;
+                    }
+                }
+            });
+        });
+        if (changed) {
+            renderTagDatalist();
+        }
+    };
+
+    // Basic slugify for tag input to match server-side `slugify`.
+    const slugifyTagText = (value) => {
+        const raw = String(value || "").trim().replace(/^#+/, "");
+        if (!raw) return "";
+        let normalized = raw;
+        try {
+            normalized = normalized.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+        } catch (error) {
+            // Ignore normalize failures (older browsers).
+        }
+        let slug = normalized.toLowerCase();
+        slug = slug.replace(/['"]/g, "");
+        slug = slug.replace(/[^a-z0-9\s_-]/g, "");
+        slug = slug.replace(/[\s_]+/g, "-");
+        slug = slug.replace(/-+/g, "-");
+        slug = slug.replace(/^-+|-+$/g, "");
+        slug = slug.slice(0, 70);
+        return slug || "tag";
+    };
+
+    // Clear tag search input and remove active tag filter when present.
+    const clearTagSearch = () => {
+        if (tagSearchInputEl) {
+            tagSearchInputEl.value = "";
+        }
+        syncTagSearchClearButton();
+        if (activeTagSlug) {
+            loadNotesList("");
+        }
+    };
+
+    // Apply tag search input as a tag filter.
+    const applyTagSearch = () => {
+        if (!tagSearchInputEl) return;
+        const rawValue = tagSearchInputEl.value.trim();
+        if (!rawValue) {
+            if (activeTagSlug) loadNotesList("");
+            return;
+        }
+        const firstTag = (parseTagInput(rawValue)[0] || rawValue || "").trim();
+        const cleaned = firstTag.replace(/^#+/, "").trim();
+        if (!cleaned) {
+            if (activeTagSlug) loadNotesList("");
+            return;
+        }
+        const knownSlug = tagSlugByName.get(cleaned.toLowerCase()) || "";
+        const slug = knownSlug || slugifyTagText(cleaned);
+        loadNotesList(slug);
+    };
+
     // Render the notes list into the sidebar.
     const renderNotesList = (notes) => {
         // Guard against missing list element.
         if (!listEl) return;
+        // Remember tag options for the search suggestions.
+        rememberTagsFromNotes(notes);
         // Clear existing list content.
         listEl.innerHTML = "";
         // Toggle empty state visibility.
@@ -265,6 +402,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const loadNotesList = async (tagSlug) => {
         // Update active tag filter state.
         activeTagSlug = tagSlug || "";
+        // Keep the tag search input in sync with the active filter.
+        syncTagSearchInputForActiveFilter();
         // Build list URL with optional tag filter.
         const url = activeTagSlug
             ? `${listUrl}?tag=${encodeURIComponent(activeTagSlug)}`
@@ -472,6 +611,138 @@ document.addEventListener("DOMContentLoaded", function () {
             ""
         );
         return cleaned;
+    };
+
+    // Format a timestamp like "April 11, 2026 4:00PM" (Notion-style).
+    const formatTimestampDisplay = (dateObj) => {
+        try {
+            const dateFormatter = new Intl.DateTimeFormat("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+            });
+            const timeFormatter = new Intl.DateTimeFormat("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+            });
+            const datePart = dateFormatter.format(dateObj);
+            const timePart = timeFormatter.format(dateObj).replace(/\s+/g, "");
+            return `${datePart} ${timePart}`;
+        } catch (error) {
+            // Fallback for older browsers.
+            return String(dateObj ? dateObj.toLocaleString() : "");
+        }
+    };
+
+    // Register a custom, non-editable timestamp embed for the notes editor.
+    const registerNotesTimestampBlot = () => {
+        if (!window.Quill) return;
+        if (window.__notesTimestampBlotRegistered) return;
+        try {
+            const Embed = window.Quill.import("blots/embed");
+            class NotesTimestampBlot extends Embed {
+                static create(value) {
+                    const node = super.create();
+                    const isoValue = value && value.iso ? String(value.iso) : "";
+                    const displayValue = value && value.display ? String(value.display) : "";
+                    if (isoValue) node.setAttribute("data-date_time_now", isoValue);
+                    if (displayValue) node.setAttribute("data-display", displayValue);
+                    node.setAttribute("contenteditable", "false");
+                    node.textContent = displayValue || isoValue || "";
+                    if (displayValue) node.setAttribute("title", displayValue);
+                    return node;
+                }
+
+                static value(node) {
+                    return {
+                        iso: node.getAttribute("data-date_time_now") || "",
+                        display: node.getAttribute("data-display") || node.textContent || "",
+                    };
+                }
+            }
+            NotesTimestampBlot.blotName = "timestamp";
+            NotesTimestampBlot.tagName = "span";
+            NotesTimestampBlot.className = "notes-timestamp";
+            window.Quill.register(NotesTimestampBlot);
+            window.__notesTimestampBlotRegistered = true;
+        } catch (error) {
+            // Ignore registration failures; editor will fall back to plain text.
+        }
+    };
+
+    // Insert a non-editable timestamp token at the current selection.
+    const insertTimestampToken = (range, source = "user") => {
+        if (!quill || !range) return;
+        const index = range.index || 0;
+        const length = range.length || 0;
+        if (length > 0) {
+            quill.deleteText(index, length, source);
+        }
+        const now = new Date();
+        const iso = String(now.toISOString() || "").replace(/Z$/, "+00:00");
+        const display = formatTimestampDisplay(now);
+        quill.insertEmbed(index, "timestamp", { iso, display }, source);
+        // Add a trailing space so typing can continue naturally.
+        quill.insertText(index + 1, " ", source);
+        quill.setSelection(index + 2, 0, "silent");
+        quill.focus();
+    };
+
+    // Convert a freshly typed "@" into a timestamp token when appropriate.
+    const maybeConvertRecentAtToTimestamp = (delta) => {
+        if (!quill) return;
+        let range = quill.getSelection();
+        if (!range && lastSelection) {
+            range = { index: lastSelection.index, length: lastSelection.length };
+        }
+
+        let atIndex = null;
+        if (range && range.length === 0) {
+            const recentIndex = range.index - 1;
+            const recentChar = recentIndex >= 0 ? (quill.getText(recentIndex, 1) || "") : "";
+            if (recentChar === "@") {
+                atIndex = recentIndex;
+            }
+        }
+
+        // Fallback: Quill keyboard bindings use keyCodes, so detect single "@" inserts via delta.
+        if (atIndex === null) {
+            const ops = delta && Array.isArray(delta.ops) ? delta.ops : [];
+            let cursor = 0;
+            let insertedAtIndex = null;
+            for (let i = 0; i < ops.length; i += 1) {
+                const op = ops[i] || {};
+                if (typeof op.retain === "number") {
+                    cursor += op.retain;
+                    continue;
+                }
+                if (typeof op.insert === "string") {
+                    if (op.insert === "@") {
+                        insertedAtIndex = cursor;
+                        break;
+                    }
+                    continue;
+                }
+            }
+            if (insertedAtIndex === null) return;
+            atIndex = insertedAtIndex;
+        }
+
+        if (typeof atIndex !== "number" || atIndex < 0) return;
+        const typedChar = quill.getText(atIndex, 1) || "";
+        if (typedChar !== "@") return;
+
+        const formats = quill.getFormat(atIndex, 1) || {};
+        if (formats["code-block"] || formats.code) return;
+
+        if (atIndex > 0) {
+            const prevChar = quill.getText(atIndex - 1, 1) || "";
+            const isWhitespace = /\s/.test(prevChar) || prevChar === "\uFFFC";
+            if (!isWhitespace) return;
+        }
+
+        insertTimestampToken({ index: atIndex, length: 1 }, "api");
     };
 
     // Split, trim, and dedupe tag input text.
@@ -702,6 +973,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!editorMountEl) return;
         // Guard against missing Quill dependency.
         if (!window.Quill) return;
+        // Ensure the timestamp embed is registered before instantiating Quill.
+        registerNotesTimestampBlot();
         // Create a new Quill instance with custom shortcuts.
         quill = new window.Quill(editorMountEl, {
             theme: "snow",
@@ -711,6 +984,27 @@ document.addEventListener("DOMContentLoaded", function () {
                 syntax: true,
                 keyboard: {
                     bindings: {
+                        timestampNow: {
+                            key: "@",
+                            handler: function (range, context) {
+                                // Allow literal @ inside code blocks / inline code.
+                                if (context && context.format) {
+                                    if (context.format["code-block"] || context.format.code) {
+                                        return true;
+                                    }
+                                }
+                                // Only trigger on a collapsed caret selection.
+                                if (!range || range.length !== 0) return true;
+                                // Only trigger when at line start or after whitespace.
+                                if (quill && range.index > 0) {
+                                    const prevChar = quill.getText(range.index - 1, 1) || "";
+                                    const isWhitespace = /\s/.test(prevChar) || prevChar === "\uFFFC";
+                                    if (!isWhitespace) return true;
+                                }
+                                insertTimestampToken(range);
+                                return false;
+                            },
+                        },
                         heading1: {
                             key: "1",
                             shortKey: true,
@@ -838,6 +1132,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 hasUserTyped = true;
                 // Schedule autosave for existing notes.
                 scheduleAutosave();
+                // Replace a freshly typed "@" with a timestamp token.
+                maybeConvertRecentAtToTimestamp(delta);
             }
             // Refresh overlay copy buttons after changes.
             scheduleCopyOverlayUpdate();
@@ -1027,7 +1323,39 @@ document.addEventListener("DOMContentLoaded", function () {
     // Attach clear filter handler.
     if (clearFilterBtn) {
         clearFilterBtn.addEventListener("click", function () {
-            loadNotesList("");
+            clearTagSearch();
+        });
+    }
+    // Attach tag search handlers.
+    if (tagSearchInputEl) {
+        tagSearchInputEl.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                applyTagSearch();
+                return;
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                clearTagSearch();
+            }
+        });
+        tagSearchInputEl.addEventListener("input", function () {
+            syncTagSearchClearButton();
+            if (!tagSearchInputEl.value.trim() && activeTagSlug) {
+                loadNotesList("");
+            }
+        });
+    }
+    if (tagSearchEffectiveClearBtn) {
+        tagSearchEffectiveClearBtn.addEventListener("click", function () {
+            clearTagSearch();
+            if (tagSearchInputEl) tagSearchInputEl.focus();
+        });
+    }
+    if (tagSearchActionBtn) {
+        tagSearchActionBtn.addEventListener("click", function () {
+            applyTagSearch();
+            if (tagSearchInputEl) tagSearchInputEl.focus();
         });
     }
     // Attach list click handler.
