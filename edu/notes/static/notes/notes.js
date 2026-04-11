@@ -613,6 +613,138 @@ document.addEventListener("DOMContentLoaded", function () {
         return cleaned;
     };
 
+    // Format a timestamp like "April 11, 2026 4:00PM" (Notion-style).
+    const formatTimestampDisplay = (dateObj) => {
+        try {
+            const dateFormatter = new Intl.DateTimeFormat("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+            });
+            const timeFormatter = new Intl.DateTimeFormat("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+            });
+            const datePart = dateFormatter.format(dateObj);
+            const timePart = timeFormatter.format(dateObj).replace(/\s+/g, "");
+            return `${datePart} ${timePart}`;
+        } catch (error) {
+            // Fallback for older browsers.
+            return String(dateObj ? dateObj.toLocaleString() : "");
+        }
+    };
+
+    // Register a custom, non-editable timestamp embed for the notes editor.
+    const registerNotesTimestampBlot = () => {
+        if (!window.Quill) return;
+        if (window.__notesTimestampBlotRegistered) return;
+        try {
+            const Embed = window.Quill.import("blots/embed");
+            class NotesTimestampBlot extends Embed {
+                static create(value) {
+                    const node = super.create();
+                    const isoValue = value && value.iso ? String(value.iso) : "";
+                    const displayValue = value && value.display ? String(value.display) : "";
+                    if (isoValue) node.setAttribute("data-date_time_now", isoValue);
+                    if (displayValue) node.setAttribute("data-display", displayValue);
+                    node.setAttribute("contenteditable", "false");
+                    node.textContent = displayValue || isoValue || "";
+                    if (displayValue) node.setAttribute("title", displayValue);
+                    return node;
+                }
+
+                static value(node) {
+                    return {
+                        iso: node.getAttribute("data-date_time_now") || "",
+                        display: node.getAttribute("data-display") || node.textContent || "",
+                    };
+                }
+            }
+            NotesTimestampBlot.blotName = "timestamp";
+            NotesTimestampBlot.tagName = "span";
+            NotesTimestampBlot.className = "notes-timestamp";
+            window.Quill.register(NotesTimestampBlot);
+            window.__notesTimestampBlotRegistered = true;
+        } catch (error) {
+            // Ignore registration failures; editor will fall back to plain text.
+        }
+    };
+
+    // Insert a non-editable timestamp token at the current selection.
+    const insertTimestampToken = (range, source = "user") => {
+        if (!quill || !range) return;
+        const index = range.index || 0;
+        const length = range.length || 0;
+        if (length > 0) {
+            quill.deleteText(index, length, source);
+        }
+        const now = new Date();
+        const iso = String(now.toISOString() || "").replace(/Z$/, "+00:00");
+        const display = formatTimestampDisplay(now);
+        quill.insertEmbed(index, "timestamp", { iso, display }, source);
+        // Add a trailing space so typing can continue naturally.
+        quill.insertText(index + 1, " ", source);
+        quill.setSelection(index + 2, 0, "silent");
+        quill.focus();
+    };
+
+    // Convert a freshly typed "@" into a timestamp token when appropriate.
+    const maybeConvertRecentAtToTimestamp = (delta) => {
+        if (!quill) return;
+        let range = quill.getSelection();
+        if (!range && lastSelection) {
+            range = { index: lastSelection.index, length: lastSelection.length };
+        }
+
+        let atIndex = null;
+        if (range && range.length === 0) {
+            const recentIndex = range.index - 1;
+            const recentChar = recentIndex >= 0 ? (quill.getText(recentIndex, 1) || "") : "";
+            if (recentChar === "@") {
+                atIndex = recentIndex;
+            }
+        }
+
+        // Fallback: Quill keyboard bindings use keyCodes, so detect single "@" inserts via delta.
+        if (atIndex === null) {
+            const ops = delta && Array.isArray(delta.ops) ? delta.ops : [];
+            let cursor = 0;
+            let insertedAtIndex = null;
+            for (let i = 0; i < ops.length; i += 1) {
+                const op = ops[i] || {};
+                if (typeof op.retain === "number") {
+                    cursor += op.retain;
+                    continue;
+                }
+                if (typeof op.insert === "string") {
+                    if (op.insert === "@") {
+                        insertedAtIndex = cursor;
+                        break;
+                    }
+                    continue;
+                }
+            }
+            if (insertedAtIndex === null) return;
+            atIndex = insertedAtIndex;
+        }
+
+        if (typeof atIndex !== "number" || atIndex < 0) return;
+        const typedChar = quill.getText(atIndex, 1) || "";
+        if (typedChar !== "@") return;
+
+        const formats = quill.getFormat(atIndex, 1) || {};
+        if (formats["code-block"] || formats.code) return;
+
+        if (atIndex > 0) {
+            const prevChar = quill.getText(atIndex - 1, 1) || "";
+            const isWhitespace = /\s/.test(prevChar) || prevChar === "\uFFFC";
+            if (!isWhitespace) return;
+        }
+
+        insertTimestampToken({ index: atIndex, length: 1 }, "api");
+    };
+
     // Split, trim, and dedupe tag input text.
     const parseTagInput = (rawValue) => {
         if (!rawValue) return [];
@@ -841,6 +973,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!editorMountEl) return;
         // Guard against missing Quill dependency.
         if (!window.Quill) return;
+        // Ensure the timestamp embed is registered before instantiating Quill.
+        registerNotesTimestampBlot();
         // Create a new Quill instance with custom shortcuts.
         quill = new window.Quill(editorMountEl, {
             theme: "snow",
@@ -850,6 +984,27 @@ document.addEventListener("DOMContentLoaded", function () {
                 syntax: true,
                 keyboard: {
                     bindings: {
+                        timestampNow: {
+                            key: "@",
+                            handler: function (range, context) {
+                                // Allow literal @ inside code blocks / inline code.
+                                if (context && context.format) {
+                                    if (context.format["code-block"] || context.format.code) {
+                                        return true;
+                                    }
+                                }
+                                // Only trigger on a collapsed caret selection.
+                                if (!range || range.length !== 0) return true;
+                                // Only trigger when at line start or after whitespace.
+                                if (quill && range.index > 0) {
+                                    const prevChar = quill.getText(range.index - 1, 1) || "";
+                                    const isWhitespace = /\s/.test(prevChar) || prevChar === "\uFFFC";
+                                    if (!isWhitespace) return true;
+                                }
+                                insertTimestampToken(range);
+                                return false;
+                            },
+                        },
                         heading1: {
                             key: "1",
                             shortKey: true,
@@ -977,6 +1132,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 hasUserTyped = true;
                 // Schedule autosave for existing notes.
                 scheduleAutosave();
+                // Replace a freshly typed "@" with a timestamp token.
+                maybeConvertRecentAtToTimestamp(delta);
             }
             // Refresh overlay copy buttons after changes.
             scheduleCopyOverlayUpdate();
