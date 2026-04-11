@@ -788,6 +788,28 @@ body.notes-open .notes-backdrop {
     font-size: 1.1em;
 }
 
+/* Timestamp token styling (inserted via "@" shortcut). */
+.notes-editor .ql-editor .notes-timestamp { 
+    /* Render naturally inline with the diary text. */
+    display: inline;
+    /* Keep the timestamp on a single line. */
+    white-space: nowrap;
+    /* Avoid text selection/caret inside the timestamp. */
+    user-select: none;
+    /* Use a muted color for a subtle presence. */
+    color: green;
+    /* Inherit the serif font from the editor. */
+    font-family: inherit;
+    /* Make it italic to distinguish it naturally like a log. */
+    font-style: italic;
+    /* Blend smoothly with surrounding text size. */
+    font-size: 0.95em;
+    /* Make the cursor default rather than restrictive. */
+    cursor: not-allowed;
+    /* Add subtle spacing around the timestamp. */
+    margin: 0 0.15rem;
+}
+
 /* Code block styling. */
 .notes-editor .ql-editor pre {
     /* Use code background color. */
