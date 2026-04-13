@@ -24,6 +24,10 @@
     --notes-code-text: #b56600;
     /* Inline code border color. */
     --notes-code-border: color-mix(in srgb, #1b2630 22%, var(--color-border));
+    /* List marker (bullets / checkboxes) size inside the editor. */
+    --notes-editor-marker-size: 1.35em;
+    /* Checklist hit-area size for Quill's injected checkbox UI span. */
+    --notes-editor-checkbox-hit: 1.65em;
     /* Modal overlay background. */
     --notes-modal-overlay: rgba(8, 16, 24, 0.45);
 }
@@ -735,9 +739,50 @@ body.notes-open .notes-backdrop {
 }
 
 /* Explicit paragraph font size for normal text. */
-.notes-editor .ql-editor p {
+.notes-editor .ql-editor p,
+.notes-editor .ql-editor li {
     /* Increase paragraph font size for readability. */
     font-size: 1.1rem;
+}
+
+/* Make list markers (bullets, numbers, checkboxes) easier to read. */
+.notes-editor .ql-editor li::marker {
+    /* Scale marker with editor typography. */
+    font-size: var(--notes-editor-marker-size);
+}
+
+/* Quill Snow theme commonly renders list markers via ::before (not ::marker). */
+.notes-editor .ql-editor li::before {
+    /* Scale pseudo-marker with editor typography. */
+    font-size: var(--notes-editor-marker-size) !important;
+}
+
+/* Quill checklist boxes use an injected `.ql-ui` span; increase its size + hit area. */
+.notes-editor .ql-editor li[data-list="checked"] > .ql-ui,
+.notes-editor .ql-editor li[data-list="unchecked"] > .ql-ui { 
+    /* Make checkbox easier to click/tap. */
+    width: var(--notes-editor-checkbox-hit);
+    height: var(--notes-editor-checkbox-hit);
+    /* Keep it aligned with the text baseline. */
+    line-height: 1;
+}
+
+.notes-editor .ql-editor li[data-list="checked"] > .ql-ui::before,
+.notes-editor .ql-editor li[data-list="unchecked"] > .ql-ui::before {
+    /* Increase the visual checkbox size. */
+    font-size: var(--notes-editor-marker-size);
+}
+
+/* Fallback: if checkboxes are actual <input> elements (e.g., pasted HTML), scale them too. */
+.notes-editor .ql-editor input[type="checkbox"] {
+    /* Match size with surrounding text. */
+    width: 1.05em;
+    height: 1.05em;
+    /* Increase checkbox control size across browsers. */
+    transform: scale(1.25);
+    transform-origin: left center;
+    /* Align with the notes accent when supported. */
+    accent-color: var(--notes-accent);
 }
 
 /* Quill placeholder styling for visibility. */
