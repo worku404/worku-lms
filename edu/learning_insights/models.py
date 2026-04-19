@@ -543,3 +543,77 @@ class InsightNotification(models.Model):
                 "learning_insights:overview",
             ]
         )
+
+
+class TelegramSubscription(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="telegram_subscription",
+    )
+    chat_id = models.BigIntegerField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Telegram subscription"
+        verbose_name_plural = "Telegram subscriptions"
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.chat_id}"
+
+
+class TelegramConnectToken(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="telegram_connect_tokens",
+    )
+    token = models.CharField(max_length=64, unique=True)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "is_used"], name="li_tct_user_used_idx"),
+        ]
+
+    def __str__(self) -> str:
+        suffix = "used" if self.is_used else "active"
+        return f"{self.user} - {suffix}"
+
+
+class NotificationQueue(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = (
+        (STATUS_PENDING, "Pending"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_FAILED, "Failed"),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="telegram_notification_queue",
+    )
+    message = models.TextField()
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_attempted_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="li_nq_status_date_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.status}"
