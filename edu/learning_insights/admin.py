@@ -5,8 +5,11 @@ from .models import (
     DailySiteStat,
     Goal,
     InsightNotification,
+    NotificationQueue,
     NotificationPreference,
     StudyTimeEvent,
+    TelegramConnectToken,
+    TelegramSubscription,
 )
 
 
@@ -245,3 +248,39 @@ class InsightNotificationAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(TelegramSubscription)
+class TelegramSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "chat_id", "created_at")
+    search_fields = ("user__username", "chat_id")
+    autocomplete_fields = ("user",)
+    ordering = ("-created_at", "-id")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(TelegramConnectToken)
+class TelegramConnectTokenAdmin(admin.ModelAdmin):
+    list_display = ("user", "token", "is_used", "created_at")
+    list_filter = ("is_used", "created_at")
+    search_fields = ("user__username", "token")
+    autocomplete_fields = ("user",)
+    ordering = ("-created_at", "-id")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(NotificationQueue)
+class NotificationQueueAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "status",
+        "attempts",
+        "created_at",
+        "last_attempted_at",
+        "sent_at",
+    )
+    list_filter = ("status", "created_at", "sent_at")
+    search_fields = ("user__username", "message", "last_error")
+    autocomplete_fields = ("user",)
+    ordering = ("-created_at", "-id")
+    readonly_fields = ("created_at", "last_attempted_at", "sent_at")
