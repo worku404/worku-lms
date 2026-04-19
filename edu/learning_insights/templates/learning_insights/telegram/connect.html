@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="telegram-connect-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="telegram-connect-title" class="c-card__title" style="margin:0;">Telegram</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Connect Telegram to receive optional reminders without needing a public URL.
+            </p>
+        </div>
+        <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Back to insights</a>
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;" aria-label="Connection status">
+    {% if subscription %}
+        <h2 class="c-card__title" style="margin:0;">Connected</h2>
+        <p class="c-card__meta" style="margin-top:.5rem;">
+            Telegram chat id: <strong>{{ subscription.chat_id }}</strong>
+        </p>
+    {% else %}
+        <h2 class="c-card__title" style="margin:0;">Not connected</h2>
+        <p class="c-card__meta" style="margin-top:.5rem;">
+            Follow the steps below to link your Telegram account.
+        </p>
+    {% endif %}
+</section>
+
+<section class="c-card" style="margin-top:1rem;" aria-label="Connection instructions">
+    <h2 class="c-card__title" style="margin:0;">How to connect</h2>
+
+    {% if bot_username %}
+        <ol style="margin:1rem 0 0 1.1rem;display:grid;gap:.5rem;">
+            <li>Open Telegram and start a chat with <strong>@{{ bot_username }}</strong>.</li>
+            <li>Send the command below to the bot.</li>
+            <li>In your terminal, run <code>python manage.py poll_telegram_updates --settings=edu.settings.local</code>.</li>
+            <li>Then run <code>python manage.py send_telegram_notifications --settings=edu.settings.local</code> to deliver queued messages.</li>
+        </ol>
+    {% else %}
+        <div class="c-card c-alert c-alert--warn" style="margin-top:1rem;">
+            <h3 class="c-card__title" style="margin:0;">Bot username not configured</h3>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Set <code>TELEGRAM_BOT_USERNAME</code> (and <code>TELEGRAM_BOT_TOKEN</code>) in your environment or <code>.env</code>.
+            </p>
+        </div>
+    {% endif %}
+
+    <div style="margin-top:1rem;">
+        <p class="c-card__meta" style="margin:0 0 .35rem 0;">Your one-time connect command</p>
+        <div class="c-card" style="padding:1rem;margin:0;border:1px solid rgba(255,255,255,0.08);">
+            <code>/start {{ connect_token.token }}</code>
+        </div>
+        <p class="c-card__meta" style="margin-top:.5rem;">
+            This token is single-use. You can regenerate it at any time.
+        </p>
+    </div>
+
+    <form method="post" style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <button type="submit" name="action" value="regen_token" class="c-btn c-btn--secondary">Regenerate token</button>
+        <button type="submit" name="action" value="queue_test" class="c-btn c-btn--ghost"{% if not subscription %} disabled{% endif %}>
+            Queue test message
+        </button>
+        {% if subscription %}
+            <button type="submit" name="action" value="disconnect" class="c-btn c-btn--ghost">Disconnect</button>
+        {% endif %}
+    </form>
+</section>
+{% endblock %}
+
