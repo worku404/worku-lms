@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -36,6 +37,21 @@ from .services.notifications import (
     mark_notification_read,
     mark_notifications_read,
 )
+from .services.telegram import (
+    generate_connect_token,
+    get_active_connect_token,
+    get_bot_username,
+    get_subscription_for_user,
+    queue_notification,
+)
+
+
+def _with_query_param(url: str, **params: str) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    for key, value in params.items():
+        query[key] = value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 class InsightsBaseMixin(LoginRequiredMixin):
@@ -193,11 +209,18 @@ class GoalListView(GoalQuerysetMixin, ListView):
 class GoalFormMixin(GoalQuerysetMixin):
     form_class = GoalForm
     success_url = reverse_lazy("learning_insights:goal_list")
+    force_notifications_bootstrap = True
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         return kwargs
+
+    def get_success_url(self):
+        url = super().get_success_url()
+        if getattr(self, "force_notifications_bootstrap", False):
+            return _with_query_param(url, li_bootstrap="1")
+        return url
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -262,6 +285,10 @@ class GoalUpdateView(GoalFormMixin, UpdateView):
 class GoalDeleteView(GoalQuerysetMixin, DeleteView):
     template_name = "learning_insights/goals/confirm_delete.html"
     success_url = reverse_lazy("learning_insights:goal_list")
+
+    def get_success_url(self):
+        url = super().get_success_url()
+        return _with_query_param(url, li_bootstrap="1")
 
     def form_valid(self, form):
         messages.success(self.request, "Goal deleted.")
@@ -349,7 +376,9 @@ class GoalQuickActionView(GoalQuerysetMixin, View):
             messages.error(request, "Unknown goal action.")
 
         sync_goal_progress_for_user(request.user)
-        return HttpResponseRedirect(reverse("learning_insights:goal_list"))
+        return HttpResponseRedirect(
+            _with_query_param(reverse("learning_insights:goal_list"), li_bootstrap="1")
+        )
 
 
 class NotificationPreferenceView(InsightsBaseMixin, UpdateView):
@@ -477,3 +506,54 @@ class NotificationMarkAllReadView(LoginRequiredMixin, View):
             request.META.get("HTTP_REFERER")
             or reverse("learning_insights:notification_center")
         )
+
+
+class TelegramConnectView(InsightsBaseMixin, TemplateView):
+    template_name = "learning_insights/telegram/connect.html"
+
+    def _ensure_connect_token(self):
+        token = get_active_connect_token(user=self.request.user)
+        if token is None:
+            token = generate_connect_token(user=self.request.user)
+        return token
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Telegram"
+        context["bot_username"] = get_bot_username()
+        context["connect_token"] = self._ensure_connect_token()
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "regen_token":
+            generate_connect_token(user=request.user)
+            messages.success(request, "A new Telegram connect token was generated.")
+        elif action == "queue_test":
+            subscription = get_subscription_for_user(user=request.user)
+            if subscription is None:
+                messages.error(
+                    request, "Connect Telegram first to receive a test message."
+                )
+            else:
+                queue_notification(
+                    user=request.user,
+                    message="Test notification. Learning Insights is connected.",
+                )
+                messages.success(
+                    request,
+                    "Test notification queued. Run send_telegram_notifications to deliver it.",
+                )
+        elif action == "disconnect":
+            subscription = get_subscription_for_user(user=request.user)
+            if subscription is None:
+                messages.info(request, "Telegram is not connected.")
+            else:
+                subscription.delete()
+                messages.success(request, "Telegram disconnected.")
+        else:
+            messages.error(request, "Unknown action.")
+
+        return HttpResponseRedirect(reverse("learning_insights:telegram_connect"))
