@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load course %}
+
+{% block title %}Delete Goal{% endblock %}
+
+{% block content %}
+<section class="c-card" style="max-width: 820px; margin: 0 auto;" aria-labelledby="delete-goal-title">
+    <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+    <h1 id="delete-goal-title" class="c-card__title" style="margin:0;">Delete goal</h1>
+
+    <p class="c-card__meta" style="margin-top:.75rem;">
+        You are about to delete <strong>{{ object.title }}</strong>. This cannot be undone.
+    </p>
+
+    <form method="post" style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;justify-content:flex-end;">
+        {% csrf_token %}
+        <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Cancel</a>
+        <button type="submit" class="c-btn c-btn--secondary">Delete</button>
+    </form>
+</section>
+{% endblock %}
+

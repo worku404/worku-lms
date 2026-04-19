@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load course %}
+
+{% block title %}Preferences | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="preferences-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="preferences-title" class="c-card__title" style="margin:0;">Preferences</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Configure timezone, week start day, and in-app reminders.
+            </p>
+        </div>
+        <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Back to insights</a>
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;" aria-labelledby="preferences-form-title">
+    <h2 id="preferences-form-title" class="c-card__title" style="margin:0;">Notification settings</h2>
+
+    {% if form.non_field_errors %}
+        <div class="c-card c-alert c-alert--danger" role="alert" style="margin-top:1rem;">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <form method="post" novalidate style="margin-top:1rem;display:grid;gap:1rem;">
+        {% csrf_token %}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+            <div class="c-card" style="padding:1rem;">
+                <label for="{{ form.timezone.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Timezone</label>
+                {{ form.timezone }}
+                {% if form.timezone.help_text %}
+                    <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ form.timezone.help_text }}</p>
+                {% endif %}
+                {% for error in form.timezone.errors %}
+                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <label for="{{ form.week_start_day.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Week starts on</label>
+                {{ form.week_start_day }}
+                {% if form.week_start_day.help_text %}
+                    <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ form.week_start_day.help_text }}</p>
+                {% endif %}
+                {% for error in form.week_start_day.errors %}
+                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">In-app notifications</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Enable insight notifications inside the website.</p>
+                    </div>
+                    <label for="{{ form.in_app_enabled.id_for_label }}">
+                        {{ form.in_app_enabled }}
+                    </label>
+                </div>
+                {% for error in form.in_app_enabled.errors %}
+                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Daily reminders</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Show a daily planning reminder.</p>
+                    </div>
+                    <label for="{{ form.daily_enabled.id_for_label }}">
+                        {{ form.daily_enabled }}
+                    </label>
+                </div>
+                <div style="margin-top:1rem;">
+                    <label for="{{ form.daily_time.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Daily reminder time</label>
+                    {{ form.daily_time }}
+                    {% for error in form.daily_time.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Weekly reminders</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Show a weekly reminder at week start.</p>
+                    </div>
+                    <label for="{{ form.weekly_enabled.id_for_label }}">
+                        {{ form.weekly_enabled }}
+                    </label>
+                </div>
+                <div style="margin-top:1rem;">
+                    <label for="{{ form.weekly_time.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Weekly reminder time</label>
+                    {{ form.weekly_time }}
+                    {% for error in form.weekly_time.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Daily achievement</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Receive daily achievement updates.</p>
+                    </div>
+                    <label for="{{ form.daily_achievement_enabled.id_for_label }}">
+                        {{ form.daily_achievement_enabled }}
+                    </label>
+                </div>
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Weekly achievement</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Receive weekly status and summary notifications.</p>
+                    </div>
+                    <label for="{{ form.weekly_achievement_enabled.id_for_label }}">
+                        {{ form.weekly_achievement_enabled }}
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Cancel</a>
+            <button type="submit" class="c-btn c-btn--primary">Save</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
