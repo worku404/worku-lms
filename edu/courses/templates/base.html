@@ -117,6 +117,7 @@
                 <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
                 <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
+                <a href="{% url 'learning_insights:overview' %}" class="c-nav__item{% if '/insights/' in request.path %} is-active{% endif %}">Overview</a>
                 {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
                 {% endif %}
@@ -576,6 +577,101 @@
         connectNotificationSocket();
     })();
 
+    (function () {
+        const stack = document.getElementById("chat-notification-stack");
+        if (!stack) return;
+
+        const shownInsightIds = new Set();
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function isInsideInsightsNotifications() {
+            const path = window.location.pathname || "";
+            return path.startsWith("/insights/notifications");
+        }
+
+        function createToast(item) {
+            if (!item || !item.id) return null;
+            if (shownInsightIds.has(item.id)) return null;
+            if (isInsideInsightsNotifications()) return null;
+
+            shownInsightIds.add(item.id);
+
+            const toast = document.createElement("article");
+            toast.className = "c-toast";
+
+            const title = escapeHtml(item.title || "Learning Insights");
+            const body = escapeHtml(item.body || "");
+            const url = item.url || "{% url 'learning_insights:notification_center' %}";
+
+            toast.innerHTML = `
+                <div class="c-toast__head">
+                    <strong class="c-toast__title">${title}</strong>
+                    <button type="button" class="c-toast__close" aria-label="Dismiss notification">&times;</button>
+                </div>
+                <p class="c-toast__meta">Learning Insights</p>
+                <p class="c-toast__body">${body}</p>
+                <a class="c-toast__link" href="${escapeHtml(url)}">Open</a>
+            `;
+
+            const closeBtn = toast.querySelector(".c-toast__close");
+            if (closeBtn) {
+                closeBtn.addEventListener("click", () => {
+                    toast.remove();
+                });
+            }
+
+            setTimeout(() => {
+                toast.remove();
+            }, 20000);
+
+            return toast;
+        }
+
+        function showToast(item) {
+            const toast = createToast(item);
+            if (!toast) return;
+            stack.prepend(toast);
+        }
+
+        let shouldBootstrap = true;
+        try {
+            const bootstrapKey = "insights_notifications_bootstrap_done";
+            if (sessionStorage.getItem(bootstrapKey) === "1") {
+                shouldBootstrap = false;
+            } else {
+                sessionStorage.setItem(bootstrapKey, "1");
+            }
+        } catch (error) {
+            shouldBootstrap = true;
+        }
+
+        if (shouldBootstrap) {
+            fetch("{% url 'learning_insights:notifications_bootstrap' %}", {
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            })
+                .then((response) => response.ok ? response.json() : { items: [] })
+                .then((data) => {
+                    (data.items || []).forEach((item) => {
+                        showToast(item);
+                    });
+                })
+                .catch(() => {
+                    // Silent failure.
+                });
+        }
+    })();
+ 
     (function () {
         const refreshBtn = document.querySelector("[data-motto-refresh]");
         if (!refreshBtn) return;
