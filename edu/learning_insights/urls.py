@@ -47,4 +47,9 @@ urlpatterns = [
         views.NotificationPreferenceView.as_view(),
         name="preferences",
     ),
+    path(
+        "telegram/",
+        views.TelegramConnectView.as_view(),
+        name="telegram_connect",
+    ),
 ]
