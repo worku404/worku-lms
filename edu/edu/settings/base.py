@@ -196,3 +196,7 @@ CHAT_MAX_MESSAGES_PER_COURSE = config(
     default=1000,
     cast=int,
 )
+
+#telegram
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME")
