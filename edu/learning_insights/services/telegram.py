@@ -11,11 +11,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db import transaction
 
-from learning_insights.models import (
-    NotificationQueue,
-    TelegramConnectToken,
-    TelegramSubscription,
-)
+from learning_insights.models import TelegramConnectToken, TelegramSubscription
 
 logger = logging.getLogger(__name__)
 
@@ -94,18 +90,35 @@ def send_message(*, token: str, chat_id: int, text: str) -> dict[str, Any]:
     return payload
 
 
-def queue_notification(*, user, message: str) -> NotificationQueue:
+def send_notification(*, user, message: str) -> bool:
+    """
+    Send a Telegram message to the given user if Telegram is configured and linked.
+
+    Returns True if the message was sent successfully.
+    """
+
     message = (message or "").strip()
     if not message:
-        raise ValueError("NotificationQueue message cannot be empty.")
-    if len(message) > TELEGRAM_TEXT_LIMIT:
-        message = message[: TELEGRAM_TEXT_LIMIT - 1] + "…"
+        return False
 
-    return NotificationQueue.objects.create(
-        user=user,
-        message=message,
-        status=NotificationQueue.STATUS_PENDING,
-    )
+    token = get_bot_token()
+    if not token:
+        return False
+
+    subscription = get_subscription_for_user(user=user)
+    if subscription is None:
+        return False
+
+    try:
+        send_message(token=token, chat_id=int(subscription.chat_id), text=message)
+    except Exception:
+        logger.exception(
+            "Failed sending Telegram message (user_id=%s).",
+            getattr(user, "id", None),
+        )
+        return False
+
+    return True
 
 
 def generate_connect_token(*, user) -> TelegramConnectToken:
@@ -178,6 +191,8 @@ class TelegramUpdateProcessor:
     Stateless update processor shared by polling and future webhook entrypoints.
     """
 
+    token: str | None = None
+
     def process_updates(self, updates: Iterable[dict[str, Any]]) -> int:
         processed = 0
         for update in updates:
@@ -224,8 +239,16 @@ class TelegramUpdateProcessor:
 
             link_chat_id_to_user(user=connect_token.user, chat_id=chat_id)
 
-        queue_notification(
-            user=connect_token.user,
-            message="Telegram connected. You will receive Learning Insights notifications here.",
-        )
+        if self.token:
+            try:
+                send_message(
+                    token=self.token,
+                    chat_id=chat_id,
+                    text="Telegram connected. You will receive Learning Insights notifications here.",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed sending Telegram connect confirmation (chat_id=%s).",
+                    chat_id,
+                )
         return True
