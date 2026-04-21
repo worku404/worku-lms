@@ -72,6 +72,76 @@
             <div class="c-card" style="padding:1rem;">
                 <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
                     <div>
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Telegram notifications</h3>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Optional delivery via Telegram.</p>
+                        <div style="margin-top:.75rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+                            {% if subscription %}
+                                <button
+                                    type="submit"
+                                    name="action"
+                                    value="disconnect"
+                                    formaction="{% url 'learning_insights:telegram_connect' %}"
+                                    class="c-btn c-btn--ghost"
+                                >
+                                    Disconnect
+                                </button>
+                                <a href="{% url 'learning_insights:telegram_connect' %}" class="c-btn c-btn--ghost">Manage</a>
+                            {% else %}
+                                <a href="{% url 'learning_insights:telegram_connect' %}" class="c-btn c-btn--ghost">Connect</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <label for="{{ form.telegram_enabled.id_for_label }}">
+                        {{ form.telegram_enabled }}
+                    </label>
+                </div>
+
+                <div style="margin-top:1rem;display:grid;gap:.75rem;">
+                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                        <div>
+                            <p class="c-card__meta" style="margin:0;">Daily AI summary</p>
+                        </div>
+                        <label for="{{ form.telegram_daily_summary_enabled.id_for_label }}">
+                            {{ form.telegram_daily_summary_enabled }}
+                        </label>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                        <div>
+                            <p class="c-card__meta" style="margin:0;">Weekly AI review</p>
+                        </div>
+                        <label for="{{ form.telegram_weekly_review_enabled.id_for_label }}">
+                            {{ form.telegram_weekly_review_enabled }}
+                        </label>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                        <div>
+                            <p class="c-card__meta" style="margin:0;">Critical alerts</p>
+                        </div>
+                        <label for="{{ form.telegram_critical_alerts_enabled.id_for_label }}">
+                            {{ form.telegram_critical_alerts_enabled }}
+                        </label>
+                    </div>
+                </div>
+
+                {% for error in form.telegram_enabled.errors %}
+                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+                {% for error in form.telegram_daily_summary_enabled.errors %}
+                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+                {% for error in form.telegram_weekly_review_enabled.errors %}
+                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+                {% for error in form.telegram_critical_alerts_enabled.errors %}
+                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div>
                         <h3 class="c-card__title" style="font-size:1rem;margin:0;">Daily reminders</h3>
                         <p class="c-card__meta" style="margin:.35rem 0 0 0;">Show a daily planning reminder.</p>
                     </div>
@@ -139,4 +209,3 @@
     </form>
 </section>
 {% endblock %}
-
