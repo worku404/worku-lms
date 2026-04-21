@@ -383,6 +383,10 @@ class NotificationPreference(models.Model):
     daily_achievement_enabled = models.BooleanField(default=True)
     weekly_achievement_enabled = models.BooleanField(default=True)
     in_app_enabled = models.BooleanField(default=True)
+    telegram_enabled = models.BooleanField(default=False)
+    telegram_daily_summary_enabled = models.BooleanField(default=False)
+    telegram_weekly_review_enabled = models.BooleanField(default=True)
+    telegram_critical_alerts_enabled = models.BooleanField(default=True)
     daily_time = models.TimeField(default=time(hour=8, minute=0))
     weekly_time = models.TimeField(default=time(hour=8, minute=0))
 
@@ -582,38 +586,78 @@ class TelegramConnectToken(models.Model):
         return f"{self.user} - {suffix}"
 
 
-class NotificationQueue(models.Model):
+class AIPlanRun(models.Model):
+    KIND_WEEKLY_PLAN = "weekly_plan"
+    KIND_DAILY_PLAN = "daily_plan"
+    KIND_DAILY_REVIEW = "daily_review"
+    KIND_WEEKLY_REVIEW = "weekly_review"
+    KIND_IMPROVEMENT = "improvement"
+    KIND_RECOVERY = "recovery"
+
+    KIND_CHOICES = (
+        (KIND_WEEKLY_PLAN, "Weekly plan"),
+        (KIND_DAILY_PLAN, "Daily plan"),
+        (KIND_DAILY_REVIEW, "Daily review"),
+        (KIND_WEEKLY_REVIEW, "Weekly review"),
+        (KIND_IMPROVEMENT, "Improvement suggestions"),
+        (KIND_RECOVERY, "Recovery suggestions"),
+    )
+
     STATUS_PENDING = "pending"
-    STATUS_SENT = "sent"
+    STATUS_SUCCESS = "success"
     STATUS_FAILED = "failed"
     STATUS_CHOICES = (
         (STATUS_PENDING, "Pending"),
-        (STATUS_SENT, "Sent"),
+        (STATUS_SUCCESS, "Success"),
         (STATUS_FAILED, "Failed"),
     )
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="telegram_notification_queue",
+        related_name="ai_plan_runs",
     )
-    message = models.TextField()
+    kind = models.CharField(
+        max_length=24,
+        choices=KIND_CHOICES,
+        default=KIND_WEEKLY_PLAN,
+    )
+    period_type = models.CharField(
+        max_length=16,
+        choices=Goal.PERIOD_CHOICES,
+        default=Goal.PERIOD_WEEKLY,
+    )
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    input_payload = models.JSONField(default=dict, blank=True)
+    output_payload = models.JSONField(default=dict, blank=True)
+    edited_payload = models.JSONField(default=dict, blank=True)
+    summary_text = models.TextField(blank=True)
     status = models.CharField(
         max_length=16,
         choices=STATUS_CHOICES,
         default=STATUS_PENDING,
     )
+    error_message = models.TextField(blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    last_attempted_at = models.DateTimeField(null=True, blank=True)
-    sent_at = models.DateTimeField(null=True, blank=True)
-    attempts = models.PositiveSmallIntegerField(default=0)
-    last_error = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
         indexes = [
-            models.Index(fields=["status", "created_at"], name="li_nq_status_date_idx"),
+            models.Index(fields=["user", "kind", "created_at"], name="li_air_user_kind_idx"),
+            models.Index(fields=["status", "created_at"], name="li_air_status_date_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"{self.user} - {self.status}"
+        return f"{self.user} - {self.kind} - {self.status}"
+
+    @property
+    def effective_payload(self) -> dict:
+        if isinstance(self.edited_payload, dict) and self.edited_payload:
+            return self.edited_payload
+        if isinstance(self.output_payload, dict):
+            return self.output_payload
+        return {}
