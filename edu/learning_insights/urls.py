@@ -6,6 +6,7 @@ app_name = "learning_insights"
 
 urlpatterns = [
     path("", views.InsightsOverviewView.as_view(), name="overview"),
+    path("daily/", views.DailySummaryView.as_view(), name="daily_summary"),
     path("weekly/", views.WeeklySummaryView.as_view(), name="weekly_summary"),
     path("monthly/", views.MonthlySummaryView.as_view(), name="monthly_summary"),
     path("goals/", views.GoalListView.as_view(), name="goal_list"),
@@ -51,5 +52,23 @@ urlpatterns = [
         "telegram/",
         views.TelegramConnectView.as_view(),
         name="telegram_connect",
+    ),
+    path("ai/plan/", views.AIPlanHubView.as_view(), name="ai_plan"),
+    path("ai/plan/generate/", views.AIPlanGenerateView.as_view(), name="ai_plan_generate"),
+    path("ai/daily-plan/", views.AIDailyPlanHubView.as_view(), name="ai_daily_plan"),
+    path(
+        "ai/daily-plan/generate/",
+        views.AIDailyPlanGenerateView.as_view(),
+        name="ai_daily_plan_generate",
+    ),
+    path("ai/review/", views.AIReviewHubView.as_view(), name="ai_review"),
+    path("ai/review/generate/", views.AIReviewGenerateView.as_view(), name="ai_review_generate"),
+    path("ai/runs/<int:pk>/", views.AIRunDetailView.as_view(), name="ai_run_detail"),
+    path("ai/runs/<int:pk>/edit/", views.AIRunEditView.as_view(), name="ai_run_edit"),
+    path("ai/runs/<int:pk>/apply/", views.AIRunApplyView.as_view(), name="ai_run_apply"),
+    path(
+        "ai/runs/<int:pk>/telegram/",
+        views.AIRunSendTelegramView.as_view(),
+        name="ai_run_send_telegram",
     ),
 ]
