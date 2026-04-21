@@ -506,6 +506,40 @@ def build_weekly_summary(user, preference=None, week_start: date | None = None) 
     }
 
 
+def build_daily_summary(user, preference=None, day: date | None = None) -> dict:
+    pref = _get_preference(user, preference)
+    target_date = day or get_local_date(user=user, preference=pref)
+    period = PeriodRange(start=target_date, end=target_date)
+    summary = _build_period_summary(user, period)
+
+    return {
+        "page_title": "Daily Summary",
+        "day": period,
+        "summary": summary,
+        "daily_status": summary["status"],
+        "totals": {
+            "site_seconds": summary["site_seconds"],
+            "course_seconds": summary["course_seconds"],
+        },
+        "top_courses": summary["top_courses"],
+        "course_breakdown": summary["course_breakdown"],
+        "productive_day": summary["productive_day"],
+        "goals": summary["goals"],
+        "goal_summary": summary["goal_summary"],
+        "achievement_percent": summary["achievement_percent"],
+        "consistency_percent": summary["consistency_percent"],
+        "planned_vs_actual_percent": summary["planned_vs_actual_percent"],
+        "improvements": summary["improvements"],
+        "daily_breakdown": summary["daily_breakdown"],
+        "daily_chart": summary["daily_chart"],
+        "course_chart": summary["course_chart"],
+        "comparison": summary["site_comparison"],
+        "insights_started_on": summary["insights_started_on"],
+        "has_data": summary["has_data"],
+        "selected_day": period.start,
+    }
+
+
 def build_monthly_summary(
     user, preference=None, month_anchor: date | None = None
 ) -> dict:
