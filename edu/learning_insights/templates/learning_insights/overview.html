@@ -10,16 +10,17 @@
             <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
             <h1 id="insights-overview-title" class="c-card__title" style="margin:0;">Overview</h1>
             <p class="c-card__meta" style="margin-top:.5rem;">
-                Weekly and monthly summaries based on tracked module study time and site presence.
+                Daily, weekly, and monthly summaries based on tracked module study time and site presence.
             </p>
         </div>
         <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:daily_summary' %}" class="c-btn c-btn--ghost">Daily summary</a>
             <a href="{% url 'learning_insights:weekly_summary' %}" class="c-btn c-btn--primary">Weekly summary</a>
             <a href="{% url 'learning_insights:monthly_summary' %}" class="c-btn c-btn--ghost">Monthly summary</a>
             <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Goals</a>
             <a href="{% url 'learning_insights:notification_center' %}" class="c-btn c-btn--ghost">Notifications</a>
             <a href="{% url 'learning_insights:preferences' %}" class="c-btn c-btn--ghost">Preferences</a>
-            <a href="{% url 'learning_insights:telegram_connect' %}" class="c-btn c-btn--ghost">Telegram</a>
+            <a href="{% url 'learning_insights:ai_review' %}" class="c-btn c-btn--ghost">AI Review</a>
         </div>
     </div>
 </section>
