@@ -21,14 +21,15 @@ from django.views.generic import (
     View,
 )
 
-from .forms import GoalForm, NotificationPreferenceForm
-from .models import Goal, InsightNotification, NotificationPreference
+from .forms import AIPlanRunEditForm, GoalForm, NotificationPreferenceForm
+from .models import AIPlanRun, Goal, InsightNotification, NotificationPreference
 from .services.analytics import (
+    build_daily_summary,
     build_monthly_summary,
     build_overview_context,
     build_weekly_summary,
 )
-from .services.common import get_period_start
+from .services.common import get_local_date, get_period_start
 from .services.goals import sync_goal_progress_for_user
 from .services.notifications import (
     dismiss_notification,
@@ -42,7 +43,17 @@ from .services.telegram import (
     get_active_connect_token,
     get_bot_username,
     get_subscription_for_user,
-    queue_notification,
+    send_notification,
+)
+from .services.ai_coach import (
+    apply_daily_plan_run,
+    apply_weekly_plan_run,
+    generate_daily_plan_run,
+    generate_daily_review_run,
+    generate_improvement_run,
+    generate_recovery_run,
+    generate_weekly_plan_run,
+    generate_weekly_review_run,
 )
 
 
@@ -88,6 +99,27 @@ class InsightsOverviewView(InsightsBaseMixin, TemplateView):
         context.update(build_overview_context(self.request.user, preference=preference))
         context["preference"] = preference
         context["page_title"] = "Learning Insights"
+        return context
+
+
+class DailySummaryView(InsightsBaseMixin, TemplateView):
+    template_name = "learning_insights/daily_summary.html"
+
+    def _parse_day(self) -> date | None:
+        raw = (self.request.GET.get("day") or "").strip()
+        if not raw:
+            return None
+        parsed = parse_date(raw)
+        if parsed is None:
+            return None
+        return parsed
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        preference = self.get_notification_preference()
+        day = self._parse_day()
+        context.update(build_daily_summary(self.request.user, preference=preference, day=day))
+        context["preference"] = preference
         return context
 
 
@@ -398,6 +430,7 @@ class NotificationPreferenceView(InsightsBaseMixin, UpdateView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Preferences"
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
         return context
 
 
@@ -538,14 +571,17 @@ class TelegramConnectView(InsightsBaseMixin, TemplateView):
                     request, "Connect Telegram first to receive a test message."
                 )
             else:
-                queue_notification(
+                ok = send_notification(
                     user=request.user,
                     message="Test notification. Learning Insights is connected.",
                 )
-                messages.success(
-                    request,
-                    "Test notification queued. Run send_telegram_notifications to deliver it.",
-                )
+                if ok:
+                    messages.success(request, "Test notification sent to Telegram.")
+                else:
+                    messages.error(
+                        request,
+                        "Unable to send Telegram message. Check TELEGRAM_BOT_TOKEN and your network connection.",
+                    )
         elif action == "disconnect":
             subscription = get_subscription_for_user(user=request.user)
             if subscription is None:
@@ -557,3 +593,224 @@ class TelegramConnectView(InsightsBaseMixin, TemplateView):
             messages.error(request, "Unknown action.")
 
         return HttpResponseRedirect(reverse("learning_insights:telegram_connect"))
+
+
+class AIRunQuerysetMixin(InsightsBaseMixin):
+    model = AIPlanRun
+
+    def get_queryset(self) -> QuerySet[AIPlanRun]:
+        return AIPlanRun.objects.filter(user=self.request.user).order_by("-created_at", "-id")
+
+
+class AIPlanHubView(AIRunQuerysetMixin, TemplateView):
+    template_name = "learning_insights/ai/plan.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        preference = self.get_notification_preference()
+        runs = list(self.get_queryset().filter(kind=AIPlanRun.KIND_WEEKLY_PLAN)[:20])
+        context["page_title"] = "AI Weekly Plan"
+        context["runs"] = runs
+        context["latest_run"] = runs[0] if runs else None
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
+        anchor = parse_date(self.request.GET.get("start") or "") or get_local_date(
+            preference=preference
+        )
+        context["plan_start"] = get_period_start(
+            anchor,
+            Goal.PERIOD_WEEKLY,
+            week_start_day=preference.week_start_day,
+        )
+        return context
+
+
+class AIPlanGenerateView(InsightsBaseMixin, View):
+    def post(self, request, *args, **kwargs):
+        preference = self.get_notification_preference()
+        start_date = parse_date(request.POST.get("start") or "")
+        run = generate_weekly_plan_run(
+            user=request.user,
+            preference=preference,
+            reference_date=start_date,
+        )
+        if run.status == AIPlanRun.STATUS_SUCCESS:
+            messages.success(request, "AI weekly plan generated. Review and edit before applying.")
+        else:
+            messages.error(request, f"AI plan generation failed: {run.summary_text or run.error_message}")
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
+
+
+class AIDailyPlanHubView(AIRunQuerysetMixin, TemplateView):
+    template_name = "learning_insights/ai/daily_plan.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        preference = self.get_notification_preference()
+        runs = list(self.get_queryset().filter(kind=AIPlanRun.KIND_DAILY_PLAN)[:20])
+        context["page_title"] = "AI Daily Plan"
+        context["runs"] = runs
+        context["latest_run"] = runs[0] if runs else None
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
+        context["plan_day"] = parse_date(self.request.GET.get("day") or "") or get_local_date(
+            preference=preference
+        )
+        return context
+
+
+class AIDailyPlanGenerateView(InsightsBaseMixin, View):
+    def post(self, request, *args, **kwargs):
+        preference = self.get_notification_preference()
+        day = parse_date(request.POST.get("day") or "")
+        run = generate_daily_plan_run(
+            user=request.user,
+            preference=preference,
+            reference_date=day,
+        )
+        if run.status == AIPlanRun.STATUS_SUCCESS:
+            messages.success(request, "AI daily plan generated. Review and edit before applying.")
+        else:
+            messages.error(request, f"AI plan generation failed: {run.summary_text or run.error_message}")
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
+
+
+class AIReviewHubView(AIRunQuerysetMixin, TemplateView):
+    template_name = "learning_insights/ai/review.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        runs = list(
+            self.get_queryset()
+            .filter(
+                kind__in=[
+                    AIPlanRun.KIND_WEEKLY_REVIEW,
+                    AIPlanRun.KIND_DAILY_REVIEW,
+                    AIPlanRun.KIND_IMPROVEMENT,
+                    AIPlanRun.KIND_RECOVERY,
+                ]
+            )
+            [:20]
+        )
+        context["page_title"] = "AI Review"
+        context["runs"] = runs
+        context["latest_run"] = runs[0] if runs else None
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
+        return context
+
+
+class AIReviewGenerateView(InsightsBaseMixin, View):
+    def post(self, request, *args, **kwargs):
+        preference = self.get_notification_preference()
+        period = (request.POST.get("period") or "weekly").strip().lower()
+
+        if period == "daily":
+            run = generate_daily_review_run(user=request.user, preference=preference)
+            label = "daily"
+        elif period == "improvement":
+            run = generate_improvement_run(user=request.user, preference=preference)
+            label = "improvement"
+        elif period == "recovery":
+            run = generate_recovery_run(user=request.user, preference=preference)
+            label = "recovery"
+        else:
+            run = generate_weekly_review_run(user=request.user, preference=preference)
+            label = "weekly"
+
+        if run.status == AIPlanRun.STATUS_SUCCESS:
+            messages.success(request, f"AI {label} review generated. Review and edit before sharing.")
+        else:
+            messages.error(request, f"AI review generation failed: {run.summary_text or run.error_message}")
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
+
+
+class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
+    template_name = "learning_insights/ai/run_detail.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
+        context["page_title"] = "AI Run"
+        context["run"] = run
+        try:
+            import json
+
+            context["payload_pretty"] = json.dumps(run.effective_payload, indent=2, ensure_ascii=False)
+        except Exception:
+            context["payload_pretty"] = str(run.effective_payload)
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
+        return context
+
+
+class AIRunEditView(AIRunQuerysetMixin, TemplateView):
+    template_name = "learning_insights/ai/run_edit.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Edit AI Output"
+        context["run"] = self.run
+        context["form"] = AIPlanRunEditForm(
+            initial={
+                "edited_payload": self.run.effective_payload,
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = AIPlanRunEditForm(data=request.POST)
+        if not form.is_valid():
+            return self.render_to_response(
+                {
+                    "page_title": "Edit AI Output",
+                    "run": self.run,
+                    "form": form,
+                }
+            )
+
+        self.run.edited_payload = form.cleaned_data["edited_payload"] or {}
+        self.run.save(update_fields=["edited_payload", "updated_at"])
+        messages.success(request, "AI output updated.")
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": self.run.id}))
+
+
+class AIRunApplyView(AIRunQuerysetMixin, View):
+    def post(self, request, *args, **kwargs):
+        run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
+        if run.kind == AIPlanRun.KIND_WEEKLY_PLAN:
+            created = apply_weekly_plan_run(run=run)
+        elif run.kind == AIPlanRun.KIND_DAILY_PLAN:
+            created = apply_daily_plan_run(run=run)
+        else:
+            created = 0
+        if created:
+            messages.success(request, f"Applied plan: created {created} daily goal(s).")
+        else:
+            messages.info(
+                request,
+                "Nothing applied. Ensure this is a successful AI plan run.",
+            )
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
+
+
+class AIRunSendTelegramView(AIRunQuerysetMixin, View):
+    def post(self, request, *args, **kwargs):
+        run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
+        subscription = get_subscription_for_user(user=request.user)
+        if subscription is None:
+            messages.error(request, "Connect Telegram first to send messages there.")
+            return HttpResponseRedirect(reverse("learning_insights:telegram_connect"))
+
+        from .services.ai_notifications import format_ai_run_message
+
+        message_text = format_ai_run_message(run)
+        ok = send_notification(user=request.user, message=message_text)
+        if ok:
+            messages.success(request, "Telegram message sent.")
+        else:
+            messages.error(
+                request,
+                "Unable to send Telegram message. Check TELEGRAM_BOT_TOKEN and your network connection.",
+            )
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
