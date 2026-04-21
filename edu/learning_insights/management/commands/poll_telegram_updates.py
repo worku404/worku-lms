@@ -68,7 +68,7 @@ class Command(BaseCommand):
         if offset is None:
             offset = cache.get(cache_key)
 
-        processor = TelegramUpdateProcessor()
+        processor = TelegramUpdateProcessor(token=token)
         run_once = bool(options["once"])
         timeout = int(options["timeout"] or 25)
         limit = int(options["limit"] or 100)
@@ -114,4 +114,3 @@ class Command(BaseCommand):
 
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
-
