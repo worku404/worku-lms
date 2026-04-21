@@ -8,6 +8,19 @@ from django import forms
 from .models import Goal, NotificationPreference
 
 
+class AIPlanRunEditForm(forms.Form):
+    edited_payload = forms.JSONField(
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 18,
+                "spellcheck": "false",
+            }
+        ),
+        help_text="Paste valid JSON. This edited payload is used when you click Apply.",
+    )
+
+
 class DateInput(forms.DateInput):
     input_type = "date"
 
@@ -174,6 +187,10 @@ class NotificationPreferenceForm(forms.ModelForm):
             "daily_achievement_enabled",
             "weekly_achievement_enabled",
             "in_app_enabled",
+            "telegram_enabled",
+            "telegram_daily_summary_enabled",
+            "telegram_weekly_review_enabled",
+            "telegram_critical_alerts_enabled",
             "daily_time",
             "weekly_time",
         ]
@@ -194,6 +211,16 @@ class NotificationPreferenceForm(forms.ModelForm):
                 attrs={"class": "form-check-input"}
             ),
             "in_app_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "telegram_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "telegram_daily_summary_enabled": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "telegram_weekly_review_enabled": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "telegram_critical_alerts_enabled": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
             "daily_time": TimeInput(attrs={"class": "form-control"}),
             "weekly_time": TimeInput(attrs={"class": "form-control"}),
         }
@@ -202,6 +229,10 @@ class NotificationPreferenceForm(forms.ModelForm):
             "week_start_day": "Controls how weekly goals and summaries are grouped.",
             "daily_time": "Preferred local time for daily in-app reminders.",
             "weekly_time": "Preferred local time for weekly in-app reminders.",
+            "telegram_enabled": "Enable Telegram delivery (requires connecting Telegram first).",
+            "telegram_daily_summary_enabled": "Optional daily AI summary to Telegram.",
+            "telegram_weekly_review_enabled": "Weekly AI review notification to Telegram.",
+            "telegram_critical_alerts_enabled": "Critical Telegram alerts when risk patterns are detected.",
         }
 
     def clean_timezone(self):
@@ -220,6 +251,10 @@ class NotificationPreferenceForm(forms.ModelForm):
         daily_enabled = cleaned_data.get("daily_enabled")
         weekly_enabled = cleaned_data.get("weekly_enabled")
         in_app_enabled = cleaned_data.get("in_app_enabled")
+        telegram_enabled = cleaned_data.get("telegram_enabled")
+        telegram_daily = cleaned_data.get("telegram_daily_summary_enabled")
+        telegram_weekly = cleaned_data.get("telegram_weekly_review_enabled")
+        telegram_critical = cleaned_data.get("telegram_critical_alerts_enabled")
         daily_time = cleaned_data.get("daily_time")
         weekly_time = cleaned_data.get("weekly_time")
 
@@ -244,5 +279,8 @@ class NotificationPreferenceForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Enable in-app notifications to receive Release 1 insight notifications."
             )
+
+        if (telegram_daily or telegram_weekly or telegram_critical) and not telegram_enabled:
+            raise forms.ValidationError("Enable Telegram to use Telegram notification settings.")
 
         return cleaned_data
