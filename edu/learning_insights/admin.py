@@ -1,11 +1,11 @@
 from django.contrib import admin
 
 from .models import (
+    AIPlanRun,
     DailyCourseStat,
     DailySiteStat,
     Goal,
     InsightNotification,
-    NotificationQueue,
     NotificationPreference,
     StudyTimeEvent,
     TelegramConnectToken,
@@ -176,6 +176,10 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
         "daily_achievement_enabled",
         "weekly_achievement_enabled",
         "in_app_enabled",
+        "telegram_enabled",
+        "telegram_daily_summary_enabled",
+        "telegram_weekly_review_enabled",
+        "telegram_critical_alerts_enabled",
         "daily_time",
         "weekly_time",
     )
@@ -186,6 +190,7 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
         "daily_achievement_enabled",
         "weekly_achievement_enabled",
         "in_app_enabled",
+        "telegram_enabled",
     )
     search_fields = ("user__username", "timezone")
     autocomplete_fields = ("user",)
@@ -269,18 +274,20 @@ class TelegramConnectTokenAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
-@admin.register(NotificationQueue)
-class NotificationQueueAdmin(admin.ModelAdmin):
+@admin.register(AIPlanRun)
+class AIPlanRunAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "user",
+        "kind",
+        "period_type",
         "status",
-        "attempts",
+        "approved_at",
+        "applied_at",
         "created_at",
-        "last_attempted_at",
-        "sent_at",
     )
-    list_filter = ("status", "created_at", "sent_at")
-    search_fields = ("user__username", "message", "last_error")
+    list_filter = ("kind", "period_type", "status", "created_at")
+    search_fields = ("user__username", "summary_text", "error_message")
     autocomplete_fields = ("user",)
     ordering = ("-created_at", "-id")
-    readonly_fields = ("created_at", "last_attempted_at", "sent_at")
+    readonly_fields = ("created_at", "updated_at")
