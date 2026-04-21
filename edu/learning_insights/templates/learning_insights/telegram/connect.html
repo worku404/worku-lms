@@ -35,10 +35,8 @@
 
     {% if bot_username %}
         <ol style="margin:1rem 0 0 1.1rem;display:grid;gap:.5rem;">
-            <li>Open Telegram and start a chat with <strong>@{{ bot_username }}</strong>.</li>
+            <li>Open Telegram and start a chat with <strong><a href="https://t.me/{{ bot_username }}" target="_blank">Link</a></strong>.</li>
             <li>Send the command below to the bot.</li>
-            <li>In your terminal, run <code>python manage.py poll_telegram_updates --settings=edu.settings.local</code>.</li>
-            <li>Then run <code>python manage.py send_telegram_notifications --settings=edu.settings.local</code> to deliver queued messages.</li>
         </ol>
     {% else %}
         <div class="c-card c-alert c-alert--warn" style="margin-top:1rem;">
@@ -63,7 +61,7 @@
         {% csrf_token %}
         <button type="submit" name="action" value="regen_token" class="c-btn c-btn--secondary">Regenerate token</button>
         <button type="submit" name="action" value="queue_test" class="c-btn c-btn--ghost"{% if not subscription %} disabled{% endif %}>
-            Queue test message
+            Send test message
         </button>
         {% if subscription %}
             <button type="submit" name="action" value="disconnect" class="c-btn c-btn--ghost">Disconnect</button>
@@ -71,4 +69,3 @@
     </form>
 </section>
 {% endblock %}
-
