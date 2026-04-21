@@ -271,18 +271,18 @@ def _weekly_achievement_notification(
         return None
 
     previous_reference = today - timedelta(days=1)
-    summary = build_weekly_summary(
-        user,
-        preference=preference,
-        week_start=previous_reference,
-    )
-
-    period = summary.get("period") or {}
-    week_start = period.get("start") or get_period_start(
+    week_start = get_period_start(
         previous_reference,
         Goal.PERIOD_WEEKLY,
         week_start_day=preference.week_start_day,
     )
+    summary = build_weekly_summary(
+        user,
+        preference=preference,
+        week_start=week_start,
+    )
+
+    period = summary.get("period") or {}
     week_end = period.get("end") or get_period_end(
         previous_reference,
         Goal.PERIOD_WEEKLY,
