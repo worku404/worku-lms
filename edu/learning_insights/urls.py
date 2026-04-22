@@ -11,6 +11,8 @@ urlpatterns = [
     path("monthly/", views.MonthlySummaryView.as_view(), name="monthly_summary"),
     path("goals/", views.GoalListView.as_view(), name="goal_list"),
     path("goals/new/", views.GoalCreateView.as_view(), name="goal_create"),
+    path("goals/ai/", views.GoalAIPlannerView.as_view(), name="goal_ai_planner"),
+    path("goals/ai/<int:pk>/apply/", views.GoalAIApplyView.as_view(), name="goal_ai_apply"),
     path("goals/<int:pk>/edit/", views.GoalUpdateView.as_view(), name="goal_update"),
     path("goals/<int:pk>/delete/", views.GoalDeleteView.as_view(), name="goal_delete"),
     path(
@@ -52,14 +54,6 @@ urlpatterns = [
         "telegram/",
         views.TelegramConnectView.as_view(),
         name="telegram_connect",
-    ),
-    path("ai/plan/", views.AIPlanHubView.as_view(), name="ai_plan"),
-    path("ai/plan/generate/", views.AIPlanGenerateView.as_view(), name="ai_plan_generate"),
-    path("ai/daily-plan/", views.AIDailyPlanHubView.as_view(), name="ai_daily_plan"),
-    path(
-        "ai/daily-plan/generate/",
-        views.AIDailyPlanGenerateView.as_view(),
-        name="ai_daily_plan_generate",
     ),
     path("ai/review/", views.AIReviewHubView.as_view(), name="ai_review"),
     path("ai/review/generate/", views.AIReviewGenerateView.as_view(), name="ai_review_generate"),
