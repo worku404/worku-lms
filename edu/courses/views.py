@@ -16,7 +16,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 
 # Request/response helpers.
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404, JsonResponse
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -56,6 +56,19 @@ SEARCH_NOTE_LIMIT = 40
 # -------------------------------------------------------------------
 # Public views (student/visitor facing)
 # -------------------------------------------------------------------
+
+
+def front_door(request, *args, **kwargs):
+    """
+    Public entry point for the site.
+
+    Anonymous visitors see the marketing landing page.
+    Authenticated users continue straight into the course home page.
+    """
+    if request.user.is_authenticated:
+        return redirect("course_list")
+
+    return render(request, "courses/landing.html")
 
 class CourseListview(TemplateResponseMixin, View):
     """
