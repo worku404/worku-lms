@@ -14,8 +14,8 @@
             </p>
         </div>
         <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
-            {% if run.kind == "weekly_plan" %}
-                <a href="{% url 'learning_insights:ai_plan' %}" class="c-btn c-btn--ghost">Back to plan</a>
+            {% if run.kind == "prompt_plan" or run.kind == "weekly_plan" or run.kind == "daily_plan" %}
+                <a href="{% url 'learning_insights:goal_create' %}?ai_run={{ run.id }}#ai-planner" class="c-btn c-btn--ghost">Back to planner</a>
             {% else %}
                 <a href="{% url 'learning_insights:ai_review' %}" class="c-btn c-btn--ghost">Back to review</a>
             {% endif %}
@@ -48,7 +48,7 @@
     <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
         <a href="{% url 'learning_insights:ai_run_edit' run.id %}" class="c-btn c-btn--secondary">Edit JSON</a>
 
-        {% if run.kind == "weekly_plan" and run.status == "success" %}
+        {% if run.kind == "prompt_plan" and run.status == "success" %}
             <form method="post" action="{% url 'learning_insights:ai_run_apply' run.id %}">
                 {% csrf_token %}
                 <button type="submit" class="c-btn c-btn--ghost">Apply to goals</button>
