@@ -43,7 +43,7 @@
     {% endif %}
     <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
         <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}" class="c-btn c-btn--secondary">Open</a>
-        <a href="{% url 'learning_insights:ai_run_edit' latest_run.id %}" class="c-btn c-btn--ghost">Edit</a>
+        <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}#edit" class="c-btn c-btn--ghost">Edit</a>
     </div>
 </section>
 {% endif %}
@@ -64,7 +64,7 @@
                     {% endif %}
                     <div style="margin-top:.75rem;display:flex;gap:.75rem;flex-wrap:wrap;">
                         <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Open</a>
-                        <a href="{% url 'learning_insights:ai_run_edit' run.id %}" class="c-btn c-btn--ghost">Edit</a>
+                        <a href="{% url 'learning_insights:ai_run_detail' run.id %}#edit" class="c-btn c-btn--ghost">Edit</a>
                     </div>
                 </article>
             {% endfor %}
