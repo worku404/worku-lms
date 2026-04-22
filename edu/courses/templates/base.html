@@ -23,6 +23,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
     {% endif %}
 
+    {% block extra_css %}{% endblock %}
+
 </head>
 <body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}">
     <a class="skip-link" href="#main-content">Skip to main content</a>
