@@ -32,7 +32,7 @@
     <header id="header" class="topbar">
         <div class="topbar__inner">
             <div class="topbar__brand-wrap">
-                <a href="{% url 'course_list' %}" class="topbar__brand" aria-label="Edu Home">
+                <a href="{% url 'home' %}" class="topbar__brand" aria-label="Edu Home">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#goldPinkGradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon">
                         <defs>
                             <linearGradient id="goldPinkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -116,9 +116,8 @@
     <main class="l-shell">
         <aside class="l-rail l-rail--left" aria-label="Primary navigation">
              <nav class="c-nav">
-                 <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Dashboard</a>
                  <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
-                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
                 {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
                 {% endif %}
