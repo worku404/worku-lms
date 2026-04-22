@@ -92,6 +92,11 @@ urlpatterns = [
     # Public catalog routes
     # -------------------------------
     path(
+        "home/",
+        views.CourseListview.as_view(),
+        name="course_list",
+    ),
+    path(
         "subject/<slug:subject>/",
         views.CourseListview.as_view(),
         name="course_list_subject",
