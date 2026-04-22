@@ -6,7 +6,7 @@ from django.contrib.postgres.search import SearchVector
 from django.utils.text import slugify  # Utility to normalize tag names into slugs.
 
 
-# Tag model to group notes by a single optional label.
+# Tag model to group notes by optional labels.
 class Tag(models.Model):
     # Associate tags to the owning user (global per user notes).
     user = models.ForeignKey(
@@ -48,7 +48,7 @@ class Tag(models.Model):
         return self.name
 
 
-# Note model storing title, HTML content, and optional tag.
+# Note model storing title, HTML content, and optional tags.
 class Note(models.Model):
     # Associate each note with its owning user.
     user = models.ForeignKey(
@@ -60,12 +60,12 @@ class Note(models.Model):
     title = models.CharField(max_length=200)
     # Store the note content as HTML (Quill output).
     content_html = models.TextField(blank=True, default="")
-    # Store the optional single tag relation for filtering.
-    tag = models.ForeignKey(
+    # Store the first "@" timestamp inserted into the note (immutable once set).
+    date_time_now = models.DateTimeField(null=True, blank=True)
+    # Store optional tags for filtering (limit enforced in views/UI).
+    tags = models.ManyToManyField(
         Tag,  # Link to the Tag model for optional categorization.
-        on_delete=models.SET_NULL,  # Keep notes if a tag is deleted.
-        null=True,  # Allow notes to have no tag.
-        blank=True,  # Allow empty tag in forms/validation.
+        blank=True,  # Allow notes to have no tags.
         related_name="notes",  # Reverse accessor for tag -> notes.
     )
     # Track when the note was created.

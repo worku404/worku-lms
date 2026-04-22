@@ -62,7 +62,29 @@
                                 Instructor: {{ course.owner.get_full_name }}
                             </p>
                             <div class="c-card__actions">
-                                <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                {% if request.user.is_authenticated and course.id in enrolled_course_ids %}
+                                    <div
+                                    class="c-progress"
+                                    role="progressbar"
+                                    aria-label="Course completion progress"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="{{ course.student_progress_percent|default:0|floatformat:0 }}"
+                                    >
+                                        <span
+                                            class="c-progress__bar"
+                                            style="width: {{ course.student_progress_percent|default:0 }}%;"
+                                        ></span>
+                                    </div>
+                                    <p class="c-card__meta">
+                                        {{ course.student_progress_percent|default:0|floatformat:0 }}%
+                                    </p>
+                                    <a href="{% url 'student_course_detail' course.id %}" class="c-btn c-btn--primary">
+                                        Continue learning
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                {% endif %}
                             </div>
                         </article>
                     {% endwith %}

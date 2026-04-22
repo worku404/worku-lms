@@ -423,8 +423,8 @@ body.notes-open .notes-backdrop {
     border-right: 1px solid var(--notes-panel-border);
     /* Stack sidebar sections vertically. */
     display: grid;
-    /* Space out toolbar, filter, list, and empty state. */
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    /* Space out toolbar, search, filter, list, and empty state. */
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     /* Add spacing between sections. */
     gap: var(--space-2);
     /* Apply internal padding. */
@@ -485,6 +485,98 @@ body.notes-open .notes-backdrop {
     font-weight: 600;
 }
 
+/* Tag search row. */
+.notes-sidebar__search {
+    /* Anchor the clear button inside the input. */
+    position: relative;
+}
+
+/* Tag search input styling. */
+.notes-sidebar__search-input {
+    /* Fill the sidebar width. */
+    width: 100%;
+    /* Compact height to match sidebar UI. */
+    min-height: 34px;
+    /* Use standard border. */
+    border: 1px solid var(--notes-panel-border);
+    /* Use pill shape for consistency. */
+    border-radius: 999px;
+    /* Use surface background. */
+    background: var(--color-surface);
+    /* Use standard text color. */
+    color: var(--color-text);
+    /* Add padding, leaving room for clear button. */
+    padding: 0.35rem 2.1rem 0.35rem 0.75rem;
+    /* Keep font small in the sidebar. */
+    font-size: 0.82rem;
+}
+
+/* Placeholder styling for search input. */
+.notes-sidebar__search-input::placeholder {
+    /* Use muted text color. */
+    color: var(--color-text-muted);
+}
+
+/* Focus state for the search input. */
+.notes-sidebar__search-input:focus-visible {
+    /* Add an outline for accessibility. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset outline slightly. */
+    outline-offset: 2px;
+}
+
+/* Clear button inside the search input. */
+.notes-sidebar__search-clear {
+    /* Position the button inside the input area. */
+    position: absolute;
+    /* Align vertically within the input. */
+    top: 50%;
+    /* Align to the right edge. */
+    right: 0.35rem;
+    /* Center via transform. */
+    transform: translateY(-50%);
+    /* Use square clickable target. */
+    width: 28px;
+    /* Match height for touch. */
+    height: 28px;
+    /* Remove default border. */
+    border: 1px solid transparent;
+    /* Use pill rounding. */
+    border-radius: 999px;
+    /* Keep background transparent by default. */
+    background: transparent;
+    /* Use muted color for subtlety. */
+    color: var(--color-text-muted);
+    /* Center the glyph. */
+    display: inline-flex;
+    /* Center content horizontally. */
+    justify-content: center;
+    /* Center content vertically. */
+    align-items: center;
+    /* Use pointer cursor. */
+    cursor: pointer;
+    /* Keep clear icon readable. */
+    font-size: 1.05rem;
+    /* Keep line-height tight. */
+    line-height: 1;
+}
+
+/* Hover state for clear button. */
+.notes-sidebar__search-clear:hover {
+    /* Add subtle background on hover. */
+    background: color-mix(in srgb, var(--notes-panel-bg) 55%, var(--color-surface));
+    /* Use standard text color for clarity. */
+    color: var(--color-text);
+}
+
+/* Focus state for clear button. */
+.notes-sidebar__search-clear:focus-visible {
+    /* Add an outline for accessibility. */
+    outline: 2px solid var(--notes-accent);
+    /* Offset outline slightly. */
+    outline-offset: 2px;
+}
+
 /* Filter label styling. */
 .notes-sidebar__filter {
     /* Use small font size. */
@@ -535,7 +627,7 @@ body.notes-open .notes-backdrop {
     padding: 0.65rem 0.75rem;
     /* Display items as grid. */
     display: grid;
-    /* Space title and tag. */
+    /* Space title and tags. */
     gap: 0.35rem;
     /* Use pointer cursor. */
     cursor: pointer;
@@ -571,6 +663,16 @@ body.notes-open .notes-backdrop {
     color: var(--color-text);
     /* Ensure long titles wrap nicely. */
     word-break: break-word;
+}
+
+/* Tag group inside the list item. */
+.notes-item__tags {
+    /* Keep multiple tags on one row when possible. */
+    display: flex;
+    /* Allow tags to wrap to the next line. */
+    flex-wrap: wrap;
+    /* Add spacing between tags. */
+    gap: 0.35rem;
 }
 
 /* Tag badge inside the list item. */
@@ -666,9 +768,50 @@ body.notes-open .notes-backdrop {
 }
 
 /* Explicit paragraph font size for normal text. */
-.notes-editor .ql-editor p {
+.notes-editor .ql-editor p,
+.notes-editor .ql-editor li {
     /* Increase paragraph font size for readability. */
     font-size: 1.1rem;
+}
+
+/* Make list markers (bullets, numbers, checkboxes) easier to read. */
+.notes-editor .ql-editor li::marker {
+    /* Scale marker with editor typography. */
+    font-size: var(--notes-editor-marker-size);
+}
+
+/* Quill Snow theme commonly renders list markers via ::before (not ::marker). */
+.notes-editor .ql-editor li::before {
+    /* Scale pseudo-marker with editor typography. */
+    font-size: var(--notes-editor-marker-size) !important;
+}
+
+/* Quill checklist boxes use an injected `.ql-ui` span; increase its size + hit area. */
+.notes-editor .ql-editor li[data-list="checked"] > .ql-ui,
+.notes-editor .ql-editor li[data-list="unchecked"] > .ql-ui { 
+    /* Make checkbox easier to click/tap. */
+    width: var(--notes-editor-checkbox-hit);
+    height: var(--notes-editor-checkbox-hit);
+    /* Keep it aligned with the text baseline. */
+    line-height: 1;
+}
+
+.notes-editor .ql-editor li[data-list="checked"] > .ql-ui::before,
+.notes-editor .ql-editor li[data-list="unchecked"] > .ql-ui::before {
+    /* Increase the visual checkbox size. */
+    font-size: var(--notes-editor-marker-size);
+}
+
+/* Fallback: if checkboxes are actual <input> elements (e.g., pasted HTML), scale them too. */
+.notes-editor .ql-editor input[type="checkbox"] {
+    /* Match size with surrounding text. */
+    width: 1.05em;
+    height: 1.05em;
+    /* Increase checkbox control size across browsers. */
+    transform: scale(1.25);
+    transform-origin: left center;
+    /* Align with the notes accent when supported. */
+    accent-color: var(--notes-accent);
 }
 
 /* Quill placeholder styling for visibility. */
@@ -717,6 +860,28 @@ body.notes-open .notes-backdrop {
     font-family: var(--notes-code-font-family);
     /* Keep inline code compact next to prose. */
     font-size: var(--notes-code-inline-font-size);
+}
+
+/* Timestamp token styling (inserted via "@" shortcut). */
+.notes-editor .ql-editor .notes-timestamp { 
+    /* Render naturally inline with the diary text. */
+    display: inline;
+    /* Keep the timestamp on a single line. */
+    white-space: nowrap;
+    /* Avoid text selection/caret inside the timestamp. */
+    user-select: none;
+    /* Use a muted color for a subtle presence. */
+    color: green;
+    /* Inherit the serif font from the editor. */
+    font-family: inherit;
+    /* Make it italic to distinguish it naturally like a log. */
+    font-style: italic;
+    /* Blend smoothly with surrounding text size. */
+    font-size: 0.95em;
+    /* Make the cursor default rather than restrictive. */
+    cursor: not-allowed;
+    /* Add subtle spacing around the timestamp. */
+    margin: 0 0.15rem;
 }
 
 /* Code block styling. */

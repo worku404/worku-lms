@@ -114,19 +114,26 @@
 
 .l-shell {
     max-width: 1700px;
-    margin: 0 auto;
+    margin: 0;
+    margin-right: auto;
     padding: var(--space-4);
+    padding-left: 0;
     display: grid;
     gap: var(--space-4);
     grid-template-columns: var(--rail-left-current) minmax(0, 1fr) var(--util-width);
     align-items: start;
     transition: grid-template-columns 0.2s ease;
+    width: 100%;
 }
 
 .l-rail,
 .l-main,
 .l-util {
     min-width: 0;
+}
+
+.l-main {
+    width: 100%;
 }
 
 .l-rail--left {
@@ -140,8 +147,18 @@
 
 .l-main__inner {
     max-width: var(--main-max);
+    width: 100%;
     display: grid;
     gap: var(--space-5);
+    justify-items: stretch;
+}
+
+body.assistant-sidebar-open .l-main__inner {
+    max-width: none;
+}
+
+body.assistant-sidebar-open .l-shell {
+    max-width: none;
 }
 
 .l-util {

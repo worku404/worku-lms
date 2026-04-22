@@ -17,6 +17,14 @@ class ModuleInline(admin.StackedInline):
     extra = 1  # Number of empty module forms to show by default
 
 
+@admin.register(Module)
+class ModuleAdmin(admin.ModelAdmin):
+    list_display = ("title", "course", "order")
+    list_filter = ("course",)
+    search_fields = ("title", "course__title")
+    ordering = ("course", "order", "id")
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     # Columns shown on the Course list page

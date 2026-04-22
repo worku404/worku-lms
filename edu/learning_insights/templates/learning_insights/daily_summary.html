@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% load course %}
+
+{% block title %}Daily Summary{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="daily-summary-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="daily-summary-title" class="c-card__title" style="margin:0;">Daily Summary</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                {{ day.start|date:"M j, Y" }}
+            </p>
+        </div>
+        <form method="get" style="display:flex;gap:.5rem;align-items:end;flex-wrap:wrap;">
+            <div>
+                <label for="day-select" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Day</label>
+                <input
+                    id="day-select"
+                    type="date"
+                    name="day"
+                    value="{{ day.start|date:'Y-m-d' }}"
+                    class="c-search__input"
+                    style="min-width:180px;"
+                >
+            </div>
+            <button type="submit" class="c-btn c-btn--primary">Load</button>
+            <a href="{% url 'learning_insights:daily_summary' %}" class="c-btn c-btn--ghost">Today</a>
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Back</a>
+        </form>
+    </div>
+</section>
+
+{% with day_item=daily_breakdown.0 %}
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;">
+    <article class="c-card">
+        <p class="c-card__meta">Daily status</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ daily_status.label|default:"No data" }}</h2>
+        <p class="c-card__meta" style="margin:0;">Score: <strong>{{ daily_status.score|default:0 }}%</strong></p>
+        {% if daily_status.note %}
+            <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ daily_status.note }}</p>
+        {% endif %}
+    </article>
+
+    <article class="c-card">
+        <p class="c-card__meta">Course study time</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ totals.course_seconds|default:0|duration_format }}</h2>
+        <p class="c-card__meta" style="margin:0;">Tracked module time for this day</p>
+    </article>
+
+    <article class="c-card">
+        <p class="c-card__meta">Site active time</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ totals.site_seconds|default:0|duration_format }}</h2>
+        <p class="c-card__meta" style="margin:0;">Presence-based active time for this day</p>
+    </article>
+
+    <article class="c-card">
+        <p class="c-card__meta">Completions</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">
+            {{ day_item.completed_goals|default:0 }} goals &middot; {{ day_item.completed_contents|default:0 }} contents
+        </h2>
+        <p class="c-card__meta" style="margin:0;">Completed goals and content items</p>
+    </article>
+
+    <article class="c-card">
+        <p class="c-card__meta">Achievement</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ achievement_percent|default:0 }}%</h2>
+        <p class="c-card__meta" style="margin:0;">Weighted across active goals</p>
+    </article>
+
+    <article class="c-card">
+        <p class="c-card__meta">Planned vs actual</p>
+        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ planned_vs_actual_percent|default:0 }}%</h2>
+        <p class="c-card__meta" style="margin:0;">Time-based goals only; otherwise achievement</p>
+    </article>
+</section>
+{% endwith %}
+
+<section style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-top:1rem;">
+    <article class="c-card" aria-labelledby="daily-top-courses-title">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div>
+                <h2 id="daily-top-courses-title" class="c-card__title" style="margin:0;">Top courses</h2>
+                <p class="c-card__meta" style="margin:.35rem 0 0 0;">Ranked by tracked study time</p>
+            </div>
+            <a href="{% url 'learning_insights:weekly_summary' %}" class="c-btn c-btn--ghost">Weekly summary</a>
+        </div>
+
+        {% if top_courses %}
+            <ol style="margin:1rem 0 0 0;padding-left:1.2rem;display:grid;gap:.75rem;">
+                {% for row in top_courses %}
+                    <li>
+                        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                            <div>
+                                <strong>{{ row.course_title }}</strong>
+                                <p class="c-card__meta" style="margin:.25rem 0 0 0;">
+                                    {{ row.total_seconds|default:0|duration_format }}
+                                </p>
+                            </div>
+                            {% if row.course_id %}
+                                <a href="{% url 'student_course_detail' row.course_id %}" class="c-btn c-btn--ghost">Open</a>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="c-card__meta" style="margin-top:1rem;">No course activity recorded for this day.</p>
+        {% endif %}
+    </article>
+
+    <article class="c-card" aria-labelledby="daily-course-chart-title">
+        <h2 id="daily-course-chart-title" class="c-card__title" style="margin:0;">Top courses chart</h2>
+        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Tracked course study time</p>
+        <div style="margin-top:1rem;">
+            <div style="position:relative;min-height:220px;">
+                <canvas id="daily-course-chart" aria-label="Daily top courses chart" role="img"></canvas>
+            </div>
+        </div>
+    </article>
+</section>
+
+{% if improvements %}
+<section class="c-card" style="margin-top:1rem;" aria-labelledby="daily-improvements-title">
+    <h2 id="daily-improvements-title" class="c-card__title" style="margin:0;">Needs improvement</h2>
+    <ul style="margin:1rem 0 0 1.1rem;display:grid;gap:.5rem;">
+        {% for item in improvements %}
+            <li>{{ item }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+<section class="c-card" style="margin-top:1rem;" aria-labelledby="daily-goals-title">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h2 id="daily-goals-title" class="c-card__title" style="margin:0;">Goals in this day</h2>
+            <p class="c-card__meta" style="margin:.35rem 0 0 0;">Planned goals and current progress</p>
+        </div>
+        <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Manage goals</a>
+    </div>
+
+    {% if goals %}
+        <div style="display:grid;gap:1rem;margin-top:1rem;">
+            {% for goal in goals %}
+                <article style="padding:.9rem 1rem;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+                        <div style="min-width:260px;">
+                            <strong>{{ goal.title }}</strong>
+                            <p class="c-card__meta" style="margin:.25rem 0 0 0;">
+                                {{ goal.get_period_type_display }}
+                                {% if goal.course %} &middot; {{ goal.course.title }}{% endif %}
+                            </p>
+                        </div>
+                        <span class="c-card__meta">{{ goal.current_value|default:0 }} / {{ goal.target_value|default:0 }}</span>
+                    </div>
+
+                    <div
+                        class="c-progress"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="{{ goal.progress_percent|default:0 }}"
+                        aria-label="{{ goal.title }} progress"
+                        style="margin-top:.8rem;"
+                    >
+                        <span class="c-progress__bar" style="width: {{ goal.progress_percent|default:0 }}%;"></span>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-top:.55rem;flex-wrap:wrap;">
+                        <span class="c-card__meta">{{ goal.progress_percent|default:0|floatformat:0 }}% complete</span>
+                        <span class="c-card__meta">{{ goal.get_status_display }}</span>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="c-card__meta" style="margin-top:1rem;">No goals found for this day.</p>
+    {% endif %}
+</section>
+
+{% if insights_started_on %}
+<section class="c-card" style="margin-top:1rem;">
+    <p class="c-card__meta" style="margin:0;">
+        Insights started collecting on <strong>{{ insights_started_on|date:"M d, Y" }}</strong>.
+        Older periods may be incomplete.
+    </p>
+</section>
+{% endif %}
+
+{{ course_chart|json_script:"li-daily-course-chart-data" }}
+{% endblock %}
+
+{% block include_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        function readJsonScript(id, fallback) {
+            const node = document.getElementById(id);
+            if (!node) return fallback;
+            try {
+                return JSON.parse(node.textContent);
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        const courseData = readJsonScript("li-daily-course-chart-data", null);
+        const canvas = document.getElementById("daily-course-chart");
+        if (!courseData || !canvas) return;
+
+        const labels = courseData.labels || [];
+        const minutes = courseData.minutes || [];
+        if (!labels.length || !minutes.length) return;
+
+        new Chart(canvas, {
+            type: "doughnut",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        data: minutes,
+                        backgroundColor: [
+                            "#ffd54f",
+                            "#ff9ec5",
+                            "#2ecc71",
+                            "#3498db",
+                            "#9b59b6",
+                        ],
+                        borderWidth: 0,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 10,
+                        },
+                    },
+                },
+            },
+        });
+    })();
+</script>
+{% endblock %}
+

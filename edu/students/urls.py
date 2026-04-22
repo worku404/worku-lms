@@ -57,15 +57,30 @@ urlpatterns = [
         name="student_module_image",
     ),
     path(
+        "video/<int:video_id>/stream/",
+        views.ModuleVideoStreamView.as_view(),
+        name="student_video_stream",
+    ),
+    path(
         'module/<int:module_id>/complete/',
         MarkModuleCompleteView.as_view(),
         name='mark_module_complete',
     ),
     path(
-    "file/<int:file_id>/view/",
-    views.ModuleFilePreviewView.as_view(),
-    name="student_file_view",
-),
+        "file/<int:file_id>/view/",
+        views.ModuleFilePreviewView.as_view(),
+        name="student_file_view",
+    ),
+    path(
+        "file/<int:file_id>/search/",
+        views.ModuleFileSearchView.as_view(),
+        name="student_file_search",
+    ),
+    path(
+        "file/<int:file_id>/page-text/",
+        views.ModuleFilePageTextView.as_view(),
+        name="student_file_page_text",
+    ),
     path(
     "presence/ping/",
     views.PresencePingView.as_view(),

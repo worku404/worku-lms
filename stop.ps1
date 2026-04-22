@@ -4,6 +4,19 @@ $stopDockerDesktop = $false
 $root = "C:\Users\hi\Downloads\webdev\Django_Projects\e-learning"
 $stopDockerDesktop = $false   # set to $true if you want to fully close Docker Desktop too
 
+# Stop Learning Insights worker started from this project
+$workerProcIds = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+    Where-Object {
+        $_.CommandLine -and
+        $_.CommandLine -match "manage\.py\s+learning_insights_worker" -and
+        $_.CommandLine -like "*$root*"
+    } |
+    Select-Object -ExpandProperty ProcessId -Unique
+
+foreach ($procId in $workerProcIds) {
+    Stop-Process -Id $procId -Force
+}
+
 # Stop Django runserver started from this project
 $djangoProcIds = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
     Where-Object {

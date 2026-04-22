@@ -140,6 +140,34 @@
                     Clear filter
                 </button>
             </div>
+            <!-- Tag search input (filters the list by tag). -->
+            <div class="notes-sidebar__search">
+                <!-- Search input for tag filtering. -->
+                <input
+                    type="search"
+                    class="notes-sidebar__search-input"
+                    data-notes-tag-search
+                    placeholder="Filter by tag…"
+                    aria-label="Filter notes by tag"
+                    list="notes-tag-datalist"
+                    autocomplete="off"
+                >
+                <!-- Search button. -->
+                <button
+                    type="button"
+                    class="notes-sidebar__search-clear"
+                    data-notes-tag-search-submit
+                    aria-label="Search notes by tag"
+                    title="Search"
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+                <!-- Tag suggestions populated from existing note tags. -->
+                <datalist id="notes-tag-datalist" data-notes-tag-datalist></datalist>
+            </div>
             <!-- Active filter label. -->
             <p class="notes-sidebar__filter" data-notes-filter-label hidden></p>
             <!-- Notes list container. -->
@@ -171,9 +199,9 @@
             <!-- Tag input label and field. -->
             <label class="notes-save-field">
                 <!-- Tag label text. -->
-                Tag (optional)
+                Tags (optional, up to 3)
                 <!-- Tag input. -->
-                <input type="text" data-notes-tag-input placeholder="e.g. revision">
+                <input type="text" data-notes-tag-input placeholder="e.g. revision, quiz, chapter 2">
             </label>
             <!-- Error message placeholder. -->
             <p class="notes-save-error" data-notes-save-error hidden></p>

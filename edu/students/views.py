@@ -11,19 +11,21 @@ import json
 import os
 import mimetypes
 import subprocess
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
 from django.conf import settings
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib.contenttypes.models import ContentType
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.utils.cache import patch_response_headers
+from django.utils import timezone
 
 # Auth helpers and login-protection mixin.
 from django.contrib.auth import authenticate, login
@@ -38,7 +40,8 @@ from django.views.generic import TemplateView, DetailView, View
 
 # Local enrollment form and Course model.
 from .forms import CourseEnrollForm
-from courses.models import Content, Course, File, Image, Module
+from courses.models import Content, Course, File, Image, Module, ContentSearchEntry, Video
+from courses.search import search_content_entries
 from .models import ContentProgress, CourseProgress, ModuleProgress
 from .services import (add_time_spent, mark_module_completed, 
                        get_overall_progress, get_course_time_spent,
@@ -56,6 +59,7 @@ r = redis.Redis(
     db=settings.REDIS_DB,
 )
 
+VIDEO_CACHE_SECONDS = 60 * 60 * 24 * 7  # 7 days
 
 def _course_progress_table_ready() -> bool:
     """
@@ -170,9 +174,20 @@ class StudentCourseListView(LoginRequiredMixin, ListView):
             if row is None:
                 course.student_progress_percent = 0.0
                 course.student_completed = False
+                course.student_last_accessed = None
                 continue
             course.student_progress_percent = round(row.progress_percent, 2)
             course.student_completed = row.completed
+            course.student_last_accessed = row.last_accessed
+
+        # Order by most recently accessed (newest first).
+        # Secondary sort keeps ordering stable/readable when last_accessed matches.
+        courses.sort(
+            key=lambda course: (
+                -float(getattr(course.student_last_accessed, "timestamp", lambda: 0)() or 0),
+                (course.title or "").lower(),
+            )
+        )
 
         context["courses"] = courses
         return context
@@ -243,6 +258,13 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
                 progress_percent=round(fallback_percent, 2),
                 completed=fallback_completed,
             )
+        elif _course_progress_table_ready():
+            try:
+                CourseProgress.objects.filter(id=course_progress.id).update(
+                    last_accessed=timezone.now()
+                )
+            except (ProgrammingError, OperationalError):
+                pass
 
         # Build a concrete list of module contents, and attach content progress state.
         module_contents = list(module.contents.select_related("content_type")) if module else []
@@ -261,7 +283,22 @@ class StudentCourseDetailView(LoginRequiredMixin, DetailView):
             )
             content_item.student_completed = bool(progress_row.completed) if progress_row else False
             # For PDF resume support we expose the stored JSON position to the template.
-            content_item.student_last_position = progress_row.last_position if progress_row else {}
+            # Ensure expected keys exist to avoid template lookup errors.
+            default_position = {
+                "page": 1,
+                "current_page": 1,
+                "page_offset_ratio": 0,
+                "doc_y_ratio": 0,
+                "zoom": 0,
+                "max_page_seen": 1,
+            }
+            if progress_row and isinstance(progress_row.last_position, dict):
+                content_item.student_last_position = {
+                    **default_position,
+                    **progress_row.last_position,
+                }
+            else:
+                content_item.student_last_position = default_position
 
         context["module"] = module
         context["modules"] = modules
@@ -357,6 +394,8 @@ class TrackContentProgressView(LoginRequiredMixin, View):
                 filename = str(getattr(file_obj, "file", "") or "")
                 if filename.lower().endswith(".pdf"):
                     kind = "pdf"
+            elif model_name == "video":
+                kind = "video"
 
         try:
             seconds_delta = int(payload.get("seconds_delta", 0))
@@ -489,6 +528,105 @@ class ModuleImageView(LoginRequiredMixin, View):
         except FileNotFoundError as exc:
             raise Http404("Image not found.") from exc
 
+
+def _parse_byte_range(range_header: str | None, file_size: int):
+    if not range_header:
+        return None
+    if not range_header.startswith("bytes="):
+        return None
+
+    range_spec = range_header.replace("bytes=", "", 1).split(",")[0].strip()
+    if "-" not in range_spec:
+        return None
+
+    start_str, end_str = range_spec.split("-", 1)
+    try:
+        if start_str == "":
+            # Suffix range: "-500" means last 500 bytes
+            suffix_len = int(end_str)
+            if suffix_len <= 0:
+                return None
+            start = max(file_size - suffix_len, 0)
+            end = file_size - 1
+        else:
+            start = int(start_str)
+            end = int(end_str) if end_str else file_size - 1
+            if start < 0:
+                return None
+            end = min(end, file_size - 1)
+        if start > end or start >= file_size:
+            return None
+        return start, end
+    except (TypeError, ValueError):
+        return None
+
+
+def _stream_file_range(file_obj, start: int, length: int, chunk_size: int = 1024 * 512):
+    file_obj.seek(start)
+    remaining = length
+    try:
+        while remaining > 0:
+            chunk = file_obj.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+    finally:
+        try:
+            file_obj.close()
+        except Exception:
+            pass
+
+
+class ModuleVideoStreamView(LoginRequiredMixin, View):
+    """
+    Stream module videos with HTTP Range support to allow seeking.
+    """
+    def get(self, request, video_id):
+        video_type = ContentType.objects.get_for_model(Video)
+        content = get_object_or_404(
+            Content,
+            content_type=video_type,
+            object_id=video_id,
+            module__course__students=request.user,
+        )
+        video_obj = content.item
+
+        if not video_obj or not video_obj.file:
+            raise Http404("Video not found.")
+
+        try:
+            video_obj.file.open("rb")
+        except FileNotFoundError as exc:
+            raise Http404("Video not found.") from exc
+
+        file_obj = video_obj.file.file
+        file_size = getattr(video_obj.file, "size", None) or 0
+        content_type, _ = mimetypes.guess_type(video_obj.file.name)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        range_header = request.headers.get("Range") or request.META.get("HTTP_RANGE")
+        byte_range = _parse_byte_range(range_header, file_size)
+
+        if byte_range:
+            start, end = byte_range
+            length = end - start + 1
+            response = StreamingHttpResponse(
+                _stream_file_range(file_obj, start, length),
+                status=206,
+                content_type=content_type,
+            )
+            response["Content-Length"] = str(length)
+            response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        else:
+            response = FileResponse(file_obj, content_type=content_type)
+            response["Content-Length"] = str(file_size)
+
+        response["Accept-Ranges"] = "bytes"
+        patch_response_headers(response, cache_timeout=VIDEO_CACHE_SECONDS)
+        return response
+
 # pdf previw page
 
 @method_decorator(xframe_options_exempt, name="dispatch")
@@ -528,6 +666,89 @@ class ModuleFilePreviewView(LoginRequiredMixin, View):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         patch_response_headers(response, cache_timeout=0)
         return response
+
+
+class ModuleFileSearchView(LoginRequiredMixin, View):
+    """
+    Search within an enrolled PDF using the server-side ContentSearchEntry index.
+    """
+    def get(self, request, file_id):
+        query = (request.GET.get("q") or "").strip()
+        if not query:
+            return JsonResponse({"query": "", "total_matches": 0, "matches": []})
+
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+
+        qs = ContentSearchEntry.objects.filter(content=content, page_number__isnull=False)
+        results = list(search_content_entries(qs, query)[:500])
+
+        page_map = {}
+        for row in results:
+            page = int(row.page_number or 1)
+            document = row.document or ""
+            match_count = len(re.findall(re.escape(query), document, flags=re.IGNORECASE))
+            if page not in page_map:
+                page_map[page] = {
+                    "page": page,
+                    "count": 0,
+                    "snippet": "",
+                }
+            page_map[page]["count"] += max(1, match_count) if document else 1
+            if not page_map[page]["snippet"] and document:
+                snippet = document[:160]
+                if len(document) > 160:
+                    snippet = f"{snippet}…"
+                page_map[page]["snippet"] = snippet
+
+        matches = [page_map[key] for key in sorted(page_map.keys())]
+        total_matches = sum(item["count"] for item in matches)
+
+        return JsonResponse(
+            {
+                "query": query,
+                "total_matches": total_matches,
+                "matches": matches,
+            }
+        )
+
+
+class ModuleFilePageTextView(LoginRequiredMixin, View):
+    """
+    Return indexed PDF page text for on-demand highlighting.
+    """
+    def get(self, request, file_id):
+        pages_param = (request.GET.get("pages") or "").strip()
+        if not pages_param:
+            return JsonResponse({"pages": {}}, status=400)
+
+        pages = []
+        for token in pages_param.split(","):
+            token = token.strip()
+            if token.isdigit():
+                pages.append(int(token))
+        if not pages:
+            return JsonResponse({"pages": {}}, status=400)
+
+        file_type = ContentType.objects.get_for_model(File)
+        content = get_object_or_404(
+            Content,
+            content_type=file_type,
+            object_id=file_id,
+            module__course__students=request.user,
+        )
+
+        rows = (
+            ContentSearchEntry.objects.filter(content=content, page_number__in=pages)
+            .values_list("page_number", "document")
+        )
+        page_map = {int(page): (doc or "") for page, doc in rows}
+        return JsonResponse({"pages": page_map})
 
 
 # Online count

@@ -1,7 +1,7 @@
 import requests
 
 username = 'gold'
-token = '7ba65296979081125b39b181ff6a5ae1e3c45452'
+token = 'ed5061fb83d1d48236b524add05e48fc6cca08b9'
 headers = {
     'Authorization': f'Token {token}',
     'Accept': 'application/json',

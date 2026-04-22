@@ -3,6 +3,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Func
 from django.template.loader import render_to_string
@@ -248,7 +249,7 @@ class Text(ItemBase):
 
 class File(ItemBase):
     # General file upload, stored under MEDIA_ROOT/files/
-    file = models.FileField(upload_to="files")
+    file = models.FileField(upload_to="files", max_length=500)
     pdf_text_index = models.TextField(blank=True, default="")
     pdf_page_count = models.PositiveIntegerField(default=0)
     pdf_index_status = models.CharField(max_length=24, default="pending")
@@ -258,9 +259,23 @@ class File(ItemBase):
 
 class Image(ItemBase):
     # Image upload, stored under MEDIA_ROOT/images/
-    file = models.FileField(upload_to="images")
+    file = models.FileField(upload_to="images", max_length=500)
 
 
 class Video(ItemBase):
     # External video link (URL validation included)
-    url = models.URLField()
+    url = models.URLField(
+        blank=True,
+        help_text="Optional video URL (YouTube/Vimeo). Leave blank if uploading a file.",
+    )
+    file = models.FileField(
+        upload_to="videos",
+        blank=True,
+        max_length=500,
+        help_text="Upload a video file for local playback (MP4/WebM/OGG).",
+    )
+
+    def clean(self):
+        super().clean()
+        if not self.file and not self.url:
+            raise ValidationError("Provide either a video URL or upload a video file.")

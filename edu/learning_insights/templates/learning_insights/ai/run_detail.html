@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}AI Run | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="ai-run-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="ai-run-title" class="c-card__title" style="margin:0;">AI Run</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                {{ run.get_kind_display|default:run.kind }} &middot;
+                Status: <strong>{{ run.get_status_display|default:run.status }}</strong>
+            </p>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            {% if run.kind == "prompt_plan" or run.kind == "weekly_plan" or run.kind == "daily_plan" %}
+                <a href="{% url 'learning_insights:goal_create' %}?ai_run={{ run.id }}#ai-planner" class="c-btn c-btn--ghost">Back to planner</a>
+            {% else %}
+                <a href="{% url 'learning_insights:ai_review' %}" class="c-btn c-btn--ghost">Back to review</a>
+            {% endif %}
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Insights</a>
+        </div>
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">Details</h2>
+    <div style="margin-top:1rem;display:grid;gap:.35rem;">
+        <p class="c-card__meta" style="margin:0;">
+            Created: <strong>{{ run.created_at|date:"M d, Y H:i" }}</strong>
+        </p>
+        {% if run.period_start and run.period_end %}
+            <p class="c-card__meta" style="margin:0;">
+                Period: <strong>{{ run.period_start }}</strong> → <strong>{{ run.period_end }}</strong>
+            </p>
+        {% endif %}
+        {% if run.summary_text %}
+            <p style="margin:.75rem 0 0;line-height:1.65;">{{ run.summary_text }}</p>
+        {% endif %}
+        {% if run.status == "failed" and run.error_message %}
+            <div class="c-card c-alert c-alert--error" style="margin-top:1rem;">
+                <p class="c-card__meta" style="margin:0;">{{ run.error_message }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+        <a href="{% url 'learning_insights:ai_run_edit' run.id %}" class="c-btn c-btn--secondary">Edit JSON</a>
+
+        {% if run.kind == "prompt_plan" and run.status == "success" %}
+            <form method="post" action="{% url 'learning_insights:ai_run_apply' run.id %}">
+                {% csrf_token %}
+                <button type="submit" class="c-btn c-btn--ghost">Apply to goals</button>
+            </form>
+        {% endif %}
+
+        {% if subscription %}
+            <form method="post" action="{% url 'learning_insights:ai_run_send_telegram' run.id %}">
+                {% csrf_token %}
+                <button type="submit" class="c-btn c-btn--ghost">Send to Telegram</button>
+            </form>
+        {% else %}
+            <a href="{% url 'learning_insights:telegram_connect' %}" class="c-btn c-btn--ghost">Connect Telegram</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">Output JSON</h2>
+    <pre style="margin-top:1rem;white-space:pre-wrap;line-height:1.5;max-height:520px;overflow:auto;border:1px solid rgba(255,255,255,0.08);padding:1rem;border-radius:.75rem;">{{ payload_pretty }}</pre>
+</section>
+{% endblock %}

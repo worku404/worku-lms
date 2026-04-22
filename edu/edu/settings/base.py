@@ -4,18 +4,18 @@ Settings for the edu project.
 
 import os
 from pathlib import Path  # Standard library: build OS-safe filesystem paths
-from django.urls import reverse_lazy  # Django utility: resolve URL names lazily at runtime
-from dotenv import load_dotenv
-
 
 from decouple import config
-
+from django.urls import (
+    reverse_lazy,  # Django utility: resolve URL names lazily at runtime
+)
+from dotenv import load_dotenv
 
 # Redis Configuration
 # Using values derived from your container inspection
-REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
-REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
-REDIS_DB = config('REDIS_DB', default=0, cast=int)
+REDIS_HOST = config("REDIS_HOST", default="127.0.0.1")
+REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
+REDIS_DB = config("REDIS_DB", default=0, cast=int)
 
 # Core project paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -37,10 +37,9 @@ ALLOWED_HOSTS = []
 
 # Application registration
 INSTALLED_APPS = [
-    'daphne',
+    "daphne",
     # Project apps (keep this app first as requested for auth monitoring/dependency order)
     "courses.apps.CoursesConfig",
-
     # Django built-in apps
     "django.contrib.admin",
     "django.contrib.auth",
@@ -48,42 +47,36 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Project apps
     "students.apps.StudentsConfig",
-    'assistant.apps.AssistantConfig',
-    'chat.apps.ChatConfig',
+    "assistant.apps.AssistantConfig",
+    "chat.apps.ChatConfig",
     # Notes app: personal notes feature.
     "notes.apps.NotesConfig",
-
+    "learning_insights.apps.LearningInsightsConfig",
     # Third-party apps
-    "embed_video",   # Embed and render video content in templates/models
-    "debug_toolbar", # Development-time request/SQL/debug inspection
-    "redisboard",    # Redis monitoring dashboard
-    'rest_framework', # To build an API
-    'rest_framework.authtoken', # DRF token authentication model
+    "embed_video",  # Embed and render video content in templates/models
+    "debug_toolbar",  # Development-time request/SQL/debug inspection
+    "redisboard",  # Redis monitoring dashboard
+    "rest_framework",  # To build an API
+    "rest_framework.authtoken",  # DRF token authentication model
     "django.contrib.postgres",
-    
 ]
 
 
 # Middleware pipeline (request/response processing order matters)
 MIDDLEWARE = [
     # "debug_toolbar.middleware.DebugToolbarMiddleware",          # Third-party middleware
-    "django.middleware.security.SecurityMiddleware",            # Built-in: security headers and protections
-    "django.contrib.sessions.middleware.SessionMiddleware",     # Built-in: session support
-
+    "django.middleware.security.SecurityMiddleware",  # Built-in: security headers and protections
+    "django.contrib.sessions.middleware.SessionMiddleware",  # Built-in: session support
     # Enable these only if full-site cache middleware is needed:
     # "django.middleware.cache.UpdateCacheMiddleware",          # Built-in: stores cache for responses
-
-    "django.middleware.common.CommonMiddleware",                # Built-in: URL rewriting, ETags, etc.
-
+    "django.middleware.common.CommonMiddleware",  # Built-in: URL rewriting, ETags, etc.
     # "django.middleware.cache.FetchFromCacheMiddleware",       # Built-in: serves cached responses
-
-    "django.middleware.csrf.CsrfViewMiddleware",                # Built-in: CSRF protection
+    "django.middleware.csrf.CsrfViewMiddleware",  # Built-in: CSRF protection
     "django.contrib.auth.middleware.AuthenticationMiddleware",  # Built-in: attaches authenticated user
-    "django.contrib.messages.middleware.MessageMiddleware",     # Built-in: one-time message framework
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",   # Built-in: clickjacking protection
+    "django.contrib.messages.middleware.MessageMiddleware",  # Built-in: one-time message framework
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # Built-in: clickjacking protection
     # 'courses.middleware.subdomain_course_middleware',
 ]
 
@@ -102,7 +95,8 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "assistant.context_processors.llm_widget",
-                'students.context_processors.global_progress',
+                "students.context_processors.global_progress",
+                "courses.context_processors.daily_motto",
             ],
         },
     },
@@ -111,11 +105,11 @@ TEMPLATES = [
 WSGI_APPLICATION = "edu.wsgi.application"
 
 
-
-
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -133,7 +127,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = BASE_DIR / "static"
 
 
 # Security headers
@@ -162,35 +156,37 @@ INTERNAL_IPS = ["127.0.0.1"]
 
 # Cache middleware settings
 CACHE_MIDDLEWARE_ALIAS = "default"
-CACHE_MIDDLEWARE_SECONDS = 60 * 15  # 15 minutes
+CACHE_MIDDLEWARE_SECONDS = 60 * 60 * 2  # 2 hours
 CACHE_MIDDLEWARE_KEY_PREFIX = "educa"
-
-
+SESSION_COOKIE_AGE = 60 * 60 * 2
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = True
 # GEMINI API
 API1_KEY = os.getenv("API1_KEY")
 API2_KEY = os.getenv("API2_KEY")
 API3_KEY = os.getenv("API3_KEY")
 API4_KEY = os.getenv("API4_KEY")
+DAILY_QUOTE_API_KEY = os.getenv("DAILY_QUOTE_API_KEY")
 
 # API
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
-    ]
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
+    ],
 }
 
-ASGI_APPLICATION = 'edu.asgi.application'
+ASGI_APPLICATION = "edu.asgi.application"
 
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
@@ -200,3 +196,7 @@ CHAT_MAX_MESSAGES_PER_COURSE = config(
     default=1000,
     cast=int,
 )
+
+#telegram
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME")

@@ -64,9 +64,16 @@
                                 {% for entry in note_results %}
                                     <li class="c-card c-card--compact">
                                         <h3 class="c-card__title">{{ entry.note.title }}</h3>
-                                        {% if entry.note.tag %}
-                                            <p class="c-card__meta">Tag: {{ entry.note.tag.name }}</p>
-                                        {% endif %}
+                                        {% with tags=entry.note.tags.all %}
+                                            {% if tags %}
+                                                <p class="c-card__meta">
+                                                    Tags:
+                                                    {% for tag in tags %}
+                                                        {{ tag.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </p>
+                                            {% endif %}
+                                        {% endwith %}
                                         {% if entry.snippet %}
                                             <p class="c-card__meta">{{ entry.snippet|safe }}</p>
                                         {% endif %}
@@ -104,7 +111,13 @@
                                         {{ course.total_modules }} modules
                                     </p>
                                     <div class="c-card__actions">
-                                        <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                        {% if request.user.is_authenticated and course.id in enrolled_course_ids %}
+                                            <a href="{% url 'student_course_detail' course.id %}" class="c-btn c-btn--primary">
+                                                Continue learning
+                                            </a>
+                                        {% else %}
+                                            <a href="{% url 'course_detail' course.slug %}" class="c-btn c-btn--secondary">Open course</a>
+                                        {% endif %}
                                     </div>
                                 </li>
                             {% endfor %}

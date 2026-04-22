@@ -2,13 +2,19 @@ import time
 from functools import lru_cache
 
 import redis
+from courses.models import Content, Course, File, Module, Text, Video
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F, Sum
 from django.utils import timezone
 
-from courses.models import Content, Course, File, Module, Text
 from .models import ContentProgress, CourseProgress, ModuleProgress
+from .signals import (
+    content_progress_recorded,
+    course_completed as course_completed_signal,
+    module_time_tracked,
+    presence_ping_recorded,
+)
 
 ONLINE_USERS_KEY = "presence:online_users"
 ONLINE_WINDOW_SECONDS = 120  # user is "online" if active in last 120s
@@ -30,10 +36,13 @@ def _content_type_id(model_cls):
     return ContentType.objects.get_for_model(model_cls).id
 
 
-def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECONDS) -> int:
+def touch_user_presence(
+    user_id: int, window_seconds: int = ONLINE_WINDOW_SECONDS
+) -> int:
     now = int(time.time())
     cutoff = now - window_seconds
     member = str(user_id)
+    recorded_at = timezone.now()
 
     try:
         pipe = _presence_redis.pipeline()
@@ -42,6 +51,11 @@ def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECOND
         pipe.zcard(ONLINE_USERS_KEY)  # count online
         pipe.expire(ONLINE_USERS_KEY, window_seconds * 2)  # safety TTL
         _, _, online_count, _ = pipe.execute()
+        presence_ping_recorded.send(
+            sender=touch_user_presence,
+            user_id=user_id,
+            recorded_at=recorded_at,
+        )
         return int(online_count)
     except redis.RedisError:
         return 0
@@ -50,18 +64,39 @@ def touch_user_presence(user_id: int, window_seconds: int = ONLINE_WINDOW_SECOND
 def _trackable_content_ids_for_module(module: Module) -> list[int]:
     text_ct = _content_type_id(Text)
     file_ct = _content_type_id(File)
+    video_ct = _content_type_id(Video)
 
     text_ids = list(
-        Content.objects.filter(module=module, content_type_id=text_ct).values_list("id", flat=True)
+        Content.objects.filter(module=module, content_type_id=text_ct).values_list(
+            "id", flat=True
+        )
     )
 
     file_contents = Content.objects.filter(module=module, content_type_id=file_ct)
     file_ids = list(file_contents.values_list("object_id", flat=True))
     pdf_file_ids = set(
-        File.objects.filter(id__in=file_ids, file__iendswith=".pdf").values_list("id", flat=True)
+        File.objects.filter(id__in=file_ids, file__iendswith=".pdf").values_list(
+            "id", flat=True
+        )
     )
-    pdf_content_ids = list(file_contents.filter(object_id__in=pdf_file_ids).values_list("id", flat=True))
-    return text_ids + pdf_content_ids
+    pdf_content_ids = list(
+        file_contents.filter(object_id__in=pdf_file_ids).values_list("id", flat=True)
+    )
+
+    video_contents = Content.objects.filter(module=module, content_type_id=video_ct)
+    video_ids = list(video_contents.values_list("object_id", flat=True))
+    trackable_video_ids = set(
+        Video.objects.filter(id__in=video_ids)
+        .exclude(file="")
+        .values_list("id", flat=True)
+    )
+    video_content_ids = list(
+        video_contents.filter(object_id__in=trackable_video_ids).values_list(
+            "id", flat=True
+        )
+    )
+
+    return text_ids + pdf_content_ids + video_content_ids
 
 
 def recompute_module_progress(user, module: Module) -> ModuleProgress:
@@ -116,7 +151,7 @@ def recompute_course_progress(user, course: Course) -> CourseProgress:
     )
     course_completed = total_modules > 0 and completed_modules >= total_modules
 
-    course_progress, _ = CourseProgress.objects.get_or_create(
+    course_progress, created_row = CourseProgress.objects.get_or_create(
         user=user,
         course=course,
         defaults={
@@ -127,13 +162,24 @@ def recompute_course_progress(user, course: Course) -> CourseProgress:
     )
 
     # Keep these fields synchronized whenever module/content progress changes.
+    was_completed = False if created_row else bool(course_progress.completed)
     course_progress.progress_percent = course_percent
     course_progress.completed = course_completed
     if course_completed and not course_progress.completed_at:
         course_progress.completed_at = timezone.now()
     if not course_completed and course_progress.completed_at:
         course_progress.completed_at = None
-    course_progress.save(update_fields=["progress_percent", "completed", "completed_at", "last_accessed"])
+    course_progress.save(
+        update_fields=["progress_percent", "completed", "completed_at", "last_accessed"]
+    )
+
+    if course_progress.completed and not was_completed:
+        course_completed_signal.send(
+            sender=CourseProgress,
+            user=user,
+            course=course,
+            completed_at=course_progress.completed_at,
+        )
     return course_progress
 
 
@@ -168,9 +214,15 @@ def mark_module_completed(user, module):
     return progress, course_progress
 
 
-def update_content_progress(user, content, kind: str, payload: dict, seconds_delta: int = 0) -> dict:
+def update_content_progress(
+    user, content, kind: str, payload: dict, seconds_delta: int = 0
+) -> dict:
     kind = (kind or "").lower().strip()
-    if kind not in {ContentProgress.CONTENT_KIND_TEXT, ContentProgress.CONTENT_KIND_PDF}:
+    if kind not in {
+        ContentProgress.CONTENT_KIND_TEXT,
+        ContentProgress.CONTENT_KIND_PDF,
+        ContentProgress.CONTENT_KIND_VIDEO,
+    }:
         raise ValueError("Unsupported content kind")
 
     progress, _ = ContentProgress.objects.get_or_create(
@@ -187,6 +239,7 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
         },
     )
 
+    was_completed = bool(progress.completed)
     last_position = progress.last_position or {}
     next_percent = progress.progress_percent
     next_position = dict(last_position)
@@ -201,12 +254,76 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
 
         pdf_percent = _clamp_percent((max_seen / total_pages) * 100.0)
         next_percent = max(progress.progress_percent, pdf_percent)
+
+        try:
+            doc_y_ratio = float(payload.get("doc_y_ratio") or 0)
+        except (TypeError, ValueError):
+            doc_y_ratio = 0.0
+        try:
+            page_offset_ratio = float(payload.get("page_offset_ratio") or 0)
+        except (TypeError, ValueError):
+            page_offset_ratio = 0.0
+        try:
+            zoom = float(payload.get("zoom") or 0)
+        except (TypeError, ValueError):
+            zoom = 0.0
+
         next_position = {
+            "page": current_page,
             "current_page": current_page,
             "total_pages": total_pages,
             "max_page_seen": max_seen,
+            "page_offset_ratio": _clamp_percent(page_offset_ratio * 100.0) / 100.0,
+            "doc_y_ratio": _clamp_percent(doc_y_ratio * 100.0) / 100.0,
+            "zoom": zoom,
+            "viewport_w": payload.get("viewport_w"),
+            "viewport_h": payload.get("viewport_h"),
+            "doc_progress": pdf_percent,
         }
-        completed = max_seen >= total_pages and next_percent >= CONTENT_COMPLETION_THRESHOLD
+        completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
+    elif kind == ContentProgress.CONTENT_KIND_VIDEO:
+        try:
+            duration = float(payload.get("duration") or 0)
+        except (TypeError, ValueError):
+            duration = 0.0
+        try:
+            current_time = float(payload.get("current_time") or 0)
+        except (TypeError, ValueError):
+            current_time = 0.0
+        try:
+            incoming_max = float(payload.get("max_time_seen") or current_time)
+        except (TypeError, ValueError):
+            incoming_max = current_time
+
+        previous_max = float(last_position.get("max_time_seen") or 0)
+        max_seen = max(previous_max, incoming_max, current_time, 0.0)
+
+        percent_from_payload = None
+        if payload.get("percent") is not None:
+            try:
+                percent_from_payload = _clamp_percent(
+                    float(payload.get("percent") or 0)
+                )
+            except (TypeError, ValueError):
+                percent_from_payload = None
+
+        if duration > 0:
+            video_percent = _clamp_percent((max_seen / duration) * 100.0)
+        else:
+            video_percent = percent_from_payload or 0.0
+
+        next_percent = max(
+            progress.progress_percent,
+            video_percent,
+            percent_from_payload or 0.0,
+        )
+        next_position = {
+            "duration": duration,
+            "current_time": current_time,
+            "max_time_seen": max_seen,
+            "percent": round(next_percent, 2),
+        }
+        completed = next_percent >= CONTENT_COMPLETION_THRESHOLD
     else:
         incoming_percent = _clamp_percent(float(payload.get("percent") or 0.0))
         next_percent = max(progress.progress_percent, incoming_percent)
@@ -231,6 +348,15 @@ def update_content_progress(user, content, kind: str, payload: dict, seconds_del
     )
     progress.refresh_from_db()
 
+    content_progress_recorded.send(
+        sender=update_content_progress,
+        user=user,
+        content=content,
+        seconds_delta=seconds_delta,
+        completed_now=(not was_completed and bool(progress.completed)),
+        recorded_at=timezone.now(),
+    )
+
     module_progress = recompute_module_progress(user, content.module)
     course_progress = recompute_course_progress(user, content.module.course)
     overall_progress = get_overall_progress(user)
@@ -253,6 +379,15 @@ def add_time_spent(user, module, seconds):
     )
     progress.time_spent = F("time_spent") + seconds
     progress.save(update_fields=["time_spent"])
+
+    if seconds and int(seconds) > 0:
+        module_time_tracked.send(
+            sender=add_time_spent,
+            user=user,
+            module=module,
+            seconds_delta=int(seconds),
+            recorded_at=timezone.now(),
+        )
 
 
 def get_course_time_spent(user, course):
@@ -282,8 +417,18 @@ def get_overall_progress(user):
 
 def get_top_courses_by_time(user, limit=3):
     return list(
-        ModuleProgress.objects.filter(user_id=user.id, time_spent__gt=0, course__students=user)
+        ModuleProgress.objects.filter(
+            user_id=user.id, time_spent__gt=0, course__students=user
+        )
         .values("course_id", "course__title")
         .annotate(total_time=Sum("time_spent"))
         .order_by("-total_time")[:limit]
     )
+
+
+# def total_spent_time(user):
+# total = list(ModuleProgress.objects.filter(
+#     user_id=1, time_spent__gt=0, course__students=1)
+#              .values("course_id", "course__title")
+#              .annotate(total_time=Sum("time_spent"))
+#     )

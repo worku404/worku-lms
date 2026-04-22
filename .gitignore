@@ -2,10 +2,11 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+media
+edu/media/files/Chapter_1_Lecture_1.ppt
 # C extensions
 *.so
-
+tools/
 # Distribution / packaging
 .Python
 build/
@@ -13,6 +14,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+edu/courses/management/commands/import_books.py
 .eggs/
 lib/
 lib64/

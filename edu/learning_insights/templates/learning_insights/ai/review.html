@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}AI Review | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="ai-review-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="ai-review-title" class="c-card__title" style="margin:0;">AI Review</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Generate daily or weekly reviews with gap analysis, behavior insights, and actionable suggestions.
+            </p>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Back to insights</a>
+            <a href="{% url 'learning_insights:goal_create' %}#ai-planner" class="c-btn c-btn--ghost">AI planner</a>
+        </div>
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">Generate</h2>
+    <form method="post" action="{% url 'learning_insights:ai_review_generate' %}" style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <button type="submit" name="period" value="weekly" class="c-btn c-btn--primary">Generate weekly review</button>
+        <button type="submit" name="period" value="daily" class="c-btn c-btn--ghost">Generate daily review</button>
+        <button type="submit" name="period" value="improvement" class="c-btn c-btn--ghost">Improvement ideas</button>
+        <button type="submit" name="period" value="recovery" class="c-btn c-btn--ghost">Recovery plan</button>
+    </form>
+</section>
+
+{% if latest_run %}
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">Latest run</h2>
+    <p class="c-card__meta" style="margin-top:.5rem;">
+        Type: <strong>{{ latest_run.get_kind_display|default:latest_run.kind }}</strong>
+        &middot; Status: <strong>{{ latest_run.get_status_display|default:latest_run.status }}</strong>
+        &middot; Created: {{ latest_run.created_at|date:"M d, Y H:i" }}
+    </p>
+    {% if latest_run.summary_text %}
+        <p style="margin-top:.75rem;line-height:1.65;">{{ latest_run.summary_text }}</p>
+    {% endif %}
+    <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+        <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}" class="c-btn c-btn--secondary">Open</a>
+        <a href="{% url 'learning_insights:ai_run_edit' latest_run.id %}" class="c-btn c-btn--ghost">Edit</a>
+    </div>
+</section>
+{% endif %}
+
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">Recent runs</h2>
+    {% if runs %}
+        <div style="display:grid;gap:.75rem;margin-top:1rem;">
+            {% for run in runs %}
+                <article class="c-card" style="margin:0;border:1px solid rgba(255,255,255,0.08);">
+                    <p class="c-card__meta" style="margin:0;">
+                        {{ run.created_at|date:"M d, Y H:i" }} &middot;
+                        <strong>{{ run.get_kind_display|default:run.kind }}</strong> &middot;
+                        <strong>{{ run.get_status_display|default:run.status }}</strong>
+                    </p>
+                    {% if run.summary_text %}
+                        <p style="margin:.65rem 0 0;line-height:1.65;">{{ run.summary_text|truncatechars:220 }}</p>
+                    {% endif %}
+                    <div style="margin-top:.75rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+                        <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Open</a>
+                        <a href="{% url 'learning_insights:ai_run_edit' run.id %}" class="c-btn c-btn--ghost">Edit</a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="c-card__meta" style="margin-top:1rem;">No AI runs yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

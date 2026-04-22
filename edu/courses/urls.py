@@ -82,6 +82,11 @@ urlpatterns = [
         views.ContentOrderview.as_view(),
         name="content_order",
     ),
+    path(
+        "motto/refresh/",
+        views.refresh_daily_motto,
+        name="motto_refresh",
+    ),
 
     # -------------------------------
     # Public catalog routes

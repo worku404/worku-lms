@@ -40,9 +40,10 @@ def _plain_text_from_html(value: str) -> str:
 
 
 def build_note_search_document(note: Note) -> str:
+    tag_names = " ".join(tag.name for tag in note.tags.all())
     parts = [
         note.title,
-        note.tag.name if note.tag_id else "",
+        tag_names,
         _plain_text_from_html(note.content_html),
     ]
     return _normalize_whitespace(" ".join(p for p in parts if p))
@@ -50,7 +51,7 @@ def build_note_search_document(note: Note) -> str:
 
 def refresh_note_search_index(note_id: int) -> bool:
     try:
-        note = Note.objects.select_related("tag").get(id=note_id)
+        note = Note.objects.prefetch_related("tags").get(id=note_id)
     except Note.DoesNotExist:
         return False
     document = build_note_search_document(note)
@@ -66,7 +67,7 @@ def delete_note_search_index(note_id: int) -> None:
 
 
 def rebuild_note_search_index(note_ids: list[int] | None = None) -> dict[str, int]:
-    queryset = Note.objects.select_related("tag")
+    queryset = Note.objects.prefetch_related("tags")
     if note_ids:
         queryset = queryset.filter(id__in=note_ids)
 

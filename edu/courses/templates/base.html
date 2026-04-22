@@ -17,6 +17,11 @@
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    {% if request.user.is_authenticated %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+    {% endif %}
 
 </head>
 <body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}">
@@ -108,33 +113,69 @@
 
     <main class="l-shell">
         <aside class="l-rail l-rail--left" aria-label="Primary navigation">
-            <nav class="c-nav">
-                <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
-                <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
-                <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
+             <nav class="c-nav">
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
+                 <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
                 {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
                 {% endif %}
-            </nav>
+                <a href="{% url 'learning_insights:overview' %}" class="c-nav__item{% if '/insights/' in request.path %} is-active{% endif %}">Insights</a>
+             </nav>
             {% block motivation %}
             {% if request.user.is_authenticated %}
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
                 <h2 class="c-card__title">Today's Motto🔥</h2>
-                <!-- <p class="c-card__meta" style="color: #D9E2EC;">ምንም ከማድረግህ በፊት እናትህን አስብ።<br> የምትኖረው የወደፊት ህይወትህ ከሰው ልጆች ጋር ሳይሆን ከማይደክሙ machine ጋር የምትወዳደርበት መሆኑን አስታውስ።<br><strong> በቂ ብቻ ሳይሆን እጅግ የላቀ መሆን አለብህ😡</strong><br> ጊዜ የምታባክንበትም ሆነ የምታርፍበት ጊዜ የለም። ለእናትህ ስትል ጠንክረህ ማጥናት አለብህ። <br>
-                    <strong style="color: #FFD166; text-decoration: underline;">እማ ስለ ወደፊትህ ምን ትመኝ እንደነበር አስብ...</strong></p> text-decoration: underline;-->
-                    {% comment %} <strong style="color: #FFD166; ">Boom ሻካላካ... 😎🔥<br>ነቃ በል 😡😡😡</br></strong> {% endcomment %}
-                    {% comment %} <strong style="color: #FFD166; ">
-                        Man has a large capacity for effort. In fact, it is so much greater than we think it is, that few
-                        ever reach this capacity. We should value the faculty of knowing what we ought to do and
-                        having the will to do it. But understanding is easy. It is the doing that is difficult. The critical
-                        issue is not what we know but what we do with what we know. The great end of life is not
-                        knowledge but action. It is the father of the world depends on.
-                    </strong> {% endcomment %}
-                    <strong style="color: #FFD166; ">
-                       {# Slow is smooth, and smooth is fast.#}
-                       If it is easy do it easy, 
-                       if it is hard do it hard, just get it done(Jim Rohn)✍
+                    {% if daily_motto and daily_motto.text %}
+                    <strong style="color: #FFD166;" data-motto-text>
+                        {{ daily_motto.text }}
                     </strong>
+                    <p class="c-card__meta">
+                        — <span data-motto-author>{{ daily_motto.author|default:"Unknown" }}</span>
+                    </p>
+                    <div class="motto-actions">
+                        <button
+                            type="button"
+                            class="c-btn c-btn--ghost motto-refresh"
+                            data-motto-refresh
+                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-url="{% url 'motto_refresh' %}"
+                            aria-label="Refresh daily motto"
+                            title="Refresh daily motto"
+                        >
+                            <span class="u-sr-only">Refresh daily motto</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    {% else %}
+                    <strong style="color: #FFD166;" data-motto-text>
+                        Daily motto unavailable.
+                    </strong>
+                    <p class="c-card__meta">
+                        — <span data-motto-author>Unknown</span>
+                        <span class="c-card__meta" data-motto-note>AI-suggested</span>
+                    </p>
+                    <div class="motto-actions">
+                        <button
+                            type="button"
+                            class="c-btn c-btn--ghost motto-refresh"
+                            data-motto-refresh
+                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-url="{% url 'motto_refresh' %}"
+                            aria-label="Refresh daily motto"
+                            title="Refresh daily motto"
+                        >
+                            <span class="u-sr-only">Refresh daily motto</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    {% endif %}
                 <div class="c-progress"
                     role="progressbar"
                     aria-valuemin="0"
@@ -165,7 +206,7 @@
                     <ul id="focus-modules-list" class="c-focus-modules__list" data-focus-list hidden>
                         {% for course in top_courses %}
                         <li class="c-focus-modules__item">
-                            <a href="{% url 'student_course_detail' course.course_id %}" style=""><span class="c-focus-modules__name"> {{ course.course__title|truncatechars:20 }}</span></a>
+                            <a href="{% url 'student_course_detail' course.course_id %}" style=""><span class="c-focus-modules__name"> {{ course.course__title|truncatechars:17 }}</span></a>
                             <span class="c-focus-modules__time" style="color: #2A9D66;">{{ course.total_time|duration_format }}</span>
                         </li>
                         {% endfor %}
@@ -191,6 +232,15 @@
 
         <section id="content" class="l-main" aria-label="Learning workspace">
             <div id="main-content" class="l-main__inner">
+                {% if messages %}
+                    <div style="display:grid; gap: .75rem; margin-bottom: 1rem;">
+                        {% for message in messages %}
+                            <div class="c-card c-alert {% if 'error' in message.tags %}c-alert--error{% elif 'warning' in message.tags %}c-alert--warn{% else %}c-alert--info{% endif %}" role="{% if 'error' in message.tags or 'warning' in message.tags %}alert{% else %}status{% endif %}">
+                                <p class="c-card__meta" style="margin:0;">{{ message }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
                 {% block content %}{% endblock %}
             </div>
         </section>
@@ -534,6 +584,216 @@
         }
 
         connectNotificationSocket();
+    })();
+
+    (function () {
+        const stack = document.getElementById("chat-notification-stack");
+        if (!stack) return;
+
+        const shownInsightIds = new Set();
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function isInsideInsightsNotifications() {
+            const path = window.location.pathname || "";
+            return path.startsWith("/insights/notifications");
+        }
+
+        function createToast(item) {
+            if (!item || !item.id) return null;
+            if (shownInsightIds.has(item.id)) return null;
+            if (isInsideInsightsNotifications()) return null;
+
+            shownInsightIds.add(item.id);
+
+            const toast = document.createElement("article");
+            toast.className = "c-toast";
+
+            const title = escapeHtml(item.title || "Learning Insights");
+            const body = escapeHtml(item.body || "");
+            const url = item.url || "{% url 'learning_insights:notification_center' %}";
+
+            toast.innerHTML = `
+                <div class="c-toast__head">
+                    <strong class="c-toast__title">${title}</strong>
+                    <button type="button" class="c-toast__close" aria-label="Dismiss notification">&times;</button>
+                </div>
+                <p class="c-toast__meta">Learning Insights</p>
+                <p class="c-toast__body">${body}</p>
+                <a class="c-toast__link" href="${escapeHtml(url)}">Open</a>
+            `;
+
+            const closeBtn = toast.querySelector(".c-toast__close");
+            if (closeBtn) {
+                closeBtn.addEventListener("click", () => {
+                    toast.remove();
+                });
+            }
+
+            setTimeout(() => {
+                toast.remove();
+            }, 20000);
+
+            return toast;
+        }
+
+        function showToast(item) {
+            const toast = createToast(item);
+            if (!toast) return;
+            stack.prepend(toast);
+        }
+
+        let params = null;
+        let forceBootstrap = false;
+        try {
+            params = new URLSearchParams(window.location.search || "");
+            forceBootstrap = params.get("li_bootstrap") === "1";
+        } catch (error) {
+            params = null;
+            forceBootstrap = false;
+        }
+
+        if (forceBootstrap) {
+            try {
+                sessionStorage.setItem("insights_notifications_bootstrap_done", "1");
+            } catch (error) {
+                // Ignore session storage errors.
+            }
+        }
+
+        function clearForceParam() {
+            if (!forceBootstrap || !params) return;
+            params.delete("li_bootstrap");
+            const queryString = params.toString();
+            const nextUrl =
+                window.location.pathname +
+                (queryString ? "?" + queryString : "") +
+                (window.location.hash || "");
+            try {
+                history.replaceState(null, "", nextUrl);
+            } catch (error) {
+                // Ignore history errors.
+            }
+        }
+
+        let shouldBootstrap = forceBootstrap;
+        if (!shouldBootstrap) {
+            try {
+                const bootstrapKey = "insights_notifications_bootstrap_done";
+                if (sessionStorage.getItem(bootstrapKey) === "1") {
+                    shouldBootstrap = false;
+                } else {
+                    sessionStorage.setItem(bootstrapKey, "1");
+                    shouldBootstrap = true;
+                }
+            } catch (error) {
+                shouldBootstrap = true;
+            }
+        }
+
+        if (shouldBootstrap) {
+            fetch("{% url 'learning_insights:notifications_bootstrap' %}", {
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            })
+                .then((response) => (response.ok ? response.json() : { items: [] }))
+                .then((data) => {
+                    (data.items || []).forEach((item) => {
+                        showToast(item);
+                    });
+                    clearForceParam();
+                })
+                .catch(() => {
+                    clearForceParam();
+                    // Silent failure.
+                });
+        } else {
+            clearForceParam();
+        }
+    })();
+ 
+    (function () {
+        const refreshBtn = document.querySelector("[data-motto-refresh]");
+        if (!refreshBtn) return;
+
+        const textEl = document.querySelector("[data-motto-text]");
+        const authorEl = document.querySelector("[data-motto-author]");
+        const noteEl = document.querySelector("[data-motto-note]");
+        const refreshUrl = refreshBtn.getAttribute("data-motto-refresh-url");
+        const defaultLabel =
+            refreshBtn.getAttribute("data-motto-refresh-label") || "Refresh daily motto";
+        const defaultAriaLabel = refreshBtn.getAttribute("aria-label") || defaultLabel;
+        const defaultTitle = refreshBtn.getAttribute("title") || defaultLabel;
+
+        function getCookie(name) {
+            const cookie = document.cookie
+                .split("; ")
+                .find((row) => row.startsWith(name + "="));
+            return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+        }
+
+        function setLoading(isLoading) {
+            refreshBtn.classList.toggle("is-loading", isLoading);
+            refreshBtn.disabled = isLoading;
+            refreshBtn.setAttribute(
+                "aria-label",
+                isLoading ? "Refreshing daily motto" : defaultAriaLabel
+            );
+            refreshBtn.setAttribute("title", isLoading ? "Refreshing..." : defaultTitle);
+        }
+
+        function applyMotto(motto) {
+            if (!motto) return;
+            if (textEl && motto.text) {
+                textEl.textContent = motto.text;
+            }
+            if (authorEl) {
+                authorEl.textContent = motto.author || "Unknown";
+            }
+            if (noteEl) {
+                noteEl.textContent = motto.source_note || "AI-suggested";
+            }
+        }
+
+        refreshBtn.addEventListener("click", async () => {
+            if (!refreshUrl) return;
+            setLoading(true);
+            try {
+                const response = await fetch(refreshUrl, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Unable to refresh.");
+                }
+                applyMotto(data.motto);
+            } catch (error) {
+                refreshBtn.classList.add("is-error");
+                refreshBtn.setAttribute("aria-label", "Refresh failed");
+                refreshBtn.setAttribute("title", "Refresh failed");
+                window.setTimeout(() => {
+                    refreshBtn.classList.remove("is-error");
+                    refreshBtn.setAttribute("aria-label", defaultAriaLabel);
+                    refreshBtn.setAttribute("title", defaultTitle);
+                }, 1400);
+            } finally {
+                setLoading(false);
+            }
+        });
     })();
 
     document.addEventListener("DOMContentLoaded", function () {
