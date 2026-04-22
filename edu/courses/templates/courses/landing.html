@@ -1,0 +1,532 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NextGen Academy is an AI-powered learning workspace for notes, videos, plans, goals, and reminders in one place.">
+    <title>NextGen Academy | Learn with one AI-powered workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+</head>
+<body class="landing-page">
+    <a class="landing-skip-link" href="#main-content">Skip to content</a>
+
+    <header class="landing-header" aria-label="Primary header">
+        <div class="landing-container landing-header__inner">
+            <a href="{% url 'home' %}" class="landing-brand" aria-label="NextGen Academy home">
+                <span class="landing-brand__mark" aria-hidden="true">N</span>
+                <span class="landing-brand__text">
+                    <span class="landing-brand__name">NextGen Academy</span>
+                    <span class="landing-brand__tag">AI notes, plans, goals, and reminders in one place</span>
+                </span>
+            </a>
+
+            <nav class="landing-nav" aria-label="Primary navigation">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How it works</a>
+                <a href="#stories">Testimonials</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+
+            <div class="landing-header__actions">
+                <a href="{% url 'login' %}?next={% url 'course_list' %}" class="c-btn c-btn--secondary">Log in</a>
+                <a href="{% url 'student_registration' %}" class="c-btn c-btn--primary">Sign up free</a>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <section class="landing-hero landing-container" aria-labelledby="landing-hero-title">
+            <div class="landing-hero__copy">
+                <p class="landing-eyebrow">All-in-one AI learning workspace</p>
+                <h1 id="landing-hero-title">Turn every study session into visible progress.</h1>
+                <p class="landing-lead">
+                    Organize notes, ask AI for instant guidance, watch videos and documents without switching apps,
+                    build adaptive plans, and stay on track with goals and reminders.
+                </p>
+
+                <div class="landing-hero__actions">
+                    <a href="{% url 'student_registration' %}" class="c-btn c-btn--primary landing-hero__cta">Get started free</a>
+                    <a href="{% url 'login' %}?next={% url 'course_list' %}" class="c-btn c-btn--secondary landing-hero__cta">Log in</a>
+                    <a href="{% url 'course_list' %}" class="landing-text-link">Explore the course catalog</a>
+                </div>
+
+                <p class="landing-hero__microcopy">
+                    Built for students, professionals, and lifelong learners who want one focused place for notes,
+                    media, planning, and follow-through.
+                </p>
+
+                <div class="landing-badges" aria-label="Core benefits">
+                    <span class="landing-badge">Structured notes</span>
+                    <span class="landing-badge">AI study support</span>
+                    <span class="landing-badge">Video + PDF learning</span>
+                    <span class="landing-badge">Goals + reminders</span>
+                </div>
+            </div>
+
+            <div class="landing-hero__visual" aria-label="Product preview">
+                <div class="landing-preview">
+                    <article class="landing-preview-card landing-preview-card--assistant">
+                        <div class="landing-preview-card__header">
+                            <span class="landing-preview-card__eyebrow">AI Study Assistant</span>
+                            <span class="landing-preview-chip">Summarize chapter 4</span>
+                        </div>
+                        <p class="landing-preview-card__text">
+                            "Break this lesson into five takeaways and flag the terms I should review again."
+                        </p>
+                        <div class="landing-preview-response">
+                            <strong>Quick answer</strong>
+                            <p>
+                                AI can summarize, clarify, and suggest the next study step before you lose momentum.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="landing-preview-card landing-preview-card--notes">
+                        <div class="landing-preview-card__header">
+                            <span class="landing-preview-card__eyebrow">Knowledge hub</span>
+                            <span class="landing-preview-chip landing-preview-chip--soft">3 tags</span>
+                        </div>
+                        <ul class="landing-note-list">
+                            <li>
+                                <strong>Research methods</strong>
+                                <span>Linked to lecture video, readings, and revision prompts.</span>
+                            </li>
+                            <li>
+                                <strong>Exam prep</strong>
+                                <span>Topic tags keep dense material easy to revisit.</span>
+                            </li>
+                        </ul>
+                    </article>
+
+                    <article class="landing-preview-card landing-preview-card--goals">
+                        <div class="landing-preview-card__header">
+                            <span class="landing-preview-card__eyebrow">Goal tracker</span>
+                            <span class="landing-preview-chip landing-preview-chip--accent">Week 3</span>
+                        </div>
+                        <div class="landing-progress-row">
+                            <span>Daily goal</span>
+                            <div class="c-progress" aria-hidden="true"><span class="c-progress__bar" style="width: 76%;"></span></div>
+                        </div>
+                        <div class="landing-progress-row">
+                            <span>Monthly goal</span>
+                            <div class="c-progress" aria-hidden="true"><span class="c-progress__bar" style="width: 58%;"></span></div>
+                        </div>
+                        <p class="landing-preview-card__footnote">Telegram reminder queued for tomorrow at 7:00 AM.</p>
+                    </article>
+
+                    <article class="landing-preview-card landing-preview-card--media">
+                        <div class="landing-preview-card__header">
+                            <span class="landing-preview-card__eyebrow">Multimedia player</span>
+                            <span class="landing-preview-chip landing-preview-chip--soft">YouTube + PDF + local video</span>
+                        </div>
+                        <div class="landing-media-frame" aria-hidden="true">
+                            <div class="landing-media-frame__play"></div>
+                            <div class="landing-media-frame__timeline">
+                                <span style="width: 48%;"></span>
+                            </div>
+                        </div>
+                        <p class="landing-preview-card__footnote">
+                            Watch, annotate, and take notes without leaving the learning flow.
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="landing-section landing-container landing-solution" aria-labelledby="problem-solution-title">
+            <div class="landing-section__header">
+                <p class="landing-eyebrow">Why learners stall</p>
+                <h2 id="problem-solution-title">Studying breaks when the system is scattered.</h2>
+                <p>
+                    Notes get buried, plans live in spreadsheets, reminders disappear, and the next study step gets
+                    fuzzy. This platform keeps the entire workflow in one calm, guided workspace.
+                </p>
+            </div>
+
+            <div class="landing-pain-grid">
+                <article class="c-card landing-pain-card">
+                    <h3 class="c-card__title">Too many tabs</h3>
+                    <p class="c-card__meta">
+                        Switch less. Keep videos, docs, notes, and AI guidance connected in one workspace.
+                    </p>
+                </article>
+                <article class="c-card landing-pain-card">
+                    <h3 class="c-card__title">Scattered notes</h3>
+                    <p class="c-card__meta">
+                        Capture ideas with tags, categories, and resource links so nothing gets lost later.
+                    </p>
+                </article>
+                <article class="c-card landing-pain-card">
+                    <h3 class="c-card__title">No clear momentum</h3>
+                    <p class="c-card__meta">
+                        Turn goals into a plan, then track the small wins that add up to real progress.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section id="features" class="landing-section landing-container" aria-labelledby="features-title">
+            <div class="landing-section__header">
+                <p class="landing-eyebrow">Feature showcase</p>
+                <h2 id="features-title">Built around the way real people learn.</h2>
+                <p>
+                    Every core tool reinforces the same outcome: less friction, more focus, and measurable progress.
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 4h8l4 4v12H7z"></path>
+                            <path d="M15 4v4h4"></path>
+                            <path d="M9 12h6"></path>
+                            <path d="M9 16h6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Intelligent note-taking & knowledge hub</h3>
+                    <p class="c-card__meta">
+                        Capture ideas in rich text, tag them by topic, and link them back to the exact resource that
+                        sparked the insight.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>Rich-text editor for quick capture and clean review.</li>
+                        <li>Tags, categories, and linked resources keep knowledge searchable.</li>
+                        <li>Turn raw notes into a structured study library.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3l1.8 4.3L18 9l-4.2 1.7L12 15l-1.8-4.3L6 9l4.2-1.7z"></path>
+                            <path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Integrated AI study assistant</h3>
+                    <p class="c-card__meta">
+                        Ask questions, generate study prompts, summarize long material, and catch errors before they
+                        spread.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>AI-driven Q&A for quick clarification.</li>
+                        <li>Essay and summary prompts to get unstuck faster.</li>
+                        <li>Smart suggestions and error checking to sharpen output.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 6h16v12H4z"></path>
+                            <path d="m10 9 5 3-5 3z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Comprehensive multimedia learning player</h3>
+                    <p class="c-card__meta">
+                        Keep local videos, YouTube lessons, PDFs, text, and images in one focused workspace.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>Upload and watch personal study videos in place.</li>
+                        <li>Embed YouTube lessons without leaving the platform.</li>
+                        <li>Annotate, highlight, and learn directly from documents and visuals.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19h16"></path>
+                            <path d="M7 16l5-5 3 3 5-6"></path>
+                            <path d="M19 8h1v1"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Dynamic plan generation</h3>
+                    <p class="c-card__meta">
+                        Create structured, adaptable learning paths tailored to your goals, projects, or course
+                        requirements.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>Build course outlines and project plans manually or with AI.</li>
+                        <li>Generate daily and weekly study schedules in seconds.</li>
+                        <li>Adjust the plan as deadlines, energy, or priorities change.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="8"></circle>
+                            <path d="M12 7v5l3 2"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Robust goal tracking system</h3>
+                    <p class="c-card__meta">
+                        Stay motivated, measure tangible progress, and work toward short-term milestones and long-term
+                        aspirations.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>Daily, weekly, and monthly goal tracking.</li>
+                        <li>Long-term goal views for skill and career growth.</li>
+                        <li>Progress bars, completion states, and momentum cues.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 10a6 6 0 0 1 12 0c0 4 2 5 2 6H4c0-1 2-2 2-6"></path>
+                            <path d="M10 20a2 2 0 0 0 4 0"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">Multi-channel notification system</h3>
+                    <p class="c-card__meta">
+                        Never miss an important deadline, update, or study reminder with alerts that meet you where
+                        you already are.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>In-website notifications for real-time reminders.</li>
+                        <li>Telegram integration for crucial updates and progress reports.</li>
+                        <li>Consistent nudges that keep learning in motion.</li>
+                    </ul>
+                </article>
+
+                <article class="c-card feature-card feature-card--wide">
+                    <div class="feature-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 19h14"></path>
+                            <path d="M7 16V8l5-3 5 3v8"></path>
+                            <path d="M9 12h6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="c-card__title">And so much more</h3>
+                    <p class="c-card__meta">
+                        Progress reporting, skill validation, community features, and gamified milestones can grow with
+                        the platform as your learning needs evolve.
+                    </p>
+                    <ul class="feature-card__list">
+                        <li>Performance snapshots that reveal what is working.</li>
+                        <li>Streaks, milestones, and skill checks to keep momentum visible.</li>
+                        <li>A product foundation ready for future community features.</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section id="how-it-works" class="landing-section landing-container" aria-labelledby="how-it-works-title">
+            <div class="landing-section__header">
+                <p class="landing-eyebrow">How it works</p>
+                <h2 id="how-it-works-title">A simple flow that keeps learners moving.</h2>
+                <p>
+                    The experience stays light and predictable: set a goal, start studying, and let the platform show
+                    what to do next.
+                </p>
+            </div>
+
+            <div class="landing-steps">
+                <article class="c-card step-card">
+                    <span class="step-card__number">1</span>
+                    <h3 class="c-card__title">Sign up and set your direction</h3>
+                    <p class="c-card__meta">
+                        Create your account, define the subject or project you care about, and choose the goals you
+                        want to reach.
+                    </p>
+                </article>
+
+                <article class="c-card step-card">
+                    <span class="step-card__number">2</span>
+                    <h3 class="c-card__title">Capture, plan, and learn in context</h3>
+                    <p class="c-card__meta">
+                        Take notes, ask the AI assistant for help, watch lesson material, and build a plan that fits
+                        your week.
+                    </p>
+                </article>
+
+                <article class="c-card step-card">
+                    <span class="step-card__number">3</span>
+                    <h3 class="c-card__title">Measure progress and stay on track</h3>
+                    <p class="c-card__meta">
+                        Track goals, review reports, and receive reminders so momentum becomes a habit instead of a
+                        lucky streak.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section id="stories" class="landing-section landing-container" aria-labelledby="stories-title">
+            <div class="landing-section__header">
+                <p class="landing-eyebrow">Social proof</p>
+                <h2 id="stories-title">Learners stay because the workflow feels manageable.</h2>
+                <p>Built to feel calm, not crowded, even when the subject matter gets heavy.</p>
+            </div>
+
+            <div class="testimonial-grid">
+                <article class="c-card testimonial-card">
+                    <p class="testimonial-card__quote">
+                        "I stopped scattering notes across notebooks and browser tabs. The AI summaries help me restart
+                        faster after a long break."
+                    </p>
+                    <div class="testimonial-card__person">
+                        <strong>Maya</strong>
+                        <span>University student</span>
+                    </div>
+                </article>
+
+                <article class="c-card testimonial-card">
+                    <p class="testimonial-card__quote">
+                        "The learning plans make self-paced courses feel concrete. I can see what to do next instead of
+                        guessing."
+                    </p>
+                    <div class="testimonial-card__person">
+                        <strong>Daniel</strong>
+                        <span>Product manager</span>
+                    </div>
+                </article>
+
+                <article class="c-card testimonial-card">
+                    <p class="testimonial-card__quote">
+                        "The goal tracker and reminders keep me honest without making the platform feel noisy."
+                    </p>
+                    <div class="testimonial-card__person">
+                        <strong>Aisha</strong>
+                        <span>Career switcher</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section id="faq" class="landing-section landing-container" aria-labelledby="faq-title">
+            <div class="landing-section__header">
+                <p class="landing-eyebrow">FAQ</p>
+                <h2 id="faq-title">Common questions before you sign up.</h2>
+                <p>Short answers that help visitors decide quickly and confidently.</p>
+            </div>
+
+            <div class="faq-grid">
+                <details class="c-card faq-item">
+                    <summary>Is it free to get started?</summary>
+                    <p class="c-card__meta">Yes. You can sign up and start organizing immediately.</p>
+                </details>
+
+                <details class="c-card faq-item">
+                    <summary>Can I use my own videos and documents?</summary>
+                    <p class="c-card__meta">
+                        Yes. Upload local video, open PDFs, work with text and images, and connect YouTube lessons.
+                    </p>
+                </details>
+
+                <details class="c-card faq-item">
+                    <summary>How does the AI assistant help?</summary>
+                    <p class="c-card__meta">
+                        It can answer questions, summarize content, suggest study steps, and flag likely mistakes.
+                    </p>
+                </details>
+
+                <details class="c-card faq-item">
+                    <summary>Do notifications work outside the browser?</summary>
+                    <p class="c-card__meta">
+                        Yes. In-app notifications are built in, and Telegram can deliver reminders and progress reports.
+                    </p>
+                </details>
+
+                <details class="c-card faq-item">
+                    <summary>Will it work on mobile?</summary>
+                    <p class="c-card__meta">
+                        Yes. The layout is responsive and designed to adapt from phones to large screens.
+                    </p>
+                </details>
+
+                <details class="c-card faq-item">
+                    <summary>Is my data private?</summary>
+                    <p class="c-card__meta">
+                        Your workspace is account-based, and access stays scoped to the features and channels you enable.
+                    </p>
+                </details>
+            </div>
+        </section>
+
+        <section class="landing-section landing-container landing-cta-band" aria-labelledby="final-cta-title">
+            <div>
+                <p class="landing-eyebrow">Ready to begin?</p>
+                <h2 id="final-cta-title">Bring notes, AI, plans, and progress into one learning flow.</h2>
+                <p>
+                    Build a workspace that helps you start faster, stay focused, and finish stronger.
+                </p>
+            </div>
+
+            <div class="landing-cta-band__actions">
+                <a href="{% url 'student_registration' %}" class="c-btn c-btn--primary">Sign up free</a>
+                <a href="{% url 'login' %}?next={% url 'course_list' %}" class="c-btn c-btn--secondary">Log in</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="landing-footer" id="about">
+        <div class="landing-container landing-footer__inner">
+            <div class="landing-footer__intro">
+                <a href="{% url 'home' %}" class="landing-brand landing-brand--footer" aria-label="NextGen Academy home">
+                    <span class="landing-brand__mark" aria-hidden="true">N</span>
+                    <span class="landing-brand__text">
+                        <span class="landing-brand__name">NextGen Academy</span>
+                        <span class="landing-brand__tag">A calm learning system for ambitious people</span>
+                    </span>
+                </a>
+                <p>
+                    NextGen Academy helps learners keep everything connected: notes, media, goals, reminders, and AI
+                    support.
+                </p>
+            </div>
+
+            <div class="landing-footer__grid">
+                <article class="c-card footer-card" id="privacy">
+                    <h3 class="c-card__title">Privacy Policy</h3>
+                    <p class="c-card__meta">
+                        Your workspace data stays tied to your account, and notifications only go where you enable them.
+                    </p>
+                </article>
+
+                <article class="c-card footer-card" id="terms">
+                    <h3 class="c-card__title">Terms of Service</h3>
+                    <p class="c-card__meta">
+                        Use the platform responsibly, respect content rights, and treat AI suggestions as support, not a
+                        substitute for judgment.
+                    </p>
+                </article>
+
+                <article class="c-card footer-card" id="contact">
+                    <h3 class="c-card__title">Contact Us</h3>
+                    <p class="c-card__meta">
+                        Questions, feedback, or partnership ideas? Email <a href="mailto:hello@nextgenacademy.example">hello@nextgenacademy.example</a>.
+                    </p>
+                </article>
+
+                <article class="c-card footer-card">
+                    <h3 class="c-card__title">About Us</h3>
+                    <p class="c-card__meta">
+                        We reduce friction between learning moments so notes, plans, and progress work like one system.
+                    </p>
+                </article>
+            </div>
+
+            <div class="landing-footer__bar">
+                <nav class="landing-footer__links" aria-label="Footer links">
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How it works</a>
+                    <a href="#stories">Testimonials</a>
+                    <a href="#faq">FAQ</a>
+                    <a href="#privacy">Privacy Policy</a>
+                    <a href="#terms">Terms of Service</a>
+                    <a href="#contact">Contact Us</a>
+                    <a href="#about">About Us</a>
+                </nav>
+                <p>© 2026 NextGen Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
