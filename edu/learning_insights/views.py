@@ -32,6 +32,8 @@ from .services.analytics import (
 from .services.common import get_local_date, get_period_start
 from .services.goals import sync_goal_progress_for_user
 from .services.notifications import (
+    create_goal_batch_notification,
+    create_goal_created_notification,
     dismiss_notification,
     ensure_due_notifications,
     get_notification_payload,
@@ -46,13 +48,11 @@ from .services.telegram import (
     send_notification,
 )
 from .services.ai_coach import (
-    apply_daily_plan_run,
-    apply_weekly_plan_run,
-    generate_daily_plan_run,
+    apply_prompt_plan_run,
     generate_daily_review_run,
     generate_improvement_run,
+    generate_prompt_plan_run,
     generate_recovery_run,
-    generate_weekly_plan_run,
     generate_weekly_review_run,
 )
 
@@ -266,7 +266,9 @@ class GoalCreateView(GoalFormMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.user = self.request.user
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        create_goal_created_notification(goal=self.object)
+        return response
 
     def get_initial(self):
         initial = super().get_initial()
@@ -301,6 +303,28 @@ class GoalCreateView(GoalFormMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Create Goal"
         context["form_mode"] = "create"
+
+        ai_run = None
+        raw_ai_run = (self.request.GET.get("ai_run") or "").strip()
+        if raw_ai_run.isdigit():
+            ai_run = (
+                AIPlanRun.objects.filter(
+                    user=self.request.user,
+                    kind=AIPlanRun.KIND_PROMPT_PLAN,
+                    pk=int(raw_ai_run),
+                )
+                .order_by("-created_at", "-id")
+                .first()
+            )
+
+        ai_output = ai_run.effective_payload if ai_run else None
+        context["ai_run"] = ai_run
+        context["ai_output"] = ai_output if isinstance(ai_output, dict) else None
+        context["ai_prompt"] = (
+            str(ai_run.input_payload.get("user_prompt") or "").strip()
+            if ai_run and isinstance(ai_run.input_payload, dict)
+            else ""
+        )
         return context
 
 
@@ -312,6 +336,114 @@ class GoalUpdateView(GoalFormMixin, UpdateView):
         context["page_title"] = "Edit Goal"
         context["form_mode"] = "edit"
         return context
+
+
+class GoalAIPlannerView(InsightsBaseMixin, View):
+    """
+    Prompt-based planning flow embedded on the goal create page.
+
+    This view handles both:
+    - starting a new AI prompt plan run
+    - continuing a run by answering clarification questions
+    """
+
+    def post(self, request, *args, **kwargs):
+        preference = self.get_notification_preference()
+        action = (request.POST.get("action") or "start").strip().lower()
+
+        if action == "continue":
+            run_id = (request.POST.get("run_id") or "").strip()
+            run = get_object_or_404(
+                AIPlanRun.objects.filter(user=request.user),
+                pk=run_id,
+                kind=AIPlanRun.KIND_PROMPT_PLAN,
+            )
+
+            output = run.effective_payload if isinstance(run.effective_payload, dict) else {}
+            current_questions = output.get("questions") if isinstance(output.get("questions"), list) else []
+
+            previous = run.input_payload if isinstance(run.input_payload, dict) else {}
+            previous_clarification = (
+                previous.get("clarification") if isinstance(previous.get("clarification"), dict) else {}
+            )
+            previous_questions = (
+                previous_clarification.get("previous_questions")
+                if isinstance(previous_clarification.get("previous_questions"), list)
+                else []
+            )
+            previous_answers = (
+                previous_clarification.get("previous_answers")
+                if isinstance(previous_clarification.get("previous_answers"), dict)
+                else {}
+            )
+
+            answers: dict[str, Any] = {}
+            for key, value in request.POST.items():
+                if not key.startswith("answer_"):
+                    continue
+                qid = key.removeprefix("answer_").strip()
+                if not qid:
+                    continue
+                answers[qid] = (value or "").strip()
+
+            merged_questions = list(previous_questions) + list(current_questions)
+            merged_answers = dict(previous_answers)
+            merged_answers.update(answers)
+
+            user_prompt = str(previous.get("user_prompt") or "").strip()
+            if not user_prompt:
+                user_prompt = (request.POST.get("prompt") or "").strip()
+
+            new_run = generate_prompt_plan_run(
+                user=request.user,
+                preference=preference,
+                user_prompt=user_prompt,
+                previous_questions=merged_questions,
+                previous_answers=merged_answers,
+            )
+        else:
+            prompt_value = (request.POST.get("prompt") or "").strip()
+            if not prompt_value:
+                messages.error(request, "Describe what you want to plan first.")
+                return HttpResponseRedirect(reverse("learning_insights:goal_create"))
+
+            new_run = generate_prompt_plan_run(
+                user=request.user,
+                preference=preference,
+                user_prompt=prompt_value,
+            )
+
+        if new_run.status == AIPlanRun.STATUS_SUCCESS:
+            messages.success(request, "AI response generated. Review and apply if it looks good.")
+        else:
+            messages.error(request, f"AI planning failed: {new_run.summary_text or new_run.error_message}")
+
+        return HttpResponseRedirect(
+            _with_query_param(reverse("learning_insights:goal_create"), ai_run=str(new_run.id))
+        )
+
+
+class GoalAIApplyView(InsightsBaseMixin, View):
+    def post(self, request, *args, **kwargs):
+        run = get_object_or_404(
+            AIPlanRun.objects.filter(user=request.user),
+            pk=kwargs.get("pk"),
+            kind=AIPlanRun.KIND_PROMPT_PLAN,
+        )
+
+        created = apply_prompt_plan_run(run=run)
+        if created:
+            messages.success(request, f"Applied AI plan: created {created} daily goal(s).")
+            create_goal_batch_notification(
+                user=request.user,
+                created_count=created,
+                source="ai_plan",
+                reference_id=run.id,
+            )
+        else:
+            messages.info(request, "Nothing applied. Ensure the AI output is a plan you can apply.")
+
+        return HttpResponseRedirect(_with_query_param(reverse("learning_insights:goal_list"), li_bootstrap="1"))
 
 
 class GoalDeleteView(GoalQuerysetMixin, DeleteView):
@@ -602,77 +734,6 @@ class AIRunQuerysetMixin(InsightsBaseMixin):
         return AIPlanRun.objects.filter(user=self.request.user).order_by("-created_at", "-id")
 
 
-class AIPlanHubView(AIRunQuerysetMixin, TemplateView):
-    template_name = "learning_insights/ai/plan.html"
-
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        preference = self.get_notification_preference()
-        runs = list(self.get_queryset().filter(kind=AIPlanRun.KIND_WEEKLY_PLAN)[:20])
-        context["page_title"] = "AI Weekly Plan"
-        context["runs"] = runs
-        context["latest_run"] = runs[0] if runs else None
-        context["subscription"] = get_subscription_for_user(user=self.request.user)
-        anchor = parse_date(self.request.GET.get("start") or "") or get_local_date(
-            preference=preference
-        )
-        context["plan_start"] = get_period_start(
-            anchor,
-            Goal.PERIOD_WEEKLY,
-            week_start_day=preference.week_start_day,
-        )
-        return context
-
-
-class AIPlanGenerateView(InsightsBaseMixin, View):
-    def post(self, request, *args, **kwargs):
-        preference = self.get_notification_preference()
-        start_date = parse_date(request.POST.get("start") or "")
-        run = generate_weekly_plan_run(
-            user=request.user,
-            preference=preference,
-            reference_date=start_date,
-        )
-        if run.status == AIPlanRun.STATUS_SUCCESS:
-            messages.success(request, "AI weekly plan generated. Review and edit before applying.")
-        else:
-            messages.error(request, f"AI plan generation failed: {run.summary_text or run.error_message}")
-        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
-
-
-class AIDailyPlanHubView(AIRunQuerysetMixin, TemplateView):
-    template_name = "learning_insights/ai/daily_plan.html"
-
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        preference = self.get_notification_preference()
-        runs = list(self.get_queryset().filter(kind=AIPlanRun.KIND_DAILY_PLAN)[:20])
-        context["page_title"] = "AI Daily Plan"
-        context["runs"] = runs
-        context["latest_run"] = runs[0] if runs else None
-        context["subscription"] = get_subscription_for_user(user=self.request.user)
-        context["plan_day"] = parse_date(self.request.GET.get("day") or "") or get_local_date(
-            preference=preference
-        )
-        return context
-
-
-class AIDailyPlanGenerateView(InsightsBaseMixin, View):
-    def post(self, request, *args, **kwargs):
-        preference = self.get_notification_preference()
-        day = parse_date(request.POST.get("day") or "")
-        run = generate_daily_plan_run(
-            user=request.user,
-            preference=preference,
-            reference_date=day,
-        )
-        if run.status == AIPlanRun.STATUS_SUCCESS:
-            messages.success(request, "AI daily plan generated. Review and edit before applying.")
-        else:
-            messages.error(request, f"AI plan generation failed: {run.summary_text or run.error_message}")
-        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
-
-
 class AIReviewHubView(AIRunQuerysetMixin, TemplateView):
     template_name = "learning_insights/ai/review.html"
 
@@ -778,14 +839,15 @@ class AIRunEditView(AIRunQuerysetMixin, TemplateView):
 class AIRunApplyView(AIRunQuerysetMixin, View):
     def post(self, request, *args, **kwargs):
         run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
-        if run.kind == AIPlanRun.KIND_WEEKLY_PLAN:
-            created = apply_weekly_plan_run(run=run)
-        elif run.kind == AIPlanRun.KIND_DAILY_PLAN:
-            created = apply_daily_plan_run(run=run)
-        else:
-            created = 0
+        created = apply_prompt_plan_run(run=run)
         if created:
             messages.success(request, f"Applied plan: created {created} daily goal(s).")
+            create_goal_batch_notification(
+                user=request.user,
+                created_count=created,
+                source="ai_plan",
+                reference_id=run.id,
+            )
         else:
             messages.info(
                 request,
