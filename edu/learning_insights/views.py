@@ -80,6 +80,9 @@ class InsightsBaseMixin(LoginRequiredMixin):
     """
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+
         sync_goal_progress_for_user(request.user)
         ensure_due_notifications(request.user)
         return super().dispatch(request, *args, **kwargs)
