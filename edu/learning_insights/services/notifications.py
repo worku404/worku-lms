@@ -9,12 +9,14 @@ from django.utils import timezone
 from learning_insights.models import Goal, InsightNotification, NotificationPreference
 from learning_insights.services.analytics import build_daily_summary, build_weekly_summary
 from learning_insights.services.common import (
+    combine_local_date_time,
     get_local_now,
     get_or_create_notification_preference,
     get_period_end,
     get_period_start,
 )
 from learning_insights.services.goals import sync_goal_progress
+from learning_insights.services.tracking import get_last_activity_at
 
 
 def _notification_exists(user, dedupe_key: str) -> bool:
@@ -472,6 +474,139 @@ def create_course_completed_notification(
         payload={
             "course_id": course_id,
             "completed_at": completed_value,
+        },
+    )
+
+
+def _goal_target_label(goal: Goal) -> str:
+    target_value = getattr(goal, "target_value", None)
+    target_type = getattr(goal, "target_type", "") or ""
+
+    if target_value is None:
+        return ""
+
+    try:
+        numeric_value = float(target_value)
+    except (TypeError, ValueError):
+        return ""
+
+    if numeric_value <= 0:
+        return ""
+
+    if target_type == Goal.TARGET_MINUTES:
+        minutes = int(round(numeric_value))
+        return _minute_label(minutes)
+    if target_type == Goal.TARGET_TASKS:
+        tasks = int(round(numeric_value))
+        if tasks == 1:
+            return "1 task"
+        return f"{tasks} tasks"
+    if target_type == Goal.TARGET_COMPLETION_PERCENT:
+        percent = int(round(numeric_value))
+        return f"{percent}% completion"
+
+    return str(target_value)
+
+
+def create_goal_completed_notification(*, goal: Goal) -> InsightNotification | None:
+    if goal is None:
+        return None
+
+    goal_id = getattr(goal, "id", None)
+    if not goal_id:
+        return None
+
+    if getattr(goal, "status", None) != Goal.STATUS_COMPLETED:
+        return None
+
+    course = getattr(goal, "course", None)
+    course_id = getattr(goal, "course_id", None)
+    course_title = (getattr(course, "title", "") or "").strip()
+
+    target_label = _goal_target_label(goal)
+    title = "Goal completed ✅"
+
+    if course_title:
+        if target_label:
+            body = f'You just hit {target_label} for "{goal.title}" in {course_title}.\nKeep going — momentum compounds.'
+        else:
+            body = f'You completed "{goal.title}" for {course_title}.\nKeep going — momentum compounds.'
+    else:
+        if target_label:
+            body = f'You just hit {target_label} for "{goal.title}".\nKeep going — momentum compounds.'
+        else:
+            body = f'You completed "{goal.title}".\nKeep going — momentum compounds.'
+
+    return _create_notification(
+        user=goal.user,
+        category=InsightNotification.CATEGORY_GOAL_COMPLETED,
+        title=title,
+        body=body,
+        dedupe_key=f"goal-completed:{goal_id}",
+        scheduled_for=timezone.now(),
+        payload={
+            "goal_id": goal_id,
+            "course_id": course_id,
+        },
+    )
+
+
+INACTIVITY_WINDOW_START = time(hour=7, minute=0)
+INACTIVITY_WINDOW_END = time(hour=22, minute=0)
+INACTIVITY_THRESHOLD = timedelta(hours=2)
+
+
+def maybe_create_inactivity_warning_notification(
+    *,
+    user,
+    preference: NotificationPreference | None = None,
+    local_now=None,
+) -> InsightNotification | None:
+    if not getattr(user, "is_authenticated", False):
+        return None
+
+    preference = preference or get_or_create_notification_preference(user)
+    local_now = local_now or get_local_now(preference=preference)
+
+    if not _within_time_window(
+        local_now.time(), INACTIVITY_WINDOW_START, INACTIVITY_WINDOW_END
+    ):
+        return None
+
+    window_start = combine_local_date_time(
+        local_now.date(),
+        INACTIVITY_WINDOW_START,
+        preference=preference,
+    )
+
+    last_activity = get_last_activity_at(user=user)
+    if last_activity is None or last_activity < window_start:
+        last_activity = window_start
+
+    if (local_now - last_activity) < INACTIVITY_THRESHOLD:
+        return None
+
+    block_index = int(
+        max(0.0, (local_now - window_start).total_seconds())
+        // float(INACTIVITY_THRESHOLD.total_seconds())
+    )
+    dedupe_key = f"inactivity-warning:{local_now.date().isoformat()}:{block_index}"
+
+    body = (
+        "Two hours with zero activity.\n"
+        "Log in now and study — no excuses. Your goals won’t complete themselves."
+    )
+
+    return _create_notification(
+        user=user,
+        category=InsightNotification.CATEGORY_INACTIVITY_WARNING,
+        title="Inactivity warning ⚠️",
+        body=body,
+        dedupe_key=dedupe_key,
+        scheduled_for=timezone.now(),
+        payload={
+            "window_start": window_start.isoformat(),
+            "block_index": block_index,
         },
     )
 
