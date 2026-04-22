@@ -38,7 +38,7 @@
                                 <span class="c-module-item__eyebrow">
                                     Module <span class="order">{{ m.order|add:1 }}</span>
                                 </span>
-                                {{ m.title }}
+                                {{ m.title|truncatechars:20  }}
                                 <span class="c-module-item__progress-inline">
                                     <span
                                         class="c-module-item__progress"
@@ -112,7 +112,7 @@
                                 data-content-id="{{ content.id }}"
                                 id="content-{{ content.id }}"
                             >
-                                <h2 class="c-card__title">{{ item.title }}</h2>
+                                <h2 class="c-card__title">{{ item.title}}</h2>
                                 <div class="c-content-render">
                                     {% if content.content_type.model == "text" %}
                                         {% include "courses/content/text.html" with item=item content=content %}
