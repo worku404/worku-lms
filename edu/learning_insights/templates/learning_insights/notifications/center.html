@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load course %}
+
+{% block title %}Notifications | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="insights-notifications-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="insights-notifications-title" class="c-card__title" style="margin:0;">Notifications</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Daily reminders, weekly summaries, and goal notifications.
+            </p>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Overview</a>
+            <a href="{% url 'learning_insights:preferences' %}" class="c-btn c-btn--ghost">Preferences</a>
+        </div>
+    </div>
+</section>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;">
+    <article class="c-card">
+        <p class="c-card__meta">Total</p>
+        <h2 class="c-card__title" style="margin:0;">{{ page_obj.paginator.count|default:0 }}</h2>
+    </article>
+    <article class="c-card">
+        <p class="c-card__meta">Unread</p>
+        <h2 class="c-card__title" style="margin:0;color:#2A9D66;">{{ unread_count|default:0 }}</h2>
+    </article>
+    <article class="c-card">
+        <p class="c-card__meta">Types</p>
+        <h2 class="c-card__title" style="margin:0;">{{ category_count|default:0 }}</h2>
+    </article>
+</section>
+
+<section class="c-card" style="margin-top:1rem;" aria-labelledby="notification-filters-title">
+    <h2 id="notification-filters-title" class="c-card__title" style="margin:0;">Filters</h2>
+    <form method="get" style="margin-top:1rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:end;">
+        <div>
+            <label for="filter-category" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Category</label>
+            <select id="filter-category" name="category" class="c-search__input" style="min-width:220px;">
+                <option value="">All</option>
+                {% for value, label in category_choices %}
+                    <option value="{{ value }}"{% if selected_category == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="filter-unread" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Unread only</label>
+            <select id="filter-unread" name="unread" class="c-search__input" style="min-width:160px;">
+                <option value="">No</option>
+                <option value="1"{% if unread_only == "1" %} selected{% endif %}>Yes</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <button type="submit" class="c-btn c-btn--secondary">Apply</button>
+            <a href="{% url 'learning_insights:notification_center' %}" class="c-btn c-btn--ghost">Reset</a>
+        </div>
+    </form>
+</section>
+
+<section class="c-card" style="margin-top:1rem;" aria-labelledby="notifications-list-title">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <h2 id="notifications-list-title" class="c-card__title" style="margin:0;">Recent notifications</h2>
+        {% if unread_count %}
+            <form method="post" action="{% url 'learning_insights:notifications_mark_all_read' %}">
+                {% csrf_token %}
+                <button type="submit" class="c-btn c-btn--ghost">Mark all as read</button>
+            </form>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+        <div style="display:grid;gap:1rem;margin-top:1rem;">
+            {% for notification in notifications %}
+                <article class="c-card" style="margin:0;border:1px solid rgba(255,255,255,0.08);" aria-labelledby="notification-{{ notification.id }}-title">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+                        <div style="flex:1 1 420px;min-width:260px;">
+                            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                                <h3 id="notification-{{ notification.id }}-title" class="c-card__title" style="margin:0;">
+                                    {{ notification.title }}
+                                </h3>
+                                {% if not notification.read_at %}
+                                    <span class="c-badge" style="background:#2A9D66;color:#fff;padding:.2rem .55rem;border-radius:999px;font-size:.8rem;">New</span>
+                                {% endif %}
+                                <span class="c-badge" style="background:rgba(255,255,255,.08);padding:.2rem .55rem;border-radius:999px;font-size:.8rem;">
+                                    {{ notification.get_category_display|default:notification.category }}
+                                </span>
+                            </div>
+                            <p class="c-card__meta" style="margin:.45rem 0 0 0;">
+                                {% if notification.scheduled_for %}
+                                    Scheduled: {{ notification.scheduled_for|date:"M d, Y H:i" }}
+                                {% else %}
+                                    Created: {{ notification.created|date:"M d, Y H:i" }}
+                                {% endif %}
+                            </p>
+                            {% if notification.body %}
+                                <p style="margin:.85rem 0 0;line-height:1.65;">
+                                    {{ notification.body }}
+                                </p>
+                            {% endif %}
+                        </div>
+
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start;">
+                            {% with target_url=notification.get_target_url %}
+                                {% if target_url %}
+                                    <a href="{{ target_url }}" class="c-btn c-btn--ghost">Open</a>
+                                {% endif %}
+                            {% endwith %}
+
+                            {% if not notification.read_at %}
+                                <form method="post" action="{% url 'learning_insights:notification_mark_read' notification.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="c-btn c-btn--ghost">Mark read</button>
+                                </form>
+                            {% endif %}
+
+                            {% if not notification.dismissed_at %}
+                                <form method="post" action="{% url 'learning_insights:notification_dismiss' notification.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="c-btn c-btn--ghost">Dismiss</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Notification pagination" style="margin-top:1.25rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+                <p class="c-card__meta" style="margin:0;">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </p>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if unread_only %}&unread={{ unread_only }}{% endif %}" class="c-btn c-btn--ghost">Previous</a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if unread_only %}&unread={{ unread_only }}{% endif %}" class="c-btn c-btn--ghost">Next</a>
+                    {% endif %}
+                </div>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="c-card c-alert c-alert--info" style="margin-top:1rem;">
+            <h3 class="c-card__title" style="margin:0;">No notifications yet</h3>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Notifications appear after you study, set goals, and reach your reminder times.
+            </p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+

@@ -19,6 +19,8 @@ $url = "http://127.0.0.1:8000"
 $log = Join-Path $root "error/start.log"
 $djangoOut = Join-Path $root "error/django-out.log"
 $djangoErr = Join-Path $root "error/django-err.log"
+$workerOut = Join-Path $root "error/insights-worker-out.log"
+$workerErr = Join-Path $root "error/insights-worker-err.log"
 $lockFile = Join-Path $root "error/.start.lock"
 
 function Log([string]$m) {
@@ -154,6 +156,31 @@ try {
     Start-Sleep 1
 
     if (-not $serverReady) { throw "Django did not bind to 127.0.0.1:8000. Check $djangoErr" }
+
+    # Start Learning Insights worker (Telegram polling + notifications) if needed.
+    $workerProcIds = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+        Where-Object {
+            $_.CommandLine -and
+            $_.CommandLine -match "manage\.py\s+learning_insights_worker" -and
+            $_.CommandLine -like "*$root*"
+        } |
+        Select-Object -ExpandProperty ProcessId -Unique
+
+    if (-not $workerProcIds) {
+        $workerOut = Initialize-Utf8Log -path $workerOut
+        $workerErr = Initialize-Utf8Log -path $workerErr
+
+        Log "Starting Learning Insights worker"
+        Log "Worker stdout log: $workerOut"
+        Log "Worker stderr log: $workerErr"
+        $workerCmdLine = 'set "PYTHONUTF8=1" && set "PYTHONIOENCODING=utf-8" && "' + $python + '" -X utf8 manage.py learning_insights_worker --settings=edu.settings.local 1>>"' + $workerOut + '" 2>>"' + $workerErr + '"'
+        Start-Process -FilePath "cmd.exe" `
+            -WorkingDirectory $app `
+            -ArgumentList @("/d","/s","/c",$workerCmdLine) `
+            -WindowStyle Hidden
+    } else {
+        Log "Learning Insights worker already running"
+    }
 
     Start-Process $url
     Log "Browser opened: $url"

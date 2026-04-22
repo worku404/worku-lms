@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% load course %}
+
+{% block title %}{% if form.instance.pk %}Edit Goal{% else %}Create Goal{% endif %}{% endblock %}
+
+{% block content %}
+<section class="c-card" style="max-width: 980px; margin: 0 auto;" aria-labelledby="goal-form-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="goal-form-title" class="c-card__title" style="margin:0;">
+                {% if form.instance.pk %}Edit goal{% else %}Create a goal{% endif %}
+            </h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Define what you want to achieve, then track progress using study time and completion signals.
+            </p>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Back to goals</a>
+            <a href="{% url 'learning_insights:weekly_summary' %}" class="c-btn c-btn--ghost">Weekly summary</a>
+        </div>
+    </div>
+
+    {% if form_mode == "create" %}
+        <div class="c-card" id="ai-planner" style="margin-top:1rem;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
+            <h2 class="c-card__title" style="margin:0;">AI planner</h2>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                Describe your goal or upcoming exam and the AI will create a plan from your enrolled courses.
+            </p>
+
+            <form method="post" action="{% url 'learning_insights:goal_ai_planner' %}" style="margin-top:1rem;display:grid;gap:.75rem;">
+                {% csrf_token %}
+                <div>
+                    <label for="ai-prompt" class="c-card__meta" style="display:block;margin-bottom:.35rem;">Prompt</label>
+                    <textarea
+                        id="ai-prompt"
+                        name="prompt"
+                        rows="4"
+                        class="form-control"
+                        placeholder="Example: I have a Digital Logic exam tomorrow. Make a plan starting today using my enrolled courses."
+                    >{{ ai_prompt }}</textarea>
+                </div>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+                    <button type="submit" name="action" value="start" class="c-btn c-btn--primary">Ask AI</button>
+                    {% if ai_run %}
+                        <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--ghost">Clear</a>
+                        <a href="{% url 'learning_insights:ai_run_detail' ai_run.id %}" class="c-btn c-btn--ghost">Open run</a>
+                    {% endif %}
+                </div>
+            </form>
+
+            {% if ai_run and ai_output %}
+                <div style="margin-top:1rem;">
+                    <p class="c-card__meta" style="margin:0;">
+                        Status: <strong>{{ ai_run.get_status_display|default:ai_run.status }}</strong>
+                        &middot; {{ ai_run.created_at|date:"M d, Y H:i" }}
+                    </p>
+                    {% if ai_run.summary_text %}
+                        <p style="margin:.75rem 0 0;line-height:1.65;">{{ ai_run.summary_text }}</p>
+                    {% endif %}
+                </div>
+
+                {% if ai_output.type == "clarification" and ai_output.questions %}
+                    <div style="margin-top:1rem;">
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Quick questions</h3>
+                        <p class="c-card__meta" style="margin-top:.35rem;">Answer these so the plan can be precise.</p>
+
+                        <form method="post" action="{% url 'learning_insights:goal_ai_planner' %}" style="margin-top:1rem;display:grid;gap:.75rem;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="continue">
+                            <input type="hidden" name="run_id" value="{{ ai_run.id }}">
+                            <input type="hidden" name="prompt" value="{{ ai_prompt|escape }}">
+
+                            {% for q in ai_output.questions %}
+                                <div>
+                                    <label class="c-card__meta" style="display:block;margin-bottom:.35rem;">
+                                        {{ q.label }}
+                                    </label>
+                                    <input
+                                        type="{% if q.type == 'date' %}date{% elif q.type == 'number' %}number{% else %}text{% endif %}"
+                                        name="answer_{{ q.id }}"
+                                        class="c-search__input"
+                                        placeholder="{{ q.placeholder }}"
+                                        {% if q.required %}required{% endif %}
+                                    >
+                                </div>
+                            {% endfor %}
+
+                            <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap;">
+                                <button type="submit" class="c-btn c-btn--primary">Continue</button>
+                            </div>
+                        </form>
+                    </div>
+                {% endif %}
+
+                {% if ai_output.type == "plan" and ai_output.plan %}
+                    <div style="margin-top:1rem;">
+                        <h3 class="c-card__title" style="font-size:1rem;margin:0;">Proposed plan</h3>
+                        <p class="c-card__meta" style="margin-top:.35rem;">
+                            Period: <strong>{{ ai_output.period.start }}</strong> &rarr; <strong>{{ ai_output.period.end }}</strong>
+                            &middot; Risk: <strong>{{ ai_output.risk_level|default:"low" }}</strong>
+                        </p>
+
+                        {% if ai_output.focus_courses %}
+                            <div style="margin-top:.75rem;">
+                                <p class="c-card__meta" style="margin:0;">Focus courses</p>
+                                <ul style="margin:.5rem 0 0 1.1rem;display:grid;gap:.35rem;">
+                                    {% for row in ai_output.focus_courses %}
+                                        <li>
+                                            <strong>{{ row.course_title|default:"General" }}</strong>
+                                            {% if row.why %}<span class="c-card__meta"> — {{ row.why }}</span>{% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                        <div style="margin-top:1rem;display:grid;gap:.75rem;">
+                            {% for day in ai_output.plan|slice:":7" %}
+                                <article class="c-card" style="margin:0;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
+                                    <p class="c-card__meta" style="margin:0;"><strong>{{ day.date }}</strong>{% if day.is_buffer_day %} &middot; Buffer day{% endif %}</p>
+                                    {% if day.items %}
+                                        <ul style="margin:.65rem 0 0 1.1rem;display:grid;gap:.35rem;">
+                                            {% for item in day.items %}
+                                                <li>
+                                                    {% if item.minutes %}<strong>{{ item.minutes }}m</strong> {% endif %}
+                                                    {% if item.course_title %}{{ item.course_title }} — {% endif %}{{ item.task }}
+                                                    {% if item.notes %}<span class="c-card__meta"> ({{ item.notes }})</span>{% endif %}
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <p class="c-card__meta" style="margin-top:.65rem;">No items.</p>
+                                    {% endif %}
+                                </article>
+                            {% endfor %}
+                            {% if ai_output.plan|length > 7 %}
+                                <p class="c-card__meta" style="margin:0;">Showing first 7 day(s). Apply to create goals for the full period.</p>
+                            {% endif %}
+                        </div>
+
+                        <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+                            <form method="post" action="{% url 'learning_insights:goal_ai_apply' ai_run.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="c-btn c-btn--primary">Apply plan (create goals)</button>
+                            </form>
+                            <a href="{% url 'learning_insights:ai_run_edit' ai_run.id %}" class="c-btn c-btn--ghost">Edit JSON</a>
+                        </div>
+
+                        {% if ai_output.recommendations %}
+                            <div style="margin-top:1rem;">
+                                <h3 class="c-card__title" style="font-size:1rem;margin:0;">Recommended courses</h3>
+                                <p class="c-card__meta" style="margin-top:.35rem;">Not enrolled yet — open a course to enroll.</p>
+                                <ul style="margin:.75rem 0 0 1.1rem;display:grid;gap:.5rem;">
+                                    {% for rec in ai_output.recommendations %}
+                                        <li>
+                                            <strong>{{ rec.course_title }}</strong>
+                                            {% if rec.why %}<span class="c-card__meta"> — {{ rec.why }}</span>{% endif %}
+                                            {% if rec.slug %}
+                                                <a href="{% url 'course_detail' rec.slug %}" class="c-btn c-btn--ghost" style="margin-left:.5rem;">Open</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <form method="post" novalidate style="margin-top:1rem;display:grid;gap:1rem;">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="c-card c-alert c-alert--danger" role="alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+            <div class="c-card" style="padding:1rem;">
+                <h2 class="c-card__title" style="font-size:1rem;margin:0 0 1rem 0;">Goal details</h2>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.title.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Title</label>
+                    {{ form.title }}
+                    {% for error in form.title.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.description.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Description</label>
+                    {{ form.description }}
+                    {% for error in form.description.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.course.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Course (optional)</label>
+                    {{ form.course }}
+                    {% for error in form.course.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label for="{{ form.parent.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Parent goal (optional)</label>
+                    {{ form.parent }}
+                    {% for error in form.parent.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <h2 class="c-card__title" style="font-size:1rem;margin:0 0 1rem 0;">Period and target</h2>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.period_type.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Period type</label>
+                    {{ form.period_type }}
+                    {% for error in form.period_type.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.start_date.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Start date</label>
+                    {{ form.start_date }}
+                    {% for error in form.start_date.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.due_date.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Due date</label>
+                    {{ form.due_date }}
+                    {% for error in form.due_date.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.target_type.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Target type</label>
+                    {{ form.target_type }}
+                    {% for error in form.target_type.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.target_value.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Target value</label>
+                    {{ form.target_value }}
+                    {% if form.target_value.help_text %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ form.target_value.help_text }}</p>
+                    {% endif %}
+                    {% for error in form.target_value.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label for="{{ form.current_value.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Current value</label>
+                    {{ form.current_value }}
+                    {% if form.current_value.help_text %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ form.current_value.help_text }}</p>
+                    {% endif %}
+                    {% for error in form.current_value.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="c-card" style="padding:1rem;">
+                <h2 class="c-card__title" style="font-size:1rem;margin:0 0 1rem 0;">Priority and status</h2>
+
+                <div style="margin-bottom:.9rem;">
+                    <label for="{{ form.priority.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Priority</label>
+                    {{ form.priority }}
+                    {% for error in form.priority.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label for="{{ form.status.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Status</label>
+                    {{ form.status }}
+                    {% for error in form.status.errors %}
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Cancel</a>
+            <button type="submit" class="c-btn c-btn--primary">
+                {% if form.instance.pk %}Save changes{% else %}Create goal{% endif %}
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

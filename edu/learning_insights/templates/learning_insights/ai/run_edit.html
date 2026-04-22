@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Edit AI Output | Learning Insights{% endblock %}
+
+{% block content %}
+<section class="c-card" aria-labelledby="ai-run-edit-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
+            <h1 id="ai-run-edit-title" class="c-card__title" style="margin:0;">Edit AI Output</h1>
+            <p class="c-card__meta" style="margin-top:.5rem;">
+                {{ run.get_kind_display|default:run.kind }} &middot;
+                Status: <strong>{{ run.get_status_display|default:run.status }}</strong>
+            </p>
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Back to run</a>
+        </div>
+    </div>
+</section>
+
+<section class="c-card" style="margin-top:1rem;">
+    <h2 class="c-card__title" style="margin:0;">JSON payload</h2>
+
+    {% if form.non_field_errors %}
+        <div class="c-card c-alert c-alert--error" role="alert" style="margin-top:1rem;">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <form method="post" style="margin-top:1rem;display:grid;gap:1rem;">
+        {% csrf_token %}
+
+        <div>
+            <label for="{{ form.edited_payload.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.35rem;">
+                Edited output (JSON)
+            </label>
+            {{ form.edited_payload }}
+            {% if form.edited_payload.help_text %}
+                <p class="c-card__meta" style="margin:.45rem 0 0 0;">{{ form.edited_payload.help_text }}</p>
+            {% endif %}
+            {% for error in form.edited_payload.errors %}
+                <p class="c-card__meta" style="margin:.45rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap;">
+            <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Cancel</a>
+            <button type="submit" class="c-btn c-btn--primary">Save</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+

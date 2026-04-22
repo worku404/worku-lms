@@ -113,14 +113,15 @@
 
     <main class="l-shell">
         <aside class="l-rail l-rail--left" aria-label="Primary navigation">
-            <nav class="c-nav">
-                <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
-                <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
-                <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
+             <nav class="c-nav">
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if request.path == '/' %} is-active{% endif %}">Dashboard</a>
+                 <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Catalog</a>
                 {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
                 {% endif %}
-            </nav>
+                <a href="{% url 'learning_insights:overview' %}" class="c-nav__item{% if '/insights/' in request.path %} is-active{% endif %}">Insights</a>
+             </nav>
             {% block motivation %}
             {% if request.user.is_authenticated %}
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
@@ -231,6 +232,15 @@
 
         <section id="content" class="l-main" aria-label="Learning workspace">
             <div id="main-content" class="l-main__inner">
+                {% if messages %}
+                    <div style="display:grid; gap: .75rem; margin-bottom: 1rem;">
+                        {% for message in messages %}
+                            <div class="c-card c-alert {% if 'error' in message.tags %}c-alert--error{% elif 'warning' in message.tags %}c-alert--warn{% else %}c-alert--info{% endif %}" role="{% if 'error' in message.tags or 'warning' in message.tags %}alert{% else %}status{% endif %}">
+                                <p class="c-card__meta" style="margin:0;">{{ message }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
                 {% block content %}{% endblock %}
             </div>
         </section>
@@ -576,6 +586,141 @@
         connectNotificationSocket();
     })();
 
+    (function () {
+        const stack = document.getElementById("chat-notification-stack");
+        if (!stack) return;
+
+        const shownInsightIds = new Set();
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function isInsideInsightsNotifications() {
+            const path = window.location.pathname || "";
+            return path.startsWith("/insights/notifications");
+        }
+
+        function createToast(item) {
+            if (!item || !item.id) return null;
+            if (shownInsightIds.has(item.id)) return null;
+            if (isInsideInsightsNotifications()) return null;
+
+            shownInsightIds.add(item.id);
+
+            const toast = document.createElement("article");
+            toast.className = "c-toast";
+
+            const title = escapeHtml(item.title || "Learning Insights");
+            const body = escapeHtml(item.body || "");
+            const url = item.url || "{% url 'learning_insights:notification_center' %}";
+
+            toast.innerHTML = `
+                <div class="c-toast__head">
+                    <strong class="c-toast__title">${title}</strong>
+                    <button type="button" class="c-toast__close" aria-label="Dismiss notification">&times;</button>
+                </div>
+                <p class="c-toast__meta">Learning Insights</p>
+                <p class="c-toast__body">${body}</p>
+                <a class="c-toast__link" href="${escapeHtml(url)}">Open</a>
+            `;
+
+            const closeBtn = toast.querySelector(".c-toast__close");
+            if (closeBtn) {
+                closeBtn.addEventListener("click", () => {
+                    toast.remove();
+                });
+            }
+
+            setTimeout(() => {
+                toast.remove();
+            }, 20000);
+
+            return toast;
+        }
+
+        function showToast(item) {
+            const toast = createToast(item);
+            if (!toast) return;
+            stack.prepend(toast);
+        }
+
+        let params = null;
+        let forceBootstrap = false;
+        try {
+            params = new URLSearchParams(window.location.search || "");
+            forceBootstrap = params.get("li_bootstrap") === "1";
+        } catch (error) {
+            params = null;
+            forceBootstrap = false;
+        }
+
+        if (forceBootstrap) {
+            try {
+                sessionStorage.setItem("insights_notifications_bootstrap_done", "1");
+            } catch (error) {
+                // Ignore session storage errors.
+            }
+        }
+
+        function clearForceParam() {
+            if (!forceBootstrap || !params) return;
+            params.delete("li_bootstrap");
+            const queryString = params.toString();
+            const nextUrl =
+                window.location.pathname +
+                (queryString ? "?" + queryString : "") +
+                (window.location.hash || "");
+            try {
+                history.replaceState(null, "", nextUrl);
+            } catch (error) {
+                // Ignore history errors.
+            }
+        }
+
+        let shouldBootstrap = forceBootstrap;
+        if (!shouldBootstrap) {
+            try {
+                const bootstrapKey = "insights_notifications_bootstrap_done";
+                if (sessionStorage.getItem(bootstrapKey) === "1") {
+                    shouldBootstrap = false;
+                } else {
+                    sessionStorage.setItem(bootstrapKey, "1");
+                    shouldBootstrap = true;
+                }
+            } catch (error) {
+                shouldBootstrap = true;
+            }
+        }
+
+        if (shouldBootstrap) {
+            fetch("{% url 'learning_insights:notifications_bootstrap' %}", {
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            })
+                .then((response) => (response.ok ? response.json() : { items: [] }))
+                .then((data) => {
+                    (data.items || []).forEach((item) => {
+                        showToast(item);
+                    });
+                    clearForceParam();
+                })
+                .catch(() => {
+                    clearForceParam();
+                    // Silent failure.
+                });
+        } else {
+            clearForceParam();
+        }
+    })();
+ 
     (function () {
         const refreshBtn = document.querySelector("[data-motto-refresh]");
         if (!refreshBtn) return;
