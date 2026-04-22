@@ -244,21 +244,6 @@ def format_review_message(payload: dict[str, Any], *, title: str = "AI Review") 
 
     return "\n".join([line for line in lines if line is not None]).strip()
 
-
-def format_ai_run_message(run: AIPlanRun) -> str:
-    payload = run.effective_payload if run else {}
-    if run and run.kind == AIPlanRun.KIND_PROMPT_PLAN:
-        return format_weekly_plan_message(payload)
-    if run and run.kind == AIPlanRun.KIND_WEEKLY_PLAN:
-        return format_weekly_plan_message(payload)
-    if run and run.kind == AIPlanRun.KIND_DAILY_PLAN:
-        return format_daily_plan_message(payload)
-    title = "AI Update"
-    if run:
-        title = run.get_kind_display() if hasattr(run, "get_kind_display") else run.kind
-    return format_review_message(payload, title=title)
-
-
 def _cache_key(prefix: str, user_id: int, suffix: str) -> str:
     return f"li_tg:{prefix}:{user_id}:{suffix}"
 
