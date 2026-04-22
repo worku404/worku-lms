@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import ContentProgress, CourseProgress, ModuleProgress
 from .signals import (
     content_progress_recorded,
+    course_completed as course_completed_signal,
     module_time_tracked,
     presence_ping_recorded,
 )
@@ -150,7 +151,7 @@ def recompute_course_progress(user, course: Course) -> CourseProgress:
     )
     course_completed = total_modules > 0 and completed_modules >= total_modules
 
-    course_progress, _ = CourseProgress.objects.get_or_create(
+    course_progress, created_row = CourseProgress.objects.get_or_create(
         user=user,
         course=course,
         defaults={
@@ -161,6 +162,7 @@ def recompute_course_progress(user, course: Course) -> CourseProgress:
     )
 
     # Keep these fields synchronized whenever module/content progress changes.
+    was_completed = False if created_row else bool(course_progress.completed)
     course_progress.progress_percent = course_percent
     course_progress.completed = course_completed
     if course_completed and not course_progress.completed_at:
@@ -170,6 +172,14 @@ def recompute_course_progress(user, course: Course) -> CourseProgress:
     course_progress.save(
         update_fields=["progress_percent", "completed", "completed_at", "last_accessed"]
     )
+
+    if course_progress.completed and not was_completed:
+        course_completed_signal.send(
+            sender=CourseProgress,
+            user=user,
+            course=course,
+            completed_at=course_progress.completed_at,
+        )
     return course_progress
 
 
