@@ -24,3 +24,10 @@ content_progress_recorded = Signal()
 # - user_id
 # - recorded_at
 presence_ping_recorded = Signal()
+
+# Emitted when a course becomes completed for a user.
+# Payload:
+# - user
+# - course
+# - completed_at
+course_completed = Signal()
