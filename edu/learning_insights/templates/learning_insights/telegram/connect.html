@@ -1,14 +1,20 @@
-{% extends "base.html" %}
+﻿{% extends "learning_insights/base.html" %}
+{% load static %}
 
 {% block title %}Telegram | Learning Insights{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'learning_insights/css/templates/telegram_connect.css' %}">
+{% endblock %}
+
 {% block content %}
 <section class="c-card" aria-labelledby="telegram-connect-title">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+    <div class="li-card-head">
         <div>
-            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
-            <h1 id="telegram-connect-title" class="c-card__title" style="margin:0;">Telegram</h1>
-            <p class="c-card__meta" style="margin-top:.5rem;">
+            <p class="c-card__meta li-kicker">Learning Insights</p>
+            <h1 id="telegram-connect-title" class="c-card__title li-title">Telegram</h1>
+            <p class="c-card__meta li-subtitle">
                 Connect Telegram to receive optional reminders without needing a public URL.
             </p>
         </div>
@@ -16,48 +22,48 @@
     </div>
 </section>
 
-<section class="c-card" style="margin-top:1rem;" aria-label="Connection status">
+<section class="c-card li-section-top" aria-label="Connection status">
     {% if subscription %}
-        <h2 class="c-card__title" style="margin:0;">Connected</h2>
-        <p class="c-card__meta" style="margin-top:.5rem;">
+        <h2 class="c-card__title li-title">Connected</h2>
+        <p class="c-card__meta li-subtitle">
             Telegram chat id: <strong>{{ subscription.chat_id }}</strong>
         </p>
     {% else %}
-        <h2 class="c-card__title" style="margin:0;">Not connected</h2>
-        <p class="c-card__meta" style="margin-top:.5rem;">
+        <h2 class="c-card__title li-title">Not connected</h2>
+        <p class="c-card__meta li-subtitle">
             Follow the steps below to link your Telegram account.
         </p>
     {% endif %}
 </section>
 
-<section class="c-card" style="margin-top:1rem;" aria-label="Connection instructions">
-    <h2 class="c-card__title" style="margin:0;">How to connect</h2>
+<section class="c-card li-section-top" aria-label="Connection instructions">
+    <h2 class="c-card__title li-title">How to connect</h2>
 
     {% if bot_username %}
-        <ol style="margin:1rem 0 0 1.1rem;display:grid;gap:.5rem;">
+        <ol class="li-list li-list--tight">
             <li>Open Telegram and start a chat with <strong><a href="https://t.me/{{ bot_username }}" target="_blank">Link</a></strong>.</li>
             <li>Send the command below to the bot.</li>
         </ol>
     {% else %}
-        <div class="c-card c-alert c-alert--warn" style="margin-top:1rem;">
-            <h3 class="c-card__title" style="margin:0;">Bot username not configured</h3>
-            <p class="c-card__meta" style="margin-top:.5rem;">
+        <div class="c-card c-alert c-alert--warn li-section-top">
+            <h3 class="c-card__title li-title">Bot username not configured</h3>
+            <p class="c-card__meta li-subtitle">
                 Set <code>TELEGRAM_BOT_USERNAME</code> (and <code>TELEGRAM_BOT_TOKEN</code>) in your environment or <code>.env</code>.
             </p>
         </div>
     {% endif %}
 
-    <div style="margin-top:1rem;">
-        <p class="c-card__meta" style="margin:0 0 .35rem 0;">Your one-time connect command</p>
-        <div class="c-card" style="padding:1rem;margin:0;border:1px solid rgba(255,255,255,0.08);">
+    <div class="li-section-top">
+        <p class="c-card__meta li-kicker">Your one-time connect command</p>
+        <div class="c-card li-m0 li-pad-card li-subcard-border">
             <code>/start {{ connect_token.token }}</code>
         </div>
-        <p class="c-card__meta" style="margin-top:.5rem;">
+        <p class="c-card__meta li-subtitle">
             This token is single-use. You can regenerate it at any time.
         </p>
     </div>
 
-    <form method="post" style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+    <form method="post" class="li-section-top li-card-actions">
         {% csrf_token %}
         <button type="submit" name="action" value="regen_token" class="c-btn c-btn--secondary">Regenerate token</button>
         <button type="submit" name="action" value="queue_test" class="c-btn c-btn--ghost"{% if not subscription %} disabled{% endif %}>
@@ -69,3 +75,5 @@
     </form>
 </section>
 {% endblock %}
+
+
