@@ -21,7 +21,12 @@ from django.views.generic import (
     View,
 )
 
-from .forms import AIPlanRunEditForm, GoalForm, NotificationPreferenceForm
+from .forms import (
+    AIPlanRunEditForm,
+    GoalForm,
+    NotificationPreferenceForm,
+    PromptPlanItemFormSet,
+)
 from .models import AIPlanRun, Goal, InsightNotification, NotificationPreference
 from .services.analytics import (
     build_daily_summary,
@@ -786,54 +791,182 @@ class AIReviewGenerateView(InsightsBaseMixin, View):
 class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
     template_name = "learning_insights/ai/run_detail.html"
 
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
-        context["page_title"] = "AI Run"
-        context["run"] = run
-        try:
-            import json
-
-            context["payload_pretty"] = json.dumps(run.effective_payload, indent=2, ensure_ascii=False)
-        except Exception:
-            context["payload_pretty"] = str(run.effective_payload)
-        context["subscription"] = get_subscription_for_user(user=self.request.user)
-        return context
-
-
-class AIRunEditView(AIRunQuerysetMixin, TemplateView):
-    template_name = "learning_insights/ai/run_edit.html"
-
     def dispatch(self, request, *args, **kwargs):
         self.run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
         return super().dispatch(request, *args, **kwargs)
 
+    def _build_prompt_plan_formset(self, *, data=None):
+        courses = self.request.user.courses_joined.order_by("title")
+
+        initial_rows: list[dict[str, Any]] = []
+        payload = self.run.effective_payload
+        if isinstance(payload, dict):
+            plan = payload.get("plan")
+            if isinstance(plan, list):
+                for day in plan:
+                    if not isinstance(day, dict):
+                        continue
+                    day_value = str(day.get("date") or "").strip()
+                    try:
+                        day_date = date.fromisoformat(day_value)
+                    except ValueError:
+                        continue
+
+                    items = day.get("items")
+                    if not isinstance(items, list):
+                        continue
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        initial_rows.append(
+                            {
+                                "day": day_date,
+                                "course": item.get("course_id") or None,
+                                "minutes": item.get("minutes") or None,
+                                "task": item.get("task") or "",
+                                "notes": item.get("notes") or "",
+                            }
+                        )
+
+        return PromptPlanItemFormSet(
+            data=data,
+            initial=initial_rows,
+            prefix="items",
+            courses=courses,
+        )
+
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        context["page_title"] = "Edit AI Output"
+        context["page_title"] = "AI Run"
         context["run"] = self.run
-        context["form"] = AIPlanRunEditForm(
-            initial={
-                "edited_payload": self.run.effective_payload,
-            }
-        )
+
+        is_prompt_plan = self.run.kind == AIPlanRun.KIND_PROMPT_PLAN
+        context["is_prompt_plan"] = is_prompt_plan
+        if is_prompt_plan:
+            context["plan_formset"] = self._build_prompt_plan_formset()
+        else:
+            context["form"] = AIPlanRunEditForm(
+                initial={
+                    "edited_payload": self.run.effective_payload,
+                }
+            )
+
+        try:
+            import json
+
+            context["payload_pretty"] = json.dumps(self.run.effective_payload, indent=2, ensure_ascii=False)
+        except Exception:
+            context["payload_pretty"] = str(self.run.effective_payload)
+
+        context["subscription"] = get_subscription_for_user(user=self.request.user)
         return context
 
     def post(self, request, *args, **kwargs):
+        if self.run.kind == AIPlanRun.KIND_PROMPT_PLAN:
+            formset = self._build_prompt_plan_formset(data=request.POST)
+            if not formset.is_valid():
+                try:
+                    import json
+
+                    payload_pretty = json.dumps(
+                        self.run.effective_payload, indent=2, ensure_ascii=False
+                    )
+                except Exception:
+                    payload_pretty = str(self.run.effective_payload)
+                return self.render_to_response(
+                    {
+                        "page_title": "AI Run",
+                        "run": self.run,
+                        "is_prompt_plan": True,
+                        "plan_formset": formset,
+                        "payload_pretty": payload_pretty,
+                        "subscription": get_subscription_for_user(user=request.user),
+                    }
+                )
+
+            plan_by_day: dict[date, list[dict[str, Any]]] = {}
+            for form in formset:
+                cleaned = getattr(form, "cleaned_data", None) or {}
+                if cleaned.get("DELETE"):
+                    continue
+
+                day_date = cleaned.get("day")
+                task = str(cleaned.get("task") or "").strip()
+                if not isinstance(day_date, date) or not task:
+                    continue
+
+                minutes = cleaned.get("minutes")
+                try:
+                    minutes_value = max(0, int(minutes or 0))
+                except (TypeError, ValueError):
+                    minutes_value = 0
+
+                course = cleaned.get("course")
+                course_id = getattr(course, "id", None) if course else None
+                course_title = getattr(course, "title", "") if course else ""
+
+                item_payload: dict[str, Any] = {
+                    "task": task,
+                    "minutes": minutes_value,
+                    "notes": str(cleaned.get("notes") or "").strip(),
+                }
+                if course_id:
+                    item_payload["course_id"] = int(course_id)
+                    item_payload["course_title"] = str(course_title or "").strip()
+
+                plan_by_day.setdefault(day_date, []).append(item_payload)
+
+            plan_days: list[dict[str, Any]] = []
+            for day_date in sorted(plan_by_day.keys()):
+                plan_days.append(
+                    {
+                        "date": day_date.isoformat(),
+                        "items": plan_by_day[day_date],
+                    }
+                )
+
+            base_payload = self.run.effective_payload if isinstance(self.run.effective_payload, dict) else {}
+            edited_payload = dict(base_payload)
+            edited_payload["type"] = "plan"
+            edited_payload["plan"] = plan_days
+            if plan_days:
+                period = edited_payload.get("period")
+                if not isinstance(period, dict):
+                    period = {}
+                period["start"] = plan_days[0]["date"]
+                period["end"] = plan_days[-1]["date"]
+                edited_payload["period"] = period
+
+            self.run.edited_payload = edited_payload
+            self.run.save(update_fields=["edited_payload", "updated_at"])
+            messages.success(request, "Plan updated.")
+            return HttpResponseRedirect(
+                reverse("learning_insights:ai_run_detail", kwargs={"pk": self.run.id}) + "#edit"
+            )
+
         form = AIPlanRunEditForm(data=request.POST)
         if not form.is_valid():
+            try:
+                import json
+
+                payload_pretty = json.dumps(self.run.effective_payload, indent=2, ensure_ascii=False)
+            except Exception:
+                payload_pretty = str(self.run.effective_payload)
             return self.render_to_response(
                 {
-                    "page_title": "Edit AI Output",
+                    "page_title": "AI Run",
                     "run": self.run,
+                    "is_prompt_plan": False,
                     "form": form,
+                    "payload_pretty": payload_pretty,
+                    "subscription": get_subscription_for_user(user=request.user),
                 }
             )
 
         self.run.edited_payload = form.cleaned_data["edited_payload"] or {}
         self.run.save(update_fields=["edited_payload", "updated_at"])
         messages.success(request, "AI output updated.")
-        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": self.run.id}))
+        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": self.run.id}) + "#edit")
 
 
 class AIRunApplyView(AIRunQuerysetMixin, View):
@@ -852,27 +985,5 @@ class AIRunApplyView(AIRunQuerysetMixin, View):
             messages.info(
                 request,
                 "Nothing applied. Ensure this is a successful AI plan run.",
-            )
-        return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
-
-
-class AIRunSendTelegramView(AIRunQuerysetMixin, View):
-    def post(self, request, *args, **kwargs):
-        run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
-        subscription = get_subscription_for_user(user=request.user)
-        if subscription is None:
-            messages.error(request, "Connect Telegram first to send messages there.")
-            return HttpResponseRedirect(reverse("learning_insights:telegram_connect"))
-
-        from .services.ai_notifications import format_ai_run_message
-
-        message_text = format_ai_run_message(run)
-        ok = send_notification(user=request.user, message=message_text)
-        if ok:
-            messages.success(request, "Telegram message sent.")
-        else:
-            messages.error(
-                request,
-                "Unable to send Telegram message. Check TELEGRAM_BOT_TOKEN and your network connection.",
             )
         return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
