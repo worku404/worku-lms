@@ -146,15 +146,25 @@
             {% for goal in goals %}
                 <article style="padding:.9rem 1rem;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
                     <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
-                        <div style="min-width:260px;">
+                <div style="min-width:260px;">
+                    {% if goal.destination_url %}
+                        <a href="{{ goal.destination_url }}" style="text-decoration:none;color:inherit;">
                             <strong>{{ goal.title }}</strong>
-                            <p class="c-card__meta" style="margin:.25rem 0 0 0;">
-                                {{ goal.get_period_type_display }}
-                                {% if goal.course %} &middot; {{ goal.course.title }}{% endif %}
-                            </p>
-                        </div>
+                        </a>
+                    {% elif goal.course_id %}
+                        <a href="{% url 'student_course_detail' goal.course_id %}" style="text-decoration:none;color:inherit;">
+                            <strong>{{ goal.title }}</strong>
+                        </a>
+                    {% else %}
+                        <strong>{{ goal.title }}</strong>
+                    {% endif %}
+                    <p class="c-card__meta" style="margin:.25rem 0 0 0;">
+                        {{ goal.get_period_type_display }}
+                        {% if goal.course %} &middot; {{ goal.course.title }}{% endif %}
+                    </p>
+                </div>
                         <span class="c-card__meta">{{ goal.current_value|default:0 }} / {{ goal.target_value|default:0 }}</span>
-                    </div>
+
 
                     <div
                         class="c-progress"
@@ -164,13 +174,12 @@
                         aria-valuenow="{{ goal.progress_percent|default:0 }}"
                         aria-label="{{ goal.title }} progress"
                         style="margin-top:.8rem;"
-                    >
-                        <span class="c-progress__bar" style="width: {{ goal.progress_percent|default:0 }}%;"></span>
+                    > <span class="c-progress__bar" style="width: {{ goal.progress_percent|default:0 }}%;"></span>
                     </div>
 
                     <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-top:.55rem;flex-wrap:wrap;">
-                        <span class="c-card__meta">{{ goal.progress_percent|default:0|floatformat:0 }}% complete</span>
-                        <span class="c-card__meta">{{ goal.get_status_display }}</span>
+                        <span class="c-card__meta">{{ goal.progress_percent|default:0|floatformat:0 }}%</span>
+                        <span class="c-card__meta" style="color: #FFD54F;" >{{ goal.get_status_display }}</span>
                     </div>
                 </article>
             {% endfor %}
