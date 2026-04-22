@@ -21,33 +21,134 @@
         </div>
     </div>
 
-    {% if form_mode == "create" %}
-        <div class="c-card" id="ai-planner" style="margin-top:1rem;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
-            <h2 class="c-card__title" style="margin:0;">AI planner</h2>
-            <p class="c-card__meta" style="margin-top:.5rem;">
-                Describe your goal or upcoming exam and the AI will create a plan from your enrolled courses.
-            </p>
+{% if form_mode == "create" %}
+    <div class="c-card" id="ai-planner" style="margin-top:1rem;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
+        <h2 class="c-card__title" style="margin:0;">AI planner</h2>
+        <p class="c-card__meta" style="margin-top:.5rem;">
+            Describe your goal or upcoming exam and the AI will create a plan from your enrolled courses.
+        </p>
 
-            <form method="post" action="{% url 'learning_insights:goal_ai_planner' %}" style="margin-top:1rem;display:grid;gap:.75rem;">
-                {% csrf_token %}
-                <div>
-                    <label for="ai-prompt" class="c-card__meta" style="display:block;margin-bottom:.35rem;">Prompt</label>
-                    <textarea
-                        id="ai-prompt"
-                        name="prompt"
-                        rows="4"
-                        class="form-control"
-                        placeholder="Example: I have a Digital Logic exam tomorrow. Make a plan starting today using my enrolled courses."
-                    >{{ ai_prompt }}</textarea>
-                </div>
-                <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
-                    <button type="submit" name="action" value="start" class="c-btn c-btn--primary">Ask AI</button>
-                    {% if ai_run %}
-                        <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--ghost">Clear</a>
-                        <a href="{% url 'learning_insights:ai_run_detail' ai_run.id %}" class="c-btn c-btn--ghost">Open run</a>
-                    {% endif %}
-                </div>
-            </form>
+        <style>
+            #ai-planner {
+                --border-color: #2c77e9;
+                --text-color: #111827;
+                --text-color: red;
+                --placeholder-color: #6b7280;
+                --accent-green: #16a34a;
+            }
+            .li-ai-prompt {
+                display: flex;
+                align-items: center;
+                border-radius: 24px;
+                padding: 8px 12px;
+                width: 100%;
+                max-width: 700px;
+                border: 1px solid var(--border-color);
+            }
+
+            .li-ai-prompt__field {
+                flex: 1;
+                border: none;
+                outline: none;
+                color: var(--text-color);
+                font-size: 17px;
+                resize: vertical;
+                overflow: hidden;
+                line-height: 1.4;
+                max-height: 120px;
+                min-height: 28px;
+            }
+
+            .li-ai-prompt__field::placeholder {
+                color: var(--placeholder-color);
+            }
+
+            .li-ai-prompt__send {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: transparent;
+                border: 1px solid var(--accent-green);
+                color: var(--accent-green);
+                cursor: pointer;
+                padding: 6px;
+                margin-left: 6px;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+            }
+
+            .li-ai-prompt__send:hover {
+                background: var(--accent-green);
+                color: #fff;
+            }
+
+            .li-ai-prompt__send:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                border-color: var(--border-color);
+                color: var(--border-color);
+            }
+        </style>
+
+        <form method="post" action="{% url 'learning_insights:goal_ai_planner' %}" style="margin-top:1rem;display:grid;gap:.75rem;">
+            {% csrf_token %}
+
+            <div class="li-ai-prompt">
+                <textarea
+                    id="ai-prompt"
+                    name="prompt"
+                    class="li-ai-prompt__field"
+                    placeholder="Enter a prompt"
+                >{{ ai_prompt }}</textarea>
+
+                <button
+                    type="submit"
+                    name="action"
+                    value="start"
+                    class="li-ai-prompt__send"
+                    aria-label="Send prompt"
+                    id="ai-prompt-send"
+                >
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                        <path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l.9 7.2L14 12l-9.7 1.4.9 7.2Z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
+                {% if ai_run %}
+                    <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--ghost">Clear</a>
+                    <a href="{% url 'learning_insights:ai_run_detail' ai_run.id %}" class="c-btn c-btn--ghost">Open run</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <script>
+            (function () {
+                const textarea = document.getElementById("ai-prompt");
+                const sendBtn = document.getElementById("ai-prompt-send");
+                if (!textarea) return;
+
+                const sync = function () {
+                    textarea.style.height = "auto";
+                    const next = Math.min(120, Math.max(36, textarea.scrollHeight || 36));
+                    textarea.style.height = next + "px";
+                    if (sendBtn) sendBtn.disabled = textarea.value.trim().length === 0;
+                };
+
+                textarea.addEventListener("input", sync);
+                textarea.addEventListener("keydown", function (event) {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        if (sendBtn && !sendBtn.disabled) {
+                            const form = sendBtn.closest("form");
+                            if (form) form.submit();
+                        }
+                    }
+                });
+                sync();
+            })();
+        </script>
 
             {% if ai_run and ai_output %}
                 <div style="margin-top:1rem;">
@@ -144,7 +245,7 @@
                                 {% csrf_token %}
                                 <button type="submit" class="c-btn c-btn--primary">Apply plan (create goals)</button>
                             </form>
-                            <a href="{% url 'learning_insights:ai_run_edit' ai_run.id %}" class="c-btn c-btn--ghost">Edit JSON</a>
+                            <a href="{% url 'learning_insights:ai_run_detail' ai_run.id %}#edit" class="c-btn c-btn--ghost">Edit plan</a>
                         </div>
 
                         {% if ai_output.recommendations %}
