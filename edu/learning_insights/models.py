@@ -409,7 +409,9 @@ class InsightNotification(models.Model):
     CATEGORY_WEEKLY_ACHIEVEMENT = "weekly_achievement"
     CATEGORY_GOAL_DUE = "goal_due"
     CATEGORY_GOAL_CREATED = "goal_created"
+    CATEGORY_GOAL_COMPLETED = "goal_completed"
     CATEGORY_COURSE_COMPLETED = "course_completed"
+    CATEGORY_INACTIVITY_WARNING = "inactivity_warning"
     CATEGORY_CHOICES = (
         (CATEGORY_DAILY_START, "Daily start"),
         (CATEGORY_WEEKLY_START, "Weekly start"),
@@ -417,7 +419,9 @@ class InsightNotification(models.Model):
         (CATEGORY_WEEKLY_ACHIEVEMENT, "Weekly achievement"),
         (CATEGORY_GOAL_DUE, "Goal due"),
         (CATEGORY_GOAL_CREATED, "Goal created"),
+        (CATEGORY_GOAL_COMPLETED, "Goal completed"),
         (CATEGORY_COURSE_COMPLETED, "Course completed"),
+        (CATEGORY_INACTIVITY_WARNING, "Inactivity warning"),
     )
 
     objects = InsightNotificationQuerySet.as_manager()
@@ -521,6 +525,16 @@ class InsightNotification(models.Model):
                 ]
             )
 
+        if self.category == self.CATEGORY_GOAL_COMPLETED:
+            if goal_id:
+                return self._reverse_first(["learning_insights:goal_update"], pk=goal_id)
+            return self._reverse_first(
+                [
+                    "learning_insights:goal_list",
+                    "learning_insights:overview",
+                ]
+            )
+
         if self.category == self.CATEGORY_COURSE_COMPLETED:
             if course_id:
                 course_url = self._reverse_first(
@@ -571,6 +585,23 @@ class InsightNotification(models.Model):
                 [
                     "learning_insights:overview",
                     "learning_insights:notification_center",
+                ]
+            )
+
+        if self.category == self.CATEGORY_INACTIVITY_WARNING:
+            if course_id:
+                course_url = self._reverse_first(
+                    [
+                        "student_course_detail",
+                    ],
+                    pk=course_id,
+                )
+                if course_url:
+                    return course_url
+            return self._reverse_first(
+                [
+                    "learning_insights:overview",
+                    "student_course_list",
                 ]
             )
 
