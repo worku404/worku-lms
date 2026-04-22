@@ -26,8 +26,8 @@ for _env_path in (BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
         load_dotenv(_env_path)
 
 # Authentication behavior
-# Redirect authenticated users to the student course list after login.
-LOGIN_REDIRECT_URL = reverse_lazy("student_course_list")
+# Send authenticated users to the course home page after login.
+LOGIN_REDIRECT_URL = reverse_lazy("course_list")
 
 
 # Security and runtime mode
