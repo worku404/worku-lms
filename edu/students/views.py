@@ -85,8 +85,8 @@ class StudentRegistrationView(CreateView):
     # Built-in Django user registration form (username + password1/password2).
     form_class = UserCreationForm
 
-    # After successful registration/login, go to enrolled courses page.
-    success_url = reverse_lazy("student_course_list")
+    # After successful registration/login, go to the public front door.
+    success_url = reverse_lazy("home")
 
     def form_valid(self, form):
         # 1) Save the new user via CreateView.
