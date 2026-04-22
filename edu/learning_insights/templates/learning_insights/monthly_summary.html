@@ -1,29 +1,32 @@
-{% extends "base.html" %}
-{% load course %}
+﻿{% extends "learning_insights/base.html" %}
+{% load course static %}
 
 {% block title %}Monthly Summary{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'learning_insights/css/templates/monthly_summary.css' %}">
+{% endblock %}
+
 {% block content %}
 <section class="c-card" aria-labelledby="monthly-summary-title">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+    <div class="li-card-head">
         <div>
-            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
-            <h1 id="monthly-summary-title" class="c-card__title" style="margin:0;">Monthly Summary</h1>
-            <p class="c-card__meta" style="margin-top:.5rem;">
+            <p class="c-card__meta li-kicker">Learning Insights</p>
+            <h1 id="monthly-summary-title" class="c-card__title li-title">Monthly Summary</h1>
+            <p class="c-card__meta li-subtitle">
                 {{ month.start|date:"F j, Y" }} &ndash; {{ month.end|date:"F j, Y" }}
             </p>
         </div>
 
-        <form method="get" style="display:flex;gap:.5rem;align-items:end;flex-wrap:wrap;">
+        <form method="get" class="li-card-filters">
             <div>
-                <label for="month-picker" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Month</label>
-                <input
+                <label for="month-picker" class="c-card__meta li-label">Month</label>
+                <input class="c-search__input li-input-min"
                     id="month-picker"
                     name="month"
                     type="month"
                     value="{{ month_value|default:'' }}"
-                    class="c-search__input"
-                    style="min-width:180px;"
                 >
             </div>
             <button type="submit" class="c-btn c-btn--primary">Load</button>
@@ -33,62 +36,62 @@
     </div>
 
     {% if insights_started_on %}
-        <p class="c-card__meta" style="margin-top:1rem;">
+        <p class="c-card__meta li-section-top">
             Insights started collecting on <strong>{{ insights_started_on|date:"M d, Y" }}</strong>.
         </p>
     {% endif %}
 </section>
 
-<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;">
+<section class="li-grid-auto li-section-top">
     <article class="c-card">
         <p class="c-card__meta">Site active time</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.site_seconds|default:0|duration_format }}</h2>
-        <p class="c-card__meta" style="margin:0;">Presence-based active time</p>
+        <h2 class="c-card__title li-stat-value">{{ summary.site_seconds|default:0|duration_format }}</h2>
+        <p class="c-card__meta li-meta">Presence-based active time</p>
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Course study time</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.course_seconds|default:0|duration_format }}</h2>
-        <p class="c-card__meta" style="margin:0;">Tracked module time</p>
+        <h2 class="c-card__title li-stat-value">{{ summary.course_seconds|default:0|duration_format }}</h2>
+        <p class="c-card__meta li-meta">Tracked module time</p>
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Monthly status</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.status.label|default:"No data" }}</h2>
-        <p class="c-card__meta" style="margin:0;">Score: <strong>{{ summary.status.score|default:0 }}%</strong></p>
+        <h2 class="c-card__title li-stat-value">{{ summary.status.label|default:"No data" }}</h2>
+        <p class="c-card__meta li-meta">Score: <strong>{{ summary.status.score|default:0 }}%</strong></p>
         {% if summary.status.note %}
-            <p class="c-card__meta" style="margin:.35rem 0 0 0;">{{ summary.status.note }}</p>
+            <p class="c-card__meta li-mt-sm">{{ summary.status.note }}</p>
         {% endif %}
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Achievement</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.achievement_percent|default:0 }}%</h2>
-        <p class="c-card__meta" style="margin:0;">Weighted across active goals</p>
+        <h2 class="c-card__title li-stat-value">{{ summary.achievement_percent|default:0 }}%</h2>
+        <p class="c-card__meta li-meta">Weighted across active goals</p>
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Consistency</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.consistency_percent|default:0 }}%</h2>
-        <p class="c-card__meta" style="margin:0;">Active days / days in month</p>
+        <h2 class="c-card__title li-stat-value">{{ summary.consistency_percent|default:0 }}%</h2>
+        <p class="c-card__meta li-meta">Active days / days in month</p>
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Planned vs actual</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">{{ summary.planned_vs_actual_percent|default:0 }}%</h2>
-        <p class="c-card__meta" style="margin:0;">Time-based goals only; otherwise achievement</p>
+        <h2 class="c-card__title li-stat-value">{{ summary.planned_vs_actual_percent|default:0 }}%</h2>
+        <p class="c-card__meta li-meta">Time-based goals only; otherwise achievement</p>
     </article>
 
     <article class="c-card">
         <p class="c-card__meta">Most productive day</p>
-        <h2 class="c-card__title" style="margin:0 0 .4rem 0;">
+        <h2 class="c-card__title li-stat-value">
             {% if summary.productive_day %}
                 {{ summary.productive_day.label }}
             {% else %}
                 &mdash;
             {% endif %}
         </h2>
-        <p class="c-card__meta" style="margin:0;">
+        <p class="c-card__meta li-meta">
             {% if summary.productive_day %}
                 Score {{ summary.productive_day.score }}
             {% else %}
@@ -98,27 +101,27 @@
     </article>
 </section>
 
-<section style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-top:1rem;">
+<section class="li-grid-split li-section-top">
     <article class="c-card" aria-labelledby="monthly-trend-title">
-        <h2 id="monthly-trend-title" class="c-card__title" style="margin:0;">Daily trend</h2>
-        <p class="c-card__meta" style="margin:.35rem 0 0 0;">Course study minutes and site active minutes</p>
-        <div style="margin-top:1rem;position:relative;min-height:320px;">
+        <h2 id="monthly-trend-title" class="c-card__title li-title">Daily trend</h2>
+        <p class="c-card__meta li-mt-sm">Course study minutes and site active minutes</p>
+        <div class="li-section-top li-chart li-chart--lg">
             <canvas id="monthly-trend-chart" aria-label="Monthly trend chart" role="img"></canvas>
         </div>
     </article>
 
     <article class="c-card" aria-labelledby="monthly-top-courses-title">
-        <h2 id="monthly-top-courses-title" class="c-card__title" style="margin:0;">Top courses</h2>
-        <p class="c-card__meta" style="margin:.35rem 0 1rem 0;">Ranked by tracked module time</p>
+        <h2 id="monthly-top-courses-title" class="c-card__title li-title">Top courses</h2>
+        <p class="c-card__meta li-mt-sm li-mb-lg">Ranked by tracked module time</p>
 
         {% if top_courses %}
-            <ol style="display:grid;gap:.85rem;padding-left:1.25rem;margin:0;">
+            <ol class="li-monthly-top-courses-list">
                 {% for course_item in top_courses %}
                     <li>
-                        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                        <div class="li-divider-row">
                             <div>
                                 <strong>{{ course_item.course_title }}</strong>
-                                <p class="c-card__meta" style="margin:.2rem 0 0 0;">
+                                <p class="c-card__meta li-mt-xs">
                                     {{ course_item.total_seconds|default:0|duration_format }}
                                 </p>
                             </div>
@@ -133,8 +136,8 @@
             <p class="c-card__meta">No tracked course study time for this month.</p>
         {% endif %}
 
-        <div style="margin-top:1rem;">
-            <div style="position:relative;min-height:220px;">
+        <div class="li-section-top">
+            <div class="li-chart">
                 <canvas id="monthly-course-chart" aria-label="Top courses chart" role="img"></canvas>
             </div>
         </div>
@@ -142,9 +145,9 @@
 </section>
 
 {% if summary.improvements %}
-<section class="c-card" style="margin-top:1rem;" aria-labelledby="monthly-improvements-title">
-    <h2 id="monthly-improvements-title" class="c-card__title" style="margin:0;">Needs improvement</h2>
-    <ul style="margin:1rem 0 0 1.1rem;display:grid;gap:.5rem;">
+<section class="c-card li-section-top" aria-labelledby="monthly-improvements-title">
+    <h2 id="monthly-improvements-title" class="c-card__title li-title">Needs improvement</h2>
+    <ul class="li-list li-list--tight">
         {% for item in summary.improvements %}
             <li>{{ item }}</li>
         {% endfor %}
@@ -249,4 +252,6 @@
     })();
 </script>
 {% endblock %}
+
+
 
