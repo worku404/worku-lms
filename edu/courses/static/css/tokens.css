@@ -33,8 +33,6 @@
     --assistant-history-bg: color-mix(in srgb, var(--color-surface) 94%, var(--color-secondary-surface));
     --assistant-history-border: color-mix(in srgb, var(--color-border) 80%, #ffffff);
     --assistant-composer-bg: color-mix(in srgb, var(--color-surface) 92%, var(--color-secondary-surface));
-    --assistant-composer-border: color-mix(in srgb, var(--color-border) 70%, #ffffff);
-    --assistant-input-bg: #ffffff;
     --assistant-input-border: color-mix(in srgb, var(--color-border) 75%, #ffffff);
     --assistant-sidebar-bg: var(--assistant-panel-bg);
     --assistant-toolbar-bg: color-mix(in srgb, var(--color-surface) 96%, var(--color-secondary-surface));
@@ -190,8 +188,6 @@ body.theme-dark {
     --assistant-history-bg: color-mix(in srgb, var(--color-surface) 88%, #0b1320);
     --assistant-history-border: color-mix(in srgb, var(--color-border) 70%, #0b1320);
     --assistant-composer-bg: color-mix(in srgb, #111b2a 82%, #0b1320);
-    --assistant-composer-border: color-mix(in srgb, var(--color-border) 65%, #0b1320);
-    --assistant-input-bg: color-mix(in srgb, var(--color-surface) 85%, #0b1320);
     --assistant-input-border: color-mix(in srgb, var(--color-border) 65%, #0b1320);
     --assistant-sidebar-bg: var(--assistant-panel-bg);
     --assistant-toolbar-bg: color-mix(in srgb, var(--color-surface) 88%, #0b1320);
