@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import timedelta, time
 from typing import Iterable
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from learning_insights.models import Goal, InsightNotification, NotificationPreference
-from learning_insights.services.analytics import build_weekly_summary
+from learning_insights.services.analytics import build_daily_summary, build_weekly_summary
 from learning_insights.services.common import (
     get_local_now,
     get_or_create_notification_preference,
@@ -59,6 +59,12 @@ def _minute_label(total_minutes: int) -> str:
 def _hour_label(total_seconds: int) -> str:
     hours = round(float(total_seconds) / 3600.0, 1)
     return f"{hours} hour" if hours == 1 else f"{hours} hours"
+
+
+def _within_time_window(current: time, start: time, end: time) -> bool:
+    if start <= end:
+        return start <= current <= end
+    return current >= start or current <= end
 
 
 def _goal_due_today_notifications(
@@ -201,33 +207,39 @@ def _daily_achievement_notification(
     if not preference.in_app_enabled or not preference.daily_achievement_enabled:
         return None
 
-    yesterday = local_now.date() - timedelta(days=1)
-    dedupe_key = f"daily-achievement:{yesterday.isoformat()}"
+    now_time = local_now.time()
+    evening_start = getattr(preference, "telegram_evening_summary_start", time(hour=22))
+    evening_end = getattr(preference, "telegram_evening_summary_end", time(hour=0))
+    morning_start = getattr(preference, "telegram_morning_summary_start", time(hour=7))
+    morning_end = getattr(preference, "telegram_morning_summary_end", time(hour=9))
 
-    summary = build_weekly_summary(
+    target_date = None
+    prefix = ""
+    if _within_time_window(now_time, evening_start, evening_end):
+        target_date = local_now.date()
+        prefix = "Today you recorded "
+    elif _within_time_window(now_time, morning_start, morning_end):
+        target_date = local_now.date() - timedelta(days=1)
+        prefix = "Yesterday you recorded "
+    else:
+        return None
+
+    dedupe_key = f"daily-achievement:{target_date.isoformat()}"
+
+    summary = build_daily_summary(
         user,
         preference=preference,
-        week_start=yesterday,
+        day=target_date,
     )
     daily_breakdown = summary.get("daily_breakdown") or []
     day_summary = next(
-        (item for item in daily_breakdown if item.get("date") == yesterday), None
+        (item for item in daily_breakdown if item.get("date") == target_date), None
     )
-    if not day_summary:
-        return None
 
-    site_minutes = int(day_summary.get("site_active_minutes", 0) or 0)
-    study_minutes = int(day_summary.get("course_minutes", 0) or 0)
-    completed_goals = int(day_summary.get("completed_goals", 0) or 0)
-    completed_contents = int(day_summary.get("completed_contents", 0) or 0)
-
-    if (
-        site_minutes <= 0
-        and study_minutes <= 0
-        and completed_goals <= 0
-        and completed_contents <= 0
-    ):
-        return None
+    site_minutes = int(float((day_summary or {}).get("site_active_minutes", 0) or 0))
+    study_minutes = int(float((day_summary or {}).get("course_minutes", 0) or 0))
+    completed_goals = int((day_summary or {}).get("completed_goals", 0) or 0)
+    completed_contents = int((day_summary or {}).get("completed_contents", 0) or 0)
 
     parts: list[str] = []
     if site_minutes > 0:
@@ -239,17 +251,24 @@ def _daily_achievement_notification(
     if completed_contents > 0:
         parts.append(f"{completed_contents} completed content item(s)")
 
-    body = "Yesterday you recorded " + ", ".join(parts) + "."
+    if parts:
+        body = prefix + ", ".join(parts) + "."
+    else:
+        body = prefix + "no learning activity."
+        if prefix.startswith("Today"):
+            body += " Tomorrow: aim for a short 20-minute session to get back on track."
+        else:
+            body += " Today: aim for a short 20-minute session to get back on track."
 
     return _create_notification(
         user=user,
         category=InsightNotification.CATEGORY_DAILY_ACHIEVEMENT,
-        title="Your daily achievement summary",
+        title="Your daily summary",
         body=body,
         dedupe_key=dedupe_key,
         scheduled_for=timezone.now(),
         payload={
-            "date": yesterday.isoformat(),
+            "date": target_date.isoformat(),
             "site_minutes": site_minutes,
             "study_minutes": study_minutes,
             "completed_goals": completed_goals,
@@ -355,6 +374,106 @@ def ensure_due_notifications(user) -> list[InsightNotification]:
 
     created.extend(_goal_due_today_notifications(user, preference, local_now))
     return created
+
+
+def create_goal_created_notification(*, goal: Goal) -> InsightNotification | None:
+    if goal is None:
+        return None
+
+    body = f'New goal created: "{goal.title}".'
+    if goal.course_id and getattr(goal, "course", None):
+        body = f'New goal created for {goal.course.title}: "{goal.title}".'
+
+    return _create_notification(
+        user=goal.user,
+        category=InsightNotification.CATEGORY_GOAL_CREATED,
+        title="Goal created",
+        body=body,
+        dedupe_key=f"goal-created:{goal.id}",
+        scheduled_for=timezone.now(),
+        payload={
+            "goal_id": goal.id,
+            "course_id": goal.course_id,
+        },
+    )
+
+
+def create_goal_batch_notification(
+    *,
+    user,
+    created_count: int,
+    source: str,
+    reference_id: str | int | None = None,
+) -> InsightNotification | None:
+    try:
+        created_value = int(created_count or 0)
+    except (TypeError, ValueError):
+        created_value = 0
+    if created_value <= 0:
+        return None
+
+    source_value = (source or "").strip() or "goals"
+    reference_value = str(reference_id).strip() if reference_id is not None else ""
+    dedupe_key = (
+        f"goal-created-batch:{source_value}:{reference_value}"
+        if reference_value
+        else f"goal-created-batch:{source_value}:{timezone.now().date().isoformat()}"
+    )
+
+    body = f"Created {created_value} goal(s)."
+    if source_value == "ai_plan":
+        body = f"Applied your AI plan: created {created_value} daily goal(s)."
+
+    return _create_notification(
+        user=user,
+        category=InsightNotification.CATEGORY_GOAL_CREATED,
+        title="Goals created",
+        body=body,
+        dedupe_key=dedupe_key,
+        scheduled_for=timezone.now(),
+        payload={
+            "created_count": created_value,
+            "source": source_value,
+        },
+    )
+
+
+def create_course_completed_notification(
+    *,
+    user,
+    course,
+    completed_at=None,
+) -> InsightNotification | None:
+    course_id = getattr(course, "id", None)
+    course_title = (getattr(course, "title", "") or "").strip() or "your course"
+
+    if not course_id:
+        return None
+
+    body = (
+        f'🎉✅ You completed "{course_title}"!\n'
+        "Amazing work — keep the streak going with your next lesson."
+    )
+    if completed_at is not None:
+        try:
+            completed_value = completed_at.isoformat()
+        except Exception:
+            completed_value = ""
+    else:
+        completed_value = ""
+
+    return _create_notification(
+        user=user,
+        category=InsightNotification.CATEGORY_COURSE_COMPLETED,
+        title="Course completed 🎉",
+        body=body,
+        dedupe_key=f"course-completed:{course_id}",
+        scheduled_for=timezone.now(),
+        payload={
+            "course_id": course_id,
+            "completed_at": completed_value,
+        },
+    )
 
 
 def get_unread_notifications(
