@@ -96,45 +96,50 @@
                     </label>
                 </div>
 
-                <div style="margin-top:1rem;display:grid;gap:.75rem;">
-                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
-                        <div>
-                            <p class="c-card__meta" style="margin:0;">Daily AI summary</p>
-                        </div>
-                        <label for="{{ form.telegram_daily_summary_enabled.id_for_label }}">
-                            {{ form.telegram_daily_summary_enabled }}
-                        </label>
+                <div style="margin-top:1rem;display:grid;gap:1rem;">
+                    <div>
+                        <h4 class="c-card__title" style="font-size:1rem;margin:0;">Daily summary windows</h4>
+                        <p class="c-card__meta" style="margin:.35rem 0 0 0;">
+                            Evening recap summarizes today. Morning fallback summarizes yesterday if the evening recap did not send.
+                        </p>
                     </div>
 
-                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
                         <div>
-                            <p class="c-card__meta" style="margin:0;">Weekly AI review</p>
+                            <label for="{{ form.telegram_evening_summary_start.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Evening start</label>
+                            {{ form.telegram_evening_summary_start }}
+                            {% for error in form.telegram_evening_summary_start.errors %}
+                                <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                            {% endfor %}
                         </div>
-                        <label for="{{ form.telegram_weekly_review_enabled.id_for_label }}">
-                            {{ form.telegram_weekly_review_enabled }}
-                        </label>
-                    </div>
 
-                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
                         <div>
-                            <p class="c-card__meta" style="margin:0;">Critical alerts</p>
+                            <label for="{{ form.telegram_evening_summary_end.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Evening end</label>
+                            {{ form.telegram_evening_summary_end }}
+                            {% for error in form.telegram_evening_summary_end.errors %}
+                                <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                            {% endfor %}
                         </div>
-                        <label for="{{ form.telegram_critical_alerts_enabled.id_for_label }}">
-                            {{ form.telegram_critical_alerts_enabled }}
-                        </label>
+
+                        <div>
+                            <label for="{{ form.telegram_morning_summary_start.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Morning start</label>
+                            {{ form.telegram_morning_summary_start }}
+                            {% for error in form.telegram_morning_summary_start.errors %}
+                                <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+
+                        <div>
+                            <label for="{{ form.telegram_morning_summary_end.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Morning end</label>
+                            {{ form.telegram_morning_summary_end }}
+                            {% for error in form.telegram_morning_summary_end.errors %}
+                                <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
 
                 {% for error in form.telegram_enabled.errors %}
-                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
-                {% endfor %}
-                {% for error in form.telegram_daily_summary_enabled.errors %}
-                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
-                {% endfor %}
-                {% for error in form.telegram_weekly_review_enabled.errors %}
-                    <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
-                {% endfor %}
-                {% for error in form.telegram_critical_alerts_enabled.errors %}
                     <p class="c-card__meta" style="margin:.75rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
                 {% endfor %}
             </div>
