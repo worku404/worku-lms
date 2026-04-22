@@ -13,7 +13,9 @@ from ..models import DailyCourseStat, DailySiteStat, StudyTimeEvent
 from .common import get_user_timezone
 
 PRESENCE_CACHE_KEY = "learning_insights:last_presence_ping:{user_id}"
+LAST_ACTIVITY_CACHE_KEY = "learning_insights:last_activity_at:{user_id}"
 PRESENCE_MAX_GAP_SECONDS = 120
+LAST_ACTIVITY_TTL_SECONDS = 60 * 60 * 24 * 7
 DEFAULT_EVENT_SOURCE = StudyTimeEvent.SOURCE_MODULE
 
 
@@ -27,6 +29,22 @@ def _coerce_positive_seconds(value) -> int:
 
 def _presence_cache_key(user_id: int) -> str:
     return PRESENCE_CACHE_KEY.format(user_id=user_id)
+
+
+def _last_activity_cache_key(user_id: int) -> str:
+    return LAST_ACTIVITY_CACHE_KEY.format(user_id=user_id)
+
+
+def _touch_last_activity(user_id: int, recorded_at: datetime):
+    try:
+        cache.set(
+            _last_activity_cache_key(int(user_id)),
+            recorded_at.timestamp(),
+            timeout=LAST_ACTIVITY_TTL_SECONDS,
+        )
+    except Exception:
+        # Cache failures should never break tracking.
+        return
 
 
 def _get_local_parts(
@@ -53,6 +71,7 @@ def record_module_time_event(
         return None
 
     recorded_at, local_date, local_hour = _get_local_parts(user, recorded_at)
+    _touch_last_activity(getattr(user, "id", 0) or 0, recorded_at)
 
     event = StudyTimeEvent.objects.create(
         user=user,
@@ -104,6 +123,7 @@ def record_content_progress_event(
 
     seconds_delta = _coerce_positive_seconds(seconds_delta)
     recorded_at, local_date, _local_hour = _get_local_parts(user, recorded_at)
+    _touch_last_activity(getattr(user, "id", 0) or 0, recorded_at)
     course = content.module.course
 
     stat, created = DailyCourseStat.objects.get_or_create(
@@ -146,6 +166,7 @@ def record_presence_ping(user_id: int, recorded_at: datetime | None = None):
 
     User = get_user_model()
     user = User.objects.get(pk=user_id)
+    _touch_last_activity(int(user_id), recorded_at)
 
     _, local_date, _ = _get_local_parts(user, recorded_at)
     cache_key = _presence_cache_key(user_id)
@@ -187,6 +208,51 @@ def record_presence_ping(user_id: int, recorded_at: datetime | None = None):
             stat.save(update_fields=["ping_count"])
 
     return stat
+
+
+def get_last_activity_at(*, user):
+    """
+    Best-effort "last activity" timestamp for inactivity warnings.
+
+    Sources (in priority order):
+    - cache updated by presence + study events
+    - latest DailySiteStat.updated
+    - latest StudyTimeEvent.session_end_at
+    """
+    user_id = getattr(user, "id", None)
+    if not user_id:
+        return None
+
+    cached = cache.get(_last_activity_cache_key(int(user_id)))
+    if cached is not None:
+        try:
+            return datetime.fromtimestamp(float(cached), tz=dt_timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            pass
+
+    last_site = (
+        DailySiteStat.objects.filter(user_id=int(user_id))
+        .order_by("-date", "-updated", "-id")
+        .values_list("updated", flat=True)
+        .first()
+    )
+    last_study = (
+        StudyTimeEvent.objects.filter(user_id=int(user_id))
+        .order_by("-session_end_at", "-id")
+        .values_list("session_end_at", flat=True)
+        .first()
+    )
+
+    candidates = [dt for dt in (last_site, last_study) if dt is not None]
+    if not candidates:
+        return None
+
+    latest = max(candidates)
+    try:
+        _touch_last_activity(int(user_id), latest)
+    except Exception:
+        pass
+    return latest
 
 
 def safe_record_module_time_event(
