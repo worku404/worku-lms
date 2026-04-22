@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.dispatch import receiver
 from students.signals import (
     content_progress_recorded,
+    course_completed,
     module_time_tracked,
     presence_ping_recorded,
 )
@@ -12,6 +13,7 @@ from learning_insights.services.tracking import (
     safe_record_module_time_event,
     safe_record_presence_ping,
 )
+from learning_insights.services.notifications import create_course_completed_notification
 
 
 @receiver(module_time_tracked)
@@ -63,4 +65,20 @@ def handle_presence_ping_recorded(sender, **kwargs):
     safe_record_presence_ping(
         user_id=user_id,
         recorded_at=recorded_at,
+    )
+
+
+@receiver(course_completed)
+def handle_course_completed(sender, **kwargs):
+    user = kwargs.get("user")
+    course = kwargs.get("course")
+    completed_at = kwargs.get("completed_at")
+
+    if user is None or course is None:
+        return
+
+    create_course_completed_notification(
+        user=user,
+        course=course,
+        completed_at=completed_at,
     )
