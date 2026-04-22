@@ -897,12 +897,16 @@ body.assistant-sidebar-open .llm-history {
     flex-direction: column;
     gap: 0.35rem;
     background: var(--assistant-composer-bg);
-    border: 1px solid var(--assistant-composer-border);
+    border: 1px solid #2A9D66;
     border-radius: var(--assistant-radius-lg);
     padding: var(--assistant-composer-padding);
     box-shadow: var(--assistant-composer-shadow);
 }
+.llm-composer:focus{
+    border:  5px solid red;
+    transition: border-color var(--assistant-transition-fast), box-shadow var(--assistant-transition-fast), background var(--assistant-transition-fast);
 
+}
 .llm-input {
     flex: 1;
     min-width: 0;
@@ -912,28 +916,21 @@ body.assistant-sidebar-open .llm-history {
     width: 100%;
     min-height: 44px;
     max-height: 152px;
-    border: 1px solid var(--assistant-input-border);
-    border-radius: var(--assistant-radius-md);
-    background: var(--assistant-input-bg);
     color: var(--assistant-text-color);
     padding: var(--assistant-input-padding);
     line-height: 1.45;
     resize: none;
     overflow: hidden;
-    transition: border-color var(--assistant-transition-fast), box-shadow var(--assistant-transition-fast), background var(--assistant-transition-fast);
     font-family: var(--assistant-font-family);
     font-size: var(--assistant-font-size);
     letter-spacing: var(--assistant-letter-spacing);
+    background-color: transparent;
+    outline: none;
+    border: transparent;
 }
 
 .llm--textarea::placeholder {
     color: var(--assistant-text-muted);
-}
-
-.llm--textarea:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
-    border-color: color-mix(in srgb, var(--assistant-input-border) 70%, var(--color-accent));
 }
 
 .llm--textarea,
