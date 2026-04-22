@@ -16,7 +16,6 @@ from learning_insights.models import (
 )
 from learning_insights.services.ai_coach import (
     generate_recovery_run,
-    generate_weekly_plan_run,
     generate_weekly_review_run,
 )
 from learning_insights.services.common import get_local_now, get_period_start
@@ -60,11 +59,20 @@ def _format_bullets(items: list[str], *, limit: int = 5) -> str:
 def format_weekly_plan_message(payload: dict[str, Any]) -> str:
     reasoning = str(payload.get("reasoning_summary") or "").strip()
     inputs = payload.get("inputs_used") if isinstance(payload.get("inputs_used"), dict) else {}
-    focus = payload.get("weekly_focus") if isinstance(payload.get("weekly_focus"), list) else []
+    focus = payload.get("focus_courses") if isinstance(payload.get("focus_courses"), list) else []
+    if not focus:
+        focus = payload.get("weekly_focus") if isinstance(payload.get("weekly_focus"), list) else []
     plan = payload.get("plan") if isinstance(payload.get("plan"), list) else []
+    period = payload.get("period") if isinstance(payload.get("period"), dict) else {}
 
     lines: list[str] = []
-    lines.append("AI Weekly Plan")
+    lines.append("AI Study Plan")
+
+    start = str(period.get("start") or "").strip()
+    end = str(period.get("end") or "").strip()
+    if start and end:
+        lines.append("")
+        lines.append(f"Period: {start} -> {end}")
     if reasoning:
         lines.append("")
         lines.append(_truncate(reasoning, 900))
@@ -80,7 +88,7 @@ def format_weekly_plan_message(payload: dict[str, Any]) -> str:
 
     if focus:
         lines.append("")
-        lines.append("Weekly focus:")
+        lines.append("Focus:")
         focus_lines = []
         for row in focus[:4]:
             if not isinstance(row, dict):
@@ -237,19 +245,10 @@ def format_review_message(payload: dict[str, Any], *, title: str = "AI Review") 
     return "\n".join([line for line in lines if line is not None]).strip()
 
 
-def format_weekly_coaching_message(*, review_run: AIPlanRun, plan_run: AIPlanRun) -> str:
-    review_payload = review_run.effective_payload if review_run else {}
-    plan_payload = plan_run.effective_payload if plan_run else {}
-
-    review_text = format_review_message(review_payload, title="Weekly Review")
-    plan_text = format_weekly_plan_message(plan_payload)
-
-    combined = review_text + "\n\n" + plan_text
-    return _truncate(combined, 3800)
-
-
 def format_ai_run_message(run: AIPlanRun) -> str:
     payload = run.effective_payload if run else {}
+    if run and run.kind == AIPlanRun.KIND_PROMPT_PLAN:
+        return format_weekly_plan_message(payload)
     if run and run.kind == AIPlanRun.KIND_WEEKLY_PLAN:
         return format_weekly_plan_message(payload)
     if run and run.kind == AIPlanRun.KIND_DAILY_PLAN:
@@ -512,15 +511,18 @@ def maybe_send_weekly_review(*, user, preference: NotificationPreference) -> boo
         return False
 
     review_run = generate_weekly_review_run(user=user, preference=preference, reference_date=local_now.date())
-    plan_run = generate_weekly_plan_run(user=user, preference=preference, reference_date=local_now.date())
-
-    if review_run.status != AIPlanRun.STATUS_SUCCESS or plan_run.status != AIPlanRun.STATUS_SUCCESS:
+    if review_run.status != AIPlanRun.STATUS_SUCCESS:
         return False
 
-    ok = send_notification(
-        user=user,
-        message=format_weekly_coaching_message(review_run=review_run, plan_run=plan_run),
+    message_text = format_review_message(review_run.effective_payload or {}, title="Weekly Review")
+    message_text = _truncate(
+        message_text
+        + "\n\n"
+        + "Tip: Create a study plan from a prompt in Learning Insights → Create goal → AI planner.",
+        3800,
     )
+
+    ok = send_notification(user=user, message=message_text)
     if ok:
         cache.set(dedupe, "1", timeout=60 * 60 * 24 * 10)
     return ok
