@@ -8,6 +8,14 @@ from django import forms
 from .models import Goal, NotificationPreference
 
 
+class DateInput(forms.DateInput):
+    input_type = "date"
+
+
+class TimeInput(forms.TimeInput):
+    input_type = "time"
+
+
 class AIPlanRunEditForm(forms.Form):
     edited_payload = forms.JSONField(
         widget=forms.Textarea(
@@ -21,12 +29,90 @@ class AIPlanRunEditForm(forms.Form):
     )
 
 
-class DateInput(forms.DateInput):
-    input_type = "date"
+class PromptPlanItemForm(forms.Form):
+    day = forms.DateField(
+        widget=DateInput(attrs={"class": "form-control"}),
+    )
+    course = forms.ModelChoiceField(
+        queryset=Course.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    minutes = forms.IntegerField(
+        required=False,
+        min_value=0,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "step": "1",
+                "placeholder": "e.g. 30",
+            }
+        ),
+    )
+    task = forms.CharField(
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "What will you do?",
+            }
+        )
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Optional notes",
+            }
+        ),
+    )
+
+    def __init__(self, *args, courses=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if courses is not None:
+            self.fields["course"].queryset = courses
+
+    def clean_task(self):
+        value = str(self.cleaned_data.get("task") or "").strip()
+        if not value:
+            raise forms.ValidationError("Task is required.")
+        return value
 
 
-class TimeInput(forms.TimeInput):
-    input_type = "time"
+class BasePromptPlanItemFormSet(forms.BaseFormSet):
+    def __init__(self, *args, courses=None, **kwargs):
+        self.courses = courses or Course.objects.none()
+        super().__init__(*args, **kwargs)
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["courses"] = self.courses
+        return kwargs
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        remaining = 0
+        for form in self.forms:
+            if self.can_delete and self._should_delete_form(form):
+                continue
+            cleaned = getattr(form, "cleaned_data", None) or {}
+            if str(cleaned.get("task") or "").strip():
+                remaining += 1
+
+        if remaining <= 0:
+            raise forms.ValidationError("Add at least one plan item before saving.")
+
+
+PromptPlanItemFormSet = forms.formset_factory(
+    PromptPlanItemForm,
+    formset=BasePromptPlanItemFormSet,
+    extra=0,
+    can_delete=True,
+)
 
 
 class GoalForm(forms.ModelForm):
