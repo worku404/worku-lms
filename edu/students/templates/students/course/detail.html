@@ -157,6 +157,7 @@ window.addEventListener("pageshow", function (event) {
 let startTime = Date.now();
 let completionSent = false;
 let userHasScrolled = false;
+let timeHeartbeatId = null;
 const modulesUiStateKey = "modules_sidebar_state";
 
 const moduleContainer = document.querySelector(".module");
@@ -519,12 +520,14 @@ if (moduleContainer) {
 
 document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
+        stopTimeHeartbeat();
         sendTime();
         trackVisibleText(true);
         trackAllVideos(true);
         if (window.PdfViewer) window.PdfViewer.flushAll();
     } else {
         startTime = Date.now();
+        startTimeHeartbeat();
     }
 });
 
@@ -536,9 +539,27 @@ function sendTime() {
     formData.append("seconds", seconds);
     formData.append("csrfmiddlewaretoken", getCookie("csrftoken"));
     navigator.sendBeacon(timeUrl, formData);
+    startTime = Date.now();
 }
 
-window.addEventListener("beforeunload", sendTime);
+function startTimeHeartbeat() {
+    if (!timeUrl) return;
+    if (timeHeartbeatId !== null) return;
+    timeHeartbeatId = window.setInterval(sendTime, 60000);
+}
+
+function stopTimeHeartbeat() {
+    if (timeHeartbeatId === null) return;
+    window.clearInterval(timeHeartbeatId);
+    timeHeartbeatId = null;
+}
+
+startTimeHeartbeat();
+
+window.addEventListener("beforeunload", function () {
+    stopTimeHeartbeat();
+    sendTime();
+});
 window.addEventListener("beforeunload", function () {
     trackVisibleText(true);
     trackAllVideos(true);
