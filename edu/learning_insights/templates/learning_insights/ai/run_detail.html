@@ -46,7 +46,9 @@
     </div>
 
     <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
-        <a href="{% url 'learning_insights:ai_run_edit' run.id %}" class="c-btn c-btn--secondary">Edit JSON</a>
+        <a href="#edit" class="c-btn c-btn--secondary">
+            {% if run.kind == "prompt_plan" %}Edit plan{% else %}Edit JSON{% endif %}
+        </a>
 
         {% if run.kind == "prompt_plan" and run.status == "success" %}
             <form method="post" action="{% url 'learning_insights:ai_run_apply' run.id %}">
@@ -54,20 +56,195 @@
                 <button type="submit" class="c-btn c-btn--ghost">Apply to goals</button>
             </form>
         {% endif %}
-
-        {% if subscription %}
-            <form method="post" action="{% url 'learning_insights:ai_run_send_telegram' run.id %}">
-                {% csrf_token %}
-                <button type="submit" class="c-btn c-btn--ghost">Send to Telegram</button>
-            </form>
-        {% else %}
-            <a href="{% url 'learning_insights:telegram_connect' %}" class="c-btn c-btn--ghost">Connect Telegram</a>
-        {% endif %}
     </div>
 </section>
 
+<section class="c-card" style="margin-top:1rem;" id="edit">
+    {% if is_prompt_plan %}
+        <h2 class="c-card__title" style="margin:0;">Edit plan</h2>
+        <p class="c-card__meta" style="margin-top:.5rem;">
+            Update dates, courses, minutes, and tasks. Save, then apply the run to create goals.
+        </p>
+
+        {% if plan_formset.non_form_errors %}
+            <div class="c-card c-alert c-alert--error" role="alert" style="margin-top:1rem;">
+                {{ plan_formset.non_form_errors }}
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'learning_insights:ai_run_detail' run.id %}#edit" style="margin-top:1rem;display:grid;gap:1rem;">
+            {% csrf_token %}
+            {{ plan_formset.management_form }}
+
+            <div id="li-plan-items" style="display:grid;gap:.75rem;">
+                <div class="c-card" style="padding:.75rem;border:1px solid rgba(255,255,255,0.08);background:color-mix(in srgb, var(--color-surface) 92%, var(--color-bg));">
+                    <p class="c-card__meta" style="margin:0;">
+                        Tip: Use <strong>Remove</strong> to delete an item. You can also add new items.
+                    </p>
+                </div>
+
+                {% for item_form in plan_formset %}
+                    <div class="c-card" style="margin:0;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
+                        {% if item_form.non_field_errors %}
+                            <div class="c-card c-alert c-alert--error" role="alert" style="margin-bottom:.75rem;">
+                                {{ item_form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;align-items:end;">
+                            <div>
+                                <label for="{{ item_form.day.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Day</label>
+                                {{ item_form.day }}
+                                {% for error in item_form.day.errors %}
+                                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <div>
+                                <label for="{{ item_form.course.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Course (optional)</label>
+                                {{ item_form.course }}
+                                {% for error in item_form.course.errors %}
+                                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <div>
+                                <label for="{{ item_form.minutes.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Minutes</label>
+                                {{ item_form.minutes }}
+                                {% for error in item_form.minutes.errors %}
+                                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <div style="grid-column:1 / -1;">
+                                <label for="{{ item_form.task.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Task</label>
+                                {{ item_form.task }}
+                                {% for error in item_form.task.errors %}
+                                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <div style="grid-column:1 / -1;">
+                                <label for="{{ item_form.notes.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Notes</label>
+                                {{ item_form.notes }}
+                                {% for error in item_form.notes.errors %}
+                                    <p class="c-card__meta" style="margin:.35rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <div style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;grid-column:1 / -1;">
+                                <label for="{{ item_form.DELETE.id_for_label }}" class="c-card__meta" style="margin:0;">Remove</label>
+                                {{ item_form.DELETE }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <template id="li-plan-empty-form">
+                <div class="c-card" style="margin:0;padding:1rem;border:1px solid rgba(255,255,255,0.08);">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;align-items:end;">
+                        <div>
+                            <label for="{{ plan_formset.empty_form.day.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Day</label>
+                            {{ plan_formset.empty_form.day }}
+                        </div>
+
+                        <div>
+                            <label for="{{ plan_formset.empty_form.course.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Course (optional)</label>
+                            {{ plan_formset.empty_form.course }}
+                        </div>
+
+                        <div>
+                            <label for="{{ plan_formset.empty_form.minutes.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Minutes</label>
+                            {{ plan_formset.empty_form.minutes }}
+                        </div>
+
+                        <div style="grid-column:1 / -1;">
+                            <label for="{{ plan_formset.empty_form.task.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Task</label>
+                            {{ plan_formset.empty_form.task }}
+                        </div>
+
+                        <div style="grid-column:1 / -1;">
+                            <label for="{{ plan_formset.empty_form.notes.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Notes</label>
+                            {{ plan_formset.empty_form.notes }}
+                        </div>
+
+                        <div style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;grid-column:1 / -1;">
+                            <label for="{{ plan_formset.empty_form.DELETE.id_for_label }}" class="c-card__meta" style="margin:0;">Remove</label>
+                            {{ plan_formset.empty_form.DELETE }}
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center;">
+                <button type="button" id="li-plan-add" class="c-btn c-btn--secondary">Add item</button>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+                    <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Cancel</a>
+                    <button type="submit" class="c-btn c-btn--primary">Save</button>
+                </div>
+            </div>
+        </form>
+
+        <script>
+            (function () {
+                const container = document.getElementById("li-plan-items");
+                const addBtn = document.getElementById("li-plan-add");
+                const template = document.getElementById("li-plan-empty-form");
+                const totalInput = document.getElementById("id_items-TOTAL_FORMS");
+                if (!container || !addBtn || !template || !totalInput) return;
+
+                addBtn.addEventListener("click", function () {
+                    const total = parseInt(totalInput.value || "0", 10);
+                    const html = template.innerHTML.replaceAll("__prefix__", String(total));
+                    const wrapper = document.createElement("div");
+                    wrapper.innerHTML = html.trim();
+                    const node = wrapper.firstElementChild;
+                    if (!node) return;
+                    container.appendChild(node);
+                    totalInput.value = String(total + 1);
+                    const dayInput = node.querySelector("input[type='date']");
+                    if (dayInput) dayInput.focus();
+                });
+            })();
+        </script>
+    {% else %}
+        <h2 class="c-card__title" style="margin:0;">Edit JSON payload</h2>
+
+        {% if form.non_field_errors %}
+            <div class="c-card c-alert c-alert--error" role="alert" style="margin-top:1rem;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'learning_insights:ai_run_detail' run.id %}#edit" style="margin-top:1rem;display:grid;gap:1rem;">
+            {% csrf_token %}
+
+            <div>
+                <label for="{{ form.edited_payload.id_for_label }}" class="c-card__meta" style="display:block;margin-bottom:.35rem;">
+                    Edited output (JSON)
+                </label>
+                {{ form.edited_payload }}
+                {% if form.edited_payload.help_text %}
+                    <p class="c-card__meta" style="margin:.45rem 0 0 0;">{{ form.edited_payload.help_text }}</p>
+                {% endif %}
+                {% for error in form.edited_payload.errors %}
+                    <p class="c-card__meta" style="margin:.45rem 0 0 0;color:#ff8f8f;">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap;">
+                <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Cancel</a>
+                <button type="submit" class="c-btn c-btn--primary">Save</button>
+            </div>
+        </form>
+    {% endif %}
+</section>
+
 <section class="c-card" style="margin-top:1rem;">
-    <h2 class="c-card__title" style="margin:0;">Output JSON</h2>
-    <pre style="margin-top:1rem;white-space:pre-wrap;line-height:1.5;max-height:520px;overflow:auto;border:1px solid rgba(255,255,255,0.08);padding:1rem;border-radius:.75rem;">{{ payload_pretty }}</pre>
+    <details>
+        <summary class="c-card__title" style="margin:0;cursor:pointer;">View current JSON</summary>
+        <pre style="margin-top:1rem;white-space:pre-wrap;line-height:1.5;max-height:520px;overflow:auto;border:1px solid rgba(255,255,255,0.08);padding:1rem;border-radius:.75rem;">{{ payload_pretty }}</pre>
+    </details>
 </section>
 {% endblock %}
