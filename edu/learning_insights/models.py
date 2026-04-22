@@ -384,9 +384,10 @@ class NotificationPreference(models.Model):
     weekly_achievement_enabled = models.BooleanField(default=True)
     in_app_enabled = models.BooleanField(default=True)
     telegram_enabled = models.BooleanField(default=False)
-    telegram_daily_summary_enabled = models.BooleanField(default=False)
-    telegram_weekly_review_enabled = models.BooleanField(default=True)
-    telegram_critical_alerts_enabled = models.BooleanField(default=True)
+    telegram_evening_summary_start = models.TimeField(default=time(hour=22, minute=0))
+    telegram_evening_summary_end = models.TimeField(default=time(hour=0, minute=0))
+    telegram_morning_summary_start = models.TimeField(default=time(hour=7, minute=0))
+    telegram_morning_summary_end = models.TimeField(default=time(hour=9, minute=0))
     daily_time = models.TimeField(default=time(hour=8, minute=0))
     weekly_time = models.TimeField(default=time(hour=8, minute=0))
 
@@ -407,12 +408,16 @@ class InsightNotification(models.Model):
     CATEGORY_DAILY_ACHIEVEMENT = "daily_achievement"
     CATEGORY_WEEKLY_ACHIEVEMENT = "weekly_achievement"
     CATEGORY_GOAL_DUE = "goal_due"
+    CATEGORY_GOAL_CREATED = "goal_created"
+    CATEGORY_COURSE_COMPLETED = "course_completed"
     CATEGORY_CHOICES = (
         (CATEGORY_DAILY_START, "Daily start"),
         (CATEGORY_WEEKLY_START, "Weekly start"),
-        (CATEGORY_DAILY_ACHIEVEMENT, "Daily achievement"),
+        (CATEGORY_DAILY_ACHIEVEMENT, "Daily summary"),
         (CATEGORY_WEEKLY_ACHIEVEMENT, "Weekly achievement"),
         (CATEGORY_GOAL_DUE, "Goal due"),
+        (CATEGORY_GOAL_CREATED, "Goal created"),
+        (CATEGORY_COURSE_COMPLETED, "Course completed"),
     )
 
     objects = InsightNotificationQuerySet.as_manager()
@@ -435,6 +440,7 @@ class InsightNotification(models.Model):
     scheduled_for = models.DateTimeField(default=timezone.now)
     read_at = models.DateTimeField(null=True, blank=True)
     dismissed_at = models.DateTimeField(null=True, blank=True)
+    telegram_sent_at = models.DateTimeField(null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -504,6 +510,33 @@ class InsightNotification(models.Model):
 
         if self.category == self.CATEGORY_GOAL_DUE and goal_id:
             return self._reverse_first(["learning_insights:goal_update"], pk=goal_id)
+
+        if self.category == self.CATEGORY_GOAL_CREATED:
+            if goal_id:
+                return self._reverse_first(["learning_insights:goal_update"], pk=goal_id)
+            return self._reverse_first(
+                [
+                    "learning_insights:goal_list",
+                    "learning_insights:overview",
+                ]
+            )
+
+        if self.category == self.CATEGORY_COURSE_COMPLETED:
+            if course_id:
+                course_url = self._reverse_first(
+                    [
+                        "student_course_detail",
+                    ],
+                    pk=course_id,
+                )
+                if course_url:
+                    return course_url
+            return self._reverse_first(
+                [
+                    "student_course_list",
+                    "learning_insights:overview",
+                ]
+            )
 
         if self.category in {
             self.CATEGORY_DAILY_START,
@@ -587,6 +620,7 @@ class TelegramConnectToken(models.Model):
 
 
 class AIPlanRun(models.Model):
+    KIND_PROMPT_PLAN = "prompt_plan"
     KIND_WEEKLY_PLAN = "weekly_plan"
     KIND_DAILY_PLAN = "daily_plan"
     KIND_DAILY_REVIEW = "daily_review"
@@ -595,6 +629,7 @@ class AIPlanRun(models.Model):
     KIND_RECOVERY = "recovery"
 
     KIND_CHOICES = (
+        (KIND_PROMPT_PLAN, "Prompt plan"),
         (KIND_WEEKLY_PLAN, "Weekly plan"),
         (KIND_DAILY_PLAN, "Daily plan"),
         (KIND_DAILY_REVIEW, "Daily review"),
@@ -620,7 +655,7 @@ class AIPlanRun(models.Model):
     kind = models.CharField(
         max_length=24,
         choices=KIND_CHOICES,
-        default=KIND_WEEKLY_PLAN,
+        default=KIND_PROMPT_PLAN,
     )
     period_type = models.CharField(
         max_length=16,
