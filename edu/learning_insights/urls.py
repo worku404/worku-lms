@@ -58,11 +58,6 @@ urlpatterns = [
     path("ai/review/", views.AIReviewHubView.as_view(), name="ai_review"),
     path("ai/review/generate/", views.AIReviewGenerateView.as_view(), name="ai_review_generate"),
     path("ai/runs/<int:pk>/", views.AIRunDetailView.as_view(), name="ai_run_detail"),
-    path("ai/runs/<int:pk>/edit/", views.AIRunEditView.as_view(), name="ai_run_edit"),
+    path("ai/runs/<int:pk>/edit/", views.AIRunDetailView.as_view(), name="ai_run_edit"),
     path("ai/runs/<int:pk>/apply/", views.AIRunApplyView.as_view(), name="ai_run_apply"),
-    path(
-        "ai/runs/<int:pk>/telegram/",
-        views.AIRunSendTelegramView.as_view(),
-        name="ai_run_send_telegram",
-    ),
 ]
