@@ -98,7 +98,9 @@
                     <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
                         <div style="flex:1 1 420px;min-width:260px;">
                             <h2 id="goal-{{ goal.id }}-title" class="c-card__title" style="margin:0;">
-                                {{ goal.title }}
+                                    <a href="{% url 'student_course_detail' goal.course_id %}" style="text-decoration:none;color:inherit;">
+                                        <strong>{{ goal.title }}</strong>
+                                    </a>
                             </h2>
                             <p class="c-card__meta" style="margin:.35rem 0 0 0;">
                                 {{ goal.get_period_type_display }} &middot; {{ goal.get_status_display }}
