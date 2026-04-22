@@ -177,9 +177,10 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
         "weekly_achievement_enabled",
         "in_app_enabled",
         "telegram_enabled",
-        "telegram_daily_summary_enabled",
-        "telegram_weekly_review_enabled",
-        "telegram_critical_alerts_enabled",
+        "telegram_evening_summary_start",
+        "telegram_evening_summary_end",
+        "telegram_morning_summary_start",
+        "telegram_morning_summary_end",
         "daily_time",
         "weekly_time",
     )
@@ -207,6 +208,7 @@ class InsightNotificationAdmin(admin.ModelAdmin):
         "scheduled_for",
         "read_at",
         "dismissed_at",
+        "telegram_sent_at",
         "created",
     )
     list_filter = (
