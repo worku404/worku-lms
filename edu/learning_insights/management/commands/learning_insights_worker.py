@@ -11,7 +11,10 @@ from learning_insights.models import InsightNotification
 from learning_insights.models import TelegramSubscription
 from learning_insights.services.common import get_or_create_notification_preference
 from learning_insights.services.common import get_local_now
-from learning_insights.services.notifications import ensure_due_notifications
+from learning_insights.services.notifications import (
+    ensure_due_notifications,
+    maybe_create_inactivity_warning_notification,
+)
 from learning_insights.services.telegram import (
     TelegramUpdateProcessor,
     fetch_updates,
@@ -157,6 +160,13 @@ class Command(BaseCommand):
 
             if not getattr(preference, "telegram_enabled", False):
                 continue
+
+            local_now = get_local_now(preference=preference)
+            maybe_create_inactivity_warning_notification(
+                user=user,
+                preference=preference,
+                local_now=local_now,
+            )
 
             ensure_due_notifications(user)
 
