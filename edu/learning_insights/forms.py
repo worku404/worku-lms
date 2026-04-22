@@ -188,9 +188,10 @@ class NotificationPreferenceForm(forms.ModelForm):
             "weekly_achievement_enabled",
             "in_app_enabled",
             "telegram_enabled",
-            "telegram_daily_summary_enabled",
-            "telegram_weekly_review_enabled",
-            "telegram_critical_alerts_enabled",
+            "telegram_evening_summary_start",
+            "telegram_evening_summary_end",
+            "telegram_morning_summary_start",
+            "telegram_morning_summary_end",
             "daily_time",
             "weekly_time",
         ]
@@ -212,15 +213,10 @@ class NotificationPreferenceForm(forms.ModelForm):
             ),
             "in_app_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "telegram_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "telegram_daily_summary_enabled": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
-            "telegram_weekly_review_enabled": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
-            "telegram_critical_alerts_enabled": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
+            "telegram_evening_summary_start": TimeInput(attrs={"class": "form-control"}),
+            "telegram_evening_summary_end": TimeInput(attrs={"class": "form-control"}),
+            "telegram_morning_summary_start": TimeInput(attrs={"class": "form-control"}),
+            "telegram_morning_summary_end": TimeInput(attrs={"class": "form-control"}),
             "daily_time": TimeInput(attrs={"class": "form-control"}),
             "weekly_time": TimeInput(attrs={"class": "form-control"}),
         }
@@ -230,9 +226,10 @@ class NotificationPreferenceForm(forms.ModelForm):
             "daily_time": "Preferred local time for daily in-app reminders.",
             "weekly_time": "Preferred local time for weekly in-app reminders.",
             "telegram_enabled": "Enable Telegram delivery (requires connecting Telegram first).",
-            "telegram_daily_summary_enabled": "Optional daily AI summary to Telegram.",
-            "telegram_weekly_review_enabled": "Weekly AI review notification to Telegram.",
-            "telegram_critical_alerts_enabled": "Critical Telegram alerts when risk patterns are detected.",
+            "telegram_evening_summary_start": "Local start time for the evening recap window.",
+            "telegram_evening_summary_end": "Local end time for the evening recap window.",
+            "telegram_morning_summary_start": "Local start time for the morning fallback window.",
+            "telegram_morning_summary_end": "Local end time for the morning fallback window.",
         }
 
     def clean_timezone(self):
@@ -252,11 +249,12 @@ class NotificationPreferenceForm(forms.ModelForm):
         weekly_enabled = cleaned_data.get("weekly_enabled")
         in_app_enabled = cleaned_data.get("in_app_enabled")
         telegram_enabled = cleaned_data.get("telegram_enabled")
-        telegram_daily = cleaned_data.get("telegram_daily_summary_enabled")
-        telegram_weekly = cleaned_data.get("telegram_weekly_review_enabled")
-        telegram_critical = cleaned_data.get("telegram_critical_alerts_enabled")
         daily_time = cleaned_data.get("daily_time")
         weekly_time = cleaned_data.get("weekly_time")
+        evening_start = cleaned_data.get("telegram_evening_summary_start")
+        evening_end = cleaned_data.get("telegram_evening_summary_end")
+        morning_start = cleaned_data.get("telegram_morning_summary_start")
+        morning_end = cleaned_data.get("telegram_morning_summary_end")
 
         if daily_enabled and not daily_time:
             self.add_error(
@@ -280,7 +278,9 @@ class NotificationPreferenceForm(forms.ModelForm):
                 "Enable in-app notifications to receive Release 1 insight notifications."
             )
 
-        if (telegram_daily or telegram_weekly or telegram_critical) and not telegram_enabled:
-            raise forms.ValidationError("Enable Telegram to use Telegram notification settings.")
+        if telegram_enabled and not all([evening_start, evening_end, morning_start, morning_end]):
+            raise forms.ValidationError(
+                "Configure both evening and morning time windows to receive Telegram summaries."
+            )
 
         return cleaned_data
