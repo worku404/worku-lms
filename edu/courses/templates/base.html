@@ -650,6 +650,47 @@
             stack.prepend(toast);
         }
 
+        const POLL_MS = 30000;
+        let pollTimerId = null;
+        let pollInFlight = false;
+
+        function pollNotifications() {
+            if (pollInFlight) return;
+            if (document.hidden) return;
+            if (isInsideInsightsNotifications()) return;
+
+            pollInFlight = true;
+            fetch("{% url 'learning_insights:notifications_bootstrap' %}", {
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            })
+                .then((response) => (response.ok ? response.json() : { items: [] }))
+                .then((data) => {
+                    (data.items || []).forEach((item) => {
+                        showToast(item);
+                    });
+                })
+                .catch(() => {
+                    // Silent failure.
+                })
+                .finally(() => {
+                    pollInFlight = false;
+                });
+        }
+
+        function startPolling() {
+            if (pollTimerId !== null) return;
+            pollTimerId = window.setInterval(pollNotifications, POLL_MS);
+        }
+
+        function stopPolling() {
+            if (pollTimerId === null) return;
+            window.clearInterval(pollTimerId);
+            pollTimerId = null;
+        }
+
         let params = null;
         let forceBootstrap = false;
         try {
@@ -719,6 +760,20 @@
         } else {
             clearForceParam();
         }
+
+        pollNotifications();
+        startPolling();
+
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                pollNotifications();
+                startPolling();
+            }
+        });
+
+        window.addEventListener("beforeunload", stopPolling);
     })();
  
     (function () {
