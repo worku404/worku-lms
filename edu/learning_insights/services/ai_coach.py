@@ -7,7 +7,8 @@ from decimal import Decimal
 from typing import Any
 
 from assistant.services import GeminiError, generate_ai_response
-from courses.models import Course
+from courses.models import ContentSearchEntry, Course
+from courses.search import search_content_entries, search_courses
 from django.db import transaction
 from django.utils import timezone
 from notes.models import Note
@@ -56,6 +57,17 @@ def _strip_html(html: str, limit: int = 1200) -> str:
     text = re.sub(r"<[^>]+>", " ", html)
     text = re.sub(r"\s+", " ", text).strip()
     return text[:limit]
+
+
+def _normalize_whitespace(value: str) -> str:
+    return " ".join((value or "").split())
+
+
+def _truncate_text(value: str, limit: int) -> str:
+    normalized = _normalize_whitespace(str(value or ""))
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: max(0, limit - 3)] + "..."
 
 
 def _serialize_goals(goals) -> list[dict[str, Any]]:
@@ -220,20 +232,51 @@ def build_ai_input_payload(
     }
 
 
-WEEKLY_PLAN_SYSTEM_PROMPT = """
-You are an AI learning coach. Generate a realistic weekly study plan.
+PROMPT_PLAN_SYSTEM_PROMPT = """
+You are an AI learning coach and planner.
+
+Your job is to turn the user's prompt into a realistic study plan using ONLY the
+resources available on this site.
+
+You will receive "Input context JSON" that includes:
+- today (YYYY-MM-DD) in the user's timezone
+- user_prompt (free-form user text)
+- clarification (optional): previous_questions + previous_answers
+- allowed_course_ids: course ids the user is enrolled in (allowed for plan items)
+- matches: search results from enrolled content + catalog recommendations
+- courses: enrolled courses with progress and next module
+- goals, analytics, notes, and preferences
 
 Hard rules:
-- Be realistic and avoid over-optimistic scheduling.
-- Adjust workload based on user consistency and recent time spent.
-- Prioritize weak or neglected courses when appropriate.
-- Include buffer/rest time if the user has low consistency or is at risk.
-- Do NOT rely on any single input. Combine goals + analytics + course roadmap + constraints.
+- Return ONLY valid JSON (no markdown, no commentary).
+- If required details are missing/ambiguous, return type="clarification" with 1-5 questions.
+- Prefer asking the minimum questions needed to produce a high-quality plan.
+- Default plan start is today unless the user explicitly says otherwise.
+- If the user provides a clear deadline (tomorrow / in N days / on a date), plan from today through the deadline.
+- If the deadline is ambiguous (e.g. "in 2 or 3 days"), ask for the exact target date.
+- Plan items MUST use course_id from allowed_course_ids. If no enrolled course matches, set course_id=0 and course_title="".
+- Recommendations MUST come from matches.catalog_courses only.
 
-Return ONLY valid JSON (no markdown, no commentary).
+Return JSON in one of these shapes:
 
-Required JSON shape:
+CLARIFICATION:
 {
+  "type": "clarification",
+  "reasoning_summary": "",
+  "questions": [
+    {
+      "id": "snake_case_id",
+      "label": "",
+      "type": "text",
+      "required": true,
+      "placeholder": ""
+    }
+  ]
+}
+
+PLAN:
+{
+  "type": "plan",
   "reasoning_summary": "",
   "inputs_used": {
     "goals": "",
@@ -241,7 +284,8 @@ Required JSON shape:
     "roadmap": "",
     "constraints": ""
   },
-  "weekly_focus": [
+  "period": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
+  "focus_courses": [
     {"course_id": 0, "course_title": "", "why": ""}
   ],
   "plan": [
@@ -259,50 +303,14 @@ Required JSON shape:
       ]
     }
   ],
-  "risk_level": "low"
-}
-
-Where risk_level is one of: "low", "medium", "high".
-""".strip()
-
-
-DAILY_PLAN_SYSTEM_PROMPT = """
-You are an AI learning coach. Generate a realistic study plan for a single day.
-
-Hard rules:
-- Be realistic and avoid over-optimistic scheduling.
-- Adjust workload based on user consistency and recent time spent.
-- Prioritize weak or neglected courses when appropriate.
-- Do NOT rely on any single input. Combine goals + analytics + course roadmap + constraints.
-- Plan ONLY for the provided day (input context contains "day").
-
-Return ONLY valid JSON (no markdown, no commentary).
-
-Required JSON shape:
-{
-  "reasoning_summary": "",
-  "inputs_used": {
-    "goals": "",
-    "analytics": "",
-    "roadmap": "",
-    "constraints": ""
-  },
-  "date": "YYYY-MM-DD",
-  "items": [
-    {
-      "course_id": 0,
-      "course_title": "",
-      "minutes": 30,
-      "task": "",
-      "notes": ""
-    }
+  "recommendations": [
+    {"course_id": 0, "course_title": "", "slug": "", "why": ""}
   ],
   "risk_level": "low"
 }
 
 Where risk_level is one of: "low", "medium", "high".
 """.strip()
-
 
 REVIEW_SYSTEM_PROMPT = """
 You are an AI learning coach. Produce a performance review summary and actionable next steps.
@@ -374,6 +382,292 @@ Required JSON shape:
 """.strip()
 
 
+def _build_prompt_plan_matches(*, user, query_text: str) -> dict[str, Any]:
+    query_text = _truncate_text(query_text, 700)
+    matches: dict[str, Any] = {
+        "enrolled_courses": [],
+        "enrolled_content": [],
+        "catalog_courses": [],
+    }
+    if not query_text:
+        return matches
+
+    try:
+        enrolled_course_qs = Course.objects.select_related("subject").filter(students=user)
+        enrolled = list(search_courses(enrolled_course_qs, query_text)[:6])
+        for course in enrolled:
+            matches["enrolled_courses"].append(
+                {
+                    "course_id": course.id,
+                    "course_title": course.title,
+                    "subject": getattr(getattr(course, "subject", None), "title", "") or "",
+                    "slug": getattr(course, "slug", "") or "",
+                    "overview": _truncate_text(getattr(course, "overview", "") or "", 240),
+                    "score": float(getattr(course, "combined_score", 0.0) or 0.0),
+                }
+            )
+    except Exception:
+        pass
+
+    try:
+        content_qs = ContentSearchEntry.objects.select_related("course", "module", "content").filter(
+            course__students=user
+        )
+        entries = list(search_content_entries(content_qs, query_text)[:10])
+        for entry in entries:
+            matches["enrolled_content"].append(
+                {
+                    "course_id": entry.course_id,
+                    "course_title": getattr(getattr(entry, "course", None), "title", "") or "",
+                    "module_id": entry.module_id,
+                    "module_title": getattr(getattr(entry, "module", None), "title", "") or "",
+                    "content_id": entry.content_id,
+                    "kind": getattr(entry, "kind", "") or "",
+                    "item_title": getattr(entry, "item_title", "") or "",
+                    "page_number": int(getattr(entry, "page_number", 0) or 0) or None,
+                    "snippet": _truncate_text(str(getattr(entry, "snippet", "") or ""), 340),
+                    "score": float(getattr(entry, "combined_score", 0.0) or 0.0),
+                }
+            )
+    except Exception:
+        pass
+
+    try:
+        catalog_qs = Course.objects.select_related("subject").exclude(students=user)
+        catalog = list(search_courses(catalog_qs, query_text)[:6])
+        for course in catalog:
+            matches["catalog_courses"].append(
+                {
+                    "course_id": course.id,
+                    "course_title": course.title,
+                    "subject": getattr(getattr(course, "subject", None), "title", "") or "",
+                    "slug": getattr(course, "slug", "") or "",
+                    "overview": _truncate_text(getattr(course, "overview", "") or "", 240),
+                    "score": float(getattr(course, "combined_score", 0.0) or 0.0),
+                }
+            )
+    except Exception:
+        pass
+
+    return matches
+
+
+def _safe_date(value: Any) -> date | None:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _normalize_prompt_plan_output(
+    *,
+    output: dict[str, Any],
+    today: date,
+    allowed_course_ids: set[int],
+    enrolled_titles: dict[int, str],
+    recommended_by_id: dict[int, dict[str, Any]],
+) -> dict[str, Any]:
+    if not isinstance(output, dict):
+        return {}
+
+    kind = str(output.get("type") or "").strip().lower()
+    if not kind:
+        if isinstance(output.get("questions"), list):
+            kind = "clarification"
+        elif isinstance(output.get("plan"), list) or isinstance(output.get("items"), list):
+            kind = "plan"
+
+    if kind == "clarification":
+        questions = output.get("questions")
+        if not isinstance(questions, list):
+            questions = []
+        cleaned_questions: list[dict[str, Any]] = []
+        for idx, raw in enumerate(questions[:5], start=1):
+            if not isinstance(raw, dict):
+                continue
+            qid = str(raw.get("id") or "").strip()
+            if not re.match(r"^[a-z][a-z0-9_]{0,50}$", qid):
+                qid = f"question_{idx}"
+            label = str(raw.get("label") or raw.get("question") or "").strip()
+            if not label:
+                continue
+            qtype = str(raw.get("type") or "text").strip().lower()
+            if qtype not in {"text", "date", "number"}:
+                qtype = "text"
+            placeholder = str(raw.get("placeholder") or "").strip()
+            cleaned_questions.append(
+                {
+                    "id": qid,
+                    "label": label[:240],
+                    "type": qtype,
+                    "required": bool(raw.get("required", True)),
+                    "placeholder": placeholder[:140],
+                }
+            )
+        return {
+            "type": "clarification",
+            "reasoning_summary": str(output.get("reasoning_summary") or "").strip()[:2000],
+            "questions": cleaned_questions,
+        }
+
+    # Normalize into a multi-day plan shape (even for 1 day).
+    plan_days = output.get("plan")
+    if not isinstance(plan_days, list):
+        items = output.get("items")
+        if isinstance(items, list):
+            single_date = str(output.get("date") or output.get("day") or "").strip()
+            plan_days = [{"date": single_date or today.isoformat(), "is_buffer_day": False, "items": items}]
+        else:
+            plan_days = []
+
+    normalized_days: list[dict[str, Any]] = []
+    for day in plan_days[:31]:
+        if not isinstance(day, dict):
+            continue
+        day_value = str(day.get("date") or "").strip()
+        parsed_day = _safe_date(day_value) or today
+        items = day.get("items")
+        if not isinstance(items, list):
+            items = []
+        normalized_items: list[dict[str, Any]] = []
+        for item in items[:10]:
+            if not isinstance(item, dict):
+                continue
+            course_id = item.get("course_id")
+            try:
+                course_id_value = int(course_id or 0)
+            except (TypeError, ValueError):
+                course_id_value = 0
+            if course_id_value not in allowed_course_ids:
+                course_id_value = 0
+
+            minutes = item.get("minutes")
+            try:
+                minutes_value = max(0, int(minutes or 0))
+            except (TypeError, ValueError):
+                minutes_value = 0
+
+            task = str(item.get("task") or "").strip()
+            if not task:
+                continue
+
+            course_title = str(item.get("course_title") or "").strip()
+            if not course_title and course_id_value in enrolled_titles:
+                course_title = enrolled_titles[course_id_value]
+
+            normalized_items.append(
+                {
+                    "course_id": course_id_value,
+                    "course_title": course_title[:200] if course_title else "",
+                    "minutes": minutes_value,
+                    "task": task[:240],
+                    "notes": str(item.get("notes") or "").strip()[:600],
+                }
+            )
+        normalized_days.append(
+            {
+                "date": parsed_day.isoformat(),
+                "is_buffer_day": bool(day.get("is_buffer_day", False)),
+                "items": normalized_items,
+            }
+        )
+
+    # Period: prefer provided period, else derive from plan days.
+    start_date = None
+    end_date = None
+    period = output.get("period") if isinstance(output.get("period"), dict) else {}
+    start_date = _safe_date(period.get("start")) or None
+    end_date = _safe_date(period.get("end")) or None
+    if normalized_days and (start_date is None or end_date is None):
+        dates = [_safe_date(row.get("date")) for row in normalized_days]
+        dates = [d for d in dates if d is not None]
+        if dates:
+            start_date = start_date or min(dates)
+            end_date = end_date or max(dates)
+    start_date = start_date or today
+    end_date = end_date or start_date
+
+    focus = output.get("focus_courses")
+    if not isinstance(focus, list):
+        focus = output.get("weekly_focus") if isinstance(output.get("weekly_focus"), list) else []
+    normalized_focus: list[dict[str, Any]] = []
+    for row in focus[:6]:
+        if not isinstance(row, dict):
+            continue
+        cid = row.get("course_id")
+        try:
+            cid_value = int(cid or 0)
+        except (TypeError, ValueError):
+            cid_value = 0
+        if cid_value not in allowed_course_ids:
+            cid_value = 0
+        title = str(row.get("course_title") or "").strip()
+        if not title and cid_value in enrolled_titles:
+            title = enrolled_titles[cid_value]
+        why = str(row.get("why") or "").strip()
+        if not title and not why:
+            continue
+        normalized_focus.append(
+            {
+                "course_id": cid_value,
+                "course_title": title[:200] if title else "",
+                "why": why[:300],
+            }
+        )
+
+    recommendations = output.get("recommendations")
+    if not isinstance(recommendations, list):
+        recommendations = []
+    normalized_recs: list[dict[str, Any]] = []
+    for row in recommendations[:6]:
+        if not isinstance(row, dict):
+            continue
+        cid = row.get("course_id")
+        try:
+            cid_value = int(cid or 0)
+        except (TypeError, ValueError):
+            cid_value = 0
+        canonical = recommended_by_id.get(cid_value)
+        if not canonical:
+            continue
+        normalized_recs.append(
+            {
+                "course_id": cid_value,
+                "course_title": canonical.get("course_title") or "",
+                "slug": canonical.get("slug") or "",
+                "why": str(row.get("why") or "").strip()[:320],
+            }
+        )
+
+    risk_level = str(output.get("risk_level") or "").strip().lower()
+    if risk_level not in {"low", "medium", "high"}:
+        risk_level = "low"
+
+    inputs_used = output.get("inputs_used") if isinstance(output.get("inputs_used"), dict) else {}
+    return {
+        "type": "plan",
+        "reasoning_summary": str(output.get("reasoning_summary") or "").strip()[:2000],
+        "inputs_used": {
+            "goals": str(inputs_used.get("goals") or "").strip()[:500],
+            "analytics": str(inputs_used.get("analytics") or "").strip()[:500],
+            "roadmap": str(inputs_used.get("roadmap") or "").strip()[:500],
+            "constraints": str(inputs_used.get("constraints") or "").strip()[:500],
+        },
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "focus_courses": normalized_focus,
+        "plan": normalized_days,
+        "recommendations": normalized_recs,
+        "risk_level": risk_level,
+    }
+
+
 def _create_ai_run(
     *,
     user,
@@ -431,68 +725,91 @@ def _create_ai_run(
     return run
 
 
-def generate_weekly_plan_run(
+def generate_prompt_plan_run(
     *,
     user,
     preference: NotificationPreference,
-    reference_date: date | None = None,
+    user_prompt: str,
+    previous_questions: list[dict[str, Any]] | None = None,
+    previous_answers: dict[str, Any] | None = None,
 ) -> AIPlanRun:
-    anchor = reference_date or get_local_date(preference=preference)
-    plan_start = get_period_start(
-        anchor,
-        Goal.PERIOD_WEEKLY,
-        week_start_day=preference.week_start_day,
-    )
-    plan_end = plan_start + timedelta(days=6)
+    prompt_value = (user_prompt or "").strip()
+    today = get_local_date(preference=preference)
+    recent_start = today - timedelta(days=6)
 
-    # Use the prior 7 days for behavioral analytics to avoid planning against future dates.
-    analytics_start = plan_start - timedelta(days=7)
-    payload = build_ai_input_payload(
-        user=user,
-        preference=preference,
-        week_start=analytics_start,
-        month_anchor=plan_start,
-    )
-    payload["period"] = {"start": plan_start.isoformat(), "end": plan_end.isoformat()}
-
-    return _create_ai_run(
-        user=user,
-        kind=AIPlanRun.KIND_WEEKLY_PLAN,
-        period_type=Goal.PERIOD_WEEKLY,
-        period_start=plan_start,
-        period_end=plan_end,
-        input_payload=payload,
-        system_prompt=WEEKLY_PLAN_SYSTEM_PROMPT,
-    )
-
-
-def generate_daily_plan_run(
-    *,
-    user,
-    preference: NotificationPreference,
-    reference_date: date | None = None,
-) -> AIPlanRun:
-    plan_date = reference_date or get_local_date(preference=preference)
-
-    recent_start = plan_date - timedelta(days=6)
-    payload = build_ai_input_payload(
+    base_payload = build_ai_input_payload(
         user=user,
         preference=preference,
         week_start=recent_start,
-        month_anchor=plan_date,
+        month_anchor=today,
     )
-    payload["day"] = plan_date.isoformat()
 
-    return _create_ai_run(
+    clarification = {
+        "previous_questions": previous_questions or [],
+        "previous_answers": previous_answers or {},
+    }
+
+    query_text = prompt_value
+    if previous_answers:
+        query_text = f"{query_text}\n\nAnswers:\n{json.dumps(previous_answers, ensure_ascii=False)}"
+
+    matches = _build_prompt_plan_matches(user=user, query_text=query_text)
+    allowed_course_ids = list(user.courses_joined.values_list("id", flat=True))
+
+    input_payload = dict(base_payload)
+    input_payload.update(
+        {
+            "today": today.isoformat(),
+            "user_prompt": prompt_value,
+            "clarification": clarification,
+            "allowed_course_ids": allowed_course_ids,
+            "matches": matches,
+        }
+    )
+
+    run = _create_ai_run(
         user=user,
-        kind=AIPlanRun.KIND_DAILY_PLAN,
+        kind=AIPlanRun.KIND_PROMPT_PLAN,
         period_type=Goal.PERIOD_DAILY,
-        period_start=plan_date,
-        period_end=plan_date,
-        input_payload=payload,
-        system_prompt=DAILY_PLAN_SYSTEM_PROMPT,
+        period_start=today,
+        period_end=today,
+        input_payload=input_payload,
+        system_prompt=PROMPT_PLAN_SYSTEM_PROMPT,
     )
 
+    if run.status != AIPlanRun.STATUS_SUCCESS or not isinstance(run.output_payload, dict):
+        return run
+
+    enrolled_titles = {
+        int(course_id): str(title)
+        for course_id, title in user.courses_joined.values_list("id", "title")
+    }
+    recommended_by_id = {
+        int(row.get("course_id")): row
+        for row in (matches.get("catalog_courses") or [])
+        if isinstance(row, dict) and row.get("course_id")
+    }
+
+    normalized = _normalize_prompt_plan_output(
+        output=run.output_payload,
+        today=today,
+        allowed_course_ids=set(int(x) for x in allowed_course_ids),
+        enrolled_titles=enrolled_titles,
+        recommended_by_id=recommended_by_id,
+    )
+    if normalized:
+        run.output_payload = normalized
+        run.summary_text = str(normalized.get("reasoning_summary") or "").strip()[:2000]
+        if isinstance(normalized.get("period"), dict):
+            start_date = _safe_date(normalized["period"].get("start"))
+            end_date = _safe_date(normalized["period"].get("end"))
+            if start_date:
+                run.period_start = start_date
+            if end_date:
+                run.period_end = end_date
+        run.save(update_fields=["output_payload", "summary_text", "period_start", "period_end", "updated_at"])
+
+    return run
 
 def generate_weekly_review_run(
     *,
@@ -618,20 +935,25 @@ def generate_recovery_run(
     )
 
 
-def apply_weekly_plan_run(*, run: AIPlanRun) -> int:
+def apply_prompt_plan_run(*, run: AIPlanRun) -> int:
     """
-    Create daily Goal rows from a weekly plan run.
+    Create daily Goal rows from a prompt-based plan run.
 
     Returns: number of goals created.
     """
 
-    if run.kind != AIPlanRun.KIND_WEEKLY_PLAN:
+    if run.kind != AIPlanRun.KIND_PROMPT_PLAN:
         return 0
     if run.status != AIPlanRun.STATUS_SUCCESS:
         return 0
 
     payload = run.effective_payload
-    plan_days = payload.get("plan") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return 0
+    if payload.get("type") not in (None, "", "plan") and "plan" not in payload:
+        return 0
+
+    plan_days = payload.get("plan")
     if not isinstance(plan_days, list):
         return 0
 
@@ -656,8 +978,12 @@ def apply_weekly_plan_run(*, run: AIPlanRun) -> int:
                     continue
                 course_id = item.get("course_id")
                 course = None
-                if isinstance(course_id, int) and course_id > 0:
-                    course = Course.objects.filter(pk=course_id).first()
+                try:
+                    course_id_value = int(course_id or 0)
+                except (TypeError, ValueError):
+                    course_id_value = 0
+                if course_id_value > 0:
+                    course = Course.objects.filter(pk=course_id_value).first()
 
                 minutes = item.get("minutes")
                 try:
@@ -698,94 +1024,6 @@ def apply_weekly_plan_run(*, run: AIPlanRun) -> int:
                     status=Goal.STATUS_NOT_STARTED,
                 )
                 created_count += 1
-
-        run.approved_at = run.approved_at or timezone.now()
-        run.applied_at = timezone.now()
-        run.save(update_fields=["approved_at", "applied_at", "updated_at"])
-
-    return created_count
-
-
-def apply_daily_plan_run(*, run: AIPlanRun) -> int:
-    """
-    Create daily Goal rows from a daily plan run.
-
-    Returns: number of goals created.
-    """
-
-    if run.kind != AIPlanRun.KIND_DAILY_PLAN:
-        return 0
-    if run.status != AIPlanRun.STATUS_SUCCESS:
-        return 0
-
-    payload = run.effective_payload
-    if not isinstance(payload, dict):
-        return 0
-
-    target_date = run.period_start
-    date_value = (payload.get("date") or "").strip()
-    if date_value:
-        try:
-            target_date = datetime.strptime(date_value, "%Y-%m-%d").date()
-        except ValueError:
-            pass
-    if target_date is None:
-        return 0
-
-    items = payload.get("items")
-    if not isinstance(items, list):
-        return 0
-
-    created_count = 0
-    with transaction.atomic():
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-
-            course_id = item.get("course_id")
-            course = None
-            if isinstance(course_id, int) and course_id > 0:
-                course = Course.objects.filter(pk=course_id).first()
-
-            minutes = item.get("minutes")
-            try:
-                minutes_value = max(0, int(minutes or 0))
-            except (TypeError, ValueError):
-                minutes_value = 0
-
-            task = (item.get("task") or "").strip()
-            if not task:
-                continue
-
-            title = f"[AI Plan] {task}"[:200]
-            exists = Goal.objects.filter(
-                user=run.user,
-                title=title,
-                start_date=target_date,
-                due_date=target_date,
-                period_type=Goal.PERIOD_DAILY,
-            ).exists()
-            if exists:
-                continue
-
-            target_type = Goal.TARGET_MINUTES if minutes_value > 0 else Goal.TARGET_TASKS
-            target_value = Decimal(str(minutes_value)) if minutes_value > 0 else Decimal("1")
-
-            Goal.objects.create(
-                user=run.user,
-                course=course,
-                title=title,
-                description=(item.get("notes") or "").strip(),
-                period_type=Goal.PERIOD_DAILY,
-                target_type=target_type,
-                target_value=target_value,
-                current_value=Decimal("0"),
-                start_date=target_date,
-                due_date=target_date,
-                priority=Goal.PRIORITY_MEDIUM,
-                status=Goal.STATUS_NOT_STARTED,
-            )
-            created_count += 1
 
         run.approved_at = run.approved_at or timezone.now()
         run.applied_at = timezone.now()
