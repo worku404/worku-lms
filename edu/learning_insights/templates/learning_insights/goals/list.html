@@ -1,50 +1,55 @@
-{% extends "base.html" %}
-{% load course %}
+{% extends "learning_insights/base.html" %}
+{% load course static %}
 
 {% block title %}Goals | Learning Insights{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'learning_insights/css/templates/goals_list.css' %}">
+{% endblock %}
+
 {% block content %}
-<section class="c-card" aria-labelledby="goals-title">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+<section class="c-card li-goals-hero" aria-labelledby="goals-title">
+    <div class="li-card-head li-goals-hero__head">
         <div>
-            <p class="c-card__meta" style="margin:0 0 .35rem 0;">Learning Insights</p>
-            <h1 id="goals-title" class="c-card__title" style="margin:0;">Goals</h1>
-            <p class="c-card__meta" style="margin-top:.5rem;">
+            <p class="c-card__meta li-kicker">Learning Insights</p>
+            <h1 id="goals-title" class="c-card__title li-title">Goals</h1>
+            <p class="c-card__meta li-subtitle">
                 Track daily, weekly, monthly, and long-term goals in one place.
             </p>
         </div>
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
-            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Overview</a>
+        <div class="li-card-actions li-goals-hero__actions">
             <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--primary">New goal</a>
+            <a href="{% url 'learning_insights:overview' %}" class="c-btn c-btn--ghost">Overview</a>
         </div>
     </div>
 </section>
 
-<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;">
+<section class="li-grid-auto li-goals-summary li-section-top" aria-label="Goal summary">
     <article class="c-card">
         <p class="c-card__meta">Total</p>
-        <h2 class="c-card__title" style="margin:0;">{{ summary.total|default:0 }}</h2>
+        <h2 class="c-card__title li-title">{{ summary.total|default:0 }}</h2>
     </article>
     <article class="c-card">
         <p class="c-card__meta">Completed</p>
-        <h2 class="c-card__title" style="margin:0;color:#2A9D66;">{{ summary.completed|default:0 }}</h2>
+        <h2 class="c-card__title li-m0 li-text-success">{{ summary.completed|default:0 }}</h2>
     </article>
     <article class="c-card">
         <p class="c-card__meta">In progress</p>
-        <h2 class="c-card__title" style="margin:0;color:#FFD166;">{{ summary.in_progress|default:0 }}</h2>
+        <h2 class="c-card__title li-m0 li-text-warning">{{ summary.in_progress|default:0 }}</h2>
     </article>
     <article class="c-card">
         <p class="c-card__meta">Overdue</p>
-        <h2 class="c-card__title" style="margin:0;color:#ff7b7b;">{{ summary.overdue|default:0 }}</h2>
+        <h2 class="c-card__title li-m0 li-text-danger">{{ summary.overdue|default:0 }}</h2>
     </article>
 </section>
 
-<section class="c-card" style="margin-top:1rem;" aria-labelledby="goal-filters-title">
-    <h2 id="goal-filters-title" class="c-card__title" style="margin:0;">Filters</h2>
+<section class="c-card li-section-top li-goals-filters" aria-labelledby="goal-filters-title">
+    <h2 id="goal-filters-title" class="c-card__title li-title">Filters</h2>
 
-    <form method="get" style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;align-items:end;">
+    <form method="get" class="li-section-top li-grid-fields--sm-lg li-goals-filters__form">
         <div>
-            <label for="filter-period" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Period</label>
+            <label for="filter-period" class="c-card__meta li-label">Period</label>
             <select id="filter-period" name="period" class="c-search__input">
                 <option value="">All</option>
                 {% for value, label in period_choices %}
@@ -54,7 +59,7 @@
         </div>
 
         <div>
-            <label for="filter-status" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Status</label>
+            <label for="filter-status" class="c-card__meta li-label">Status</label>
             <select id="filter-status" name="status" class="c-search__input">
                 <option value="">All</option>
                 {% for value, label in status_choices %}
@@ -64,7 +69,7 @@
         </div>
 
         <div>
-            <label for="filter-course" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Course</label>
+            <label for="filter-course" class="c-card__meta li-label">Course</label>
             <select id="filter-course" name="course" class="c-search__input">
                 <option value="">All</option>
                 {% for course in enrolled_courses %}
@@ -74,7 +79,7 @@
         </div>
 
         <div>
-            <label for="filter-priority" class="c-card__meta" style="display:block;margin-bottom:.25rem;">Priority</label>
+            <label for="filter-priority" class="c-card__meta li-label">Priority</label>
             <select id="filter-priority" name="priority" class="c-search__input">
                 <option value="">All</option>
                 {% for value, label in priority_choices %}
@@ -83,37 +88,43 @@
             </select>
         </div>
 
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+        <div class="li-card-actions li-goals-filters__actions">
             <button type="submit" class="c-btn c-btn--secondary">Apply</button>
             <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Reset</a>
         </div>
     </form>
 </section>
 
-<section style="margin-top:1rem;">
+<section class="li-section-top li-goals-results">
     {% if goals %}
-        <div style="display:grid;gap:1rem;">
+        <div class="li-grid">
             {% for goal in goals %}
-                <article class="c-card" aria-labelledby="goal-{{ goal.id }}-title">
-                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
-                        <div style="flex:1 1 420px;min-width:260px;">
-                            <h2 id="goal-{{ goal.id }}-title" class="c-card__title" style="margin:0;">
-                                    <a href="{% url 'student_course_detail' goal.course_id %}" style="text-decoration:none;color:inherit;">
+                <article class="c-card li-goal-card" aria-labelledby="goal-{{ goal.id }}-title">
+                    <div class="li-card-head li-goal-card__header">
+                        <div class="li-col-fluid">
+                            <h2 id="goal-{{ goal.id }}-title" class="c-card__title li-title">
+                                    <a href="{% url 'student_course_detail' goal.course_id %}" class="li-link-reset">
                                         <strong>{{ goal.title }}</strong>
                                     </a>
                             </h2>
-                            <p class="c-card__meta" style="margin:.35rem 0 0 0;">
-                                {{ goal.get_period_type_display }} &middot; {{ goal.get_status_display }}
-                                {% if goal.course %} &middot; {{ goal.course.title }}{% endif %}
-                            </p>
-                            <p class="c-card__meta" style="margin:.35rem 0 0 0;">
+                            <div class="li-goal-card__badges">
+                                <span class="li-goal-chip">{{ goal.get_period_type_display }}</span>
+                                <span class="li-goal-chip">{{ goal.get_status_display }}</span>
+                                {% if goal.course %}
+                                    <span class="li-goal-chip">{{ goal.course.title }}</span>
+                                {% endif %}
+                                <span class="li-goal-chip">Priority: {{ goal.get_priority_display }}</span>
+                            </div>
+                            <p class="c-card__meta li-mt-sm li-goal-card__schedule">
                                 {{ goal.start_date|date:"M d, Y" }} &rarr; {{ goal.due_date|date:"M d, Y" }}
-                                &middot; Priority: {{ goal.get_priority_display }}
                             </p>
                         </div>
-                        <div style="min-width:220px;">
-                            <p class="c-card__meta" style="margin:0 0 .25rem 0;">Progress</p>
+                        <div class="li-input-min--md li-goal-card__progress">
                             {% with percent=goal.progress_percent|default:0 %}
+                                <div class="li-goal-progress__head">
+                                    <p class="c-card__meta li-m0">Progress</p>
+                                    <strong class="li-goal-progress__value">{{ percent|floatformat:0 }}%</strong>
+                                </div>
                                 <div
                                     class="c-progress"
                                     role="progressbar"
@@ -124,20 +135,19 @@
                                 >
                                     <span class="c-progress__bar" style="width: {{ percent }}%;"></span>
                                 </div>
-                                <p class="c-card__meta" style="margin:.5rem 0 0 0;">
+                                <p class="c-card__meta li-mt-md li-goal-progress__values">
                                     {{ goal.current_value|default:0 }} / {{ goal.target_value|default:0 }}
-                                    ({{ percent|floatformat:0 }}%)
                                 </p>
                             {% endwith %}
                         </div>
                     </div>
 
-                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.08);">
-                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                    <div class="li-row-divider li-goal-card__actions">
+                        <div class="li-row-actions-sm">
                             <a href="{% url 'learning_insights:goal_update' goal.id %}" class="c-btn c-btn--ghost">Edit</a>
                             <a href="{% url 'learning_insights:goal_delete' goal.id %}" class="c-btn c-btn--secondary">Delete</a>
                         </div>
-                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                        <div class="li-row-actions-sm">
                             {% if goal.status != "completed" %}
                                 <form method="post" action="{% url 'learning_insights:goal_action' goal.id %}">
                                     {% csrf_token %}
@@ -157,7 +167,7 @@
         </div>
 
         {% if is_paginated %}
-            <nav aria-label="Goal pagination" style="margin-top:1rem;display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap;">
+            <nav aria-label="Goal pagination" class="li-section-top li-pagination li-pagination--center li-goals-pagination">
                 {% if page_obj.has_previous %}
                     <a
                         class="c-btn c-btn--ghost"
@@ -166,7 +176,7 @@
                         Previous
                     </a>
                 {% endif %}
-                <span class="c-btn c-btn--ghost" style="pointer-events:none;">
+                <span class="c-btn c-btn--ghost li-btn-static">
                     Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
                 </span>
                 {% if page_obj.has_next %}
@@ -180,16 +190,15 @@
             </nav>
         {% endif %}
     {% else %}
-        <article class="c-card">
-            <h2 class="c-card__title" style="margin:0;">No goals yet</h2>
-            <p class="c-card__meta" style="margin-top:.5rem;">
+        <article class="c-card li-goals-empty">
+            <h2 class="c-card__title li-title">No goals yet</h2>
+            <p class="c-card__meta li-subtitle">
                 Create your first goal to track achievement and planned versus actual progress.
             </p>
-            <div style="margin-top:1rem;">
+            <div class="li-section-top">
                 <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--primary">Create goal</a>
             </div>
         </article>
     {% endif %}
 </section>
 {% endblock %}
-
