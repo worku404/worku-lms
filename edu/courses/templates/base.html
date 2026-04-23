@@ -26,7 +26,8 @@
     {% block extra_css %}{% endblock %}
 
 </head>
-<body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}">
+{% with app_name=request.resolver_match.app_name|default:'' %}
+<body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}{% if app_name != 'learning_insights' and app_name != 'notes' %} app-body--modern{% endif %}">
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <header id="header" class="topbar">
@@ -856,5 +857,6 @@
         {% block domready %}{% endblock %}
     });
 </script>
+{% endwith %}
 </body>
 </html>
