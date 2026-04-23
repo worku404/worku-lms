@@ -111,6 +111,8 @@ body::-webkit-scrollbar-thumb {
 }
 
 .course-workspace.modules-collapsed .module {
+    grid-column: 1 / -1;
+    justify-self: stretch;
     width: 100%;
     max-width: 100%;
     min-width: 0;
