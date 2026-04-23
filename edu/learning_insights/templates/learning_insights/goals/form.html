@@ -60,7 +60,16 @@
 
             <div class="li-row-end li-row-inline">
                 {% if ai_run %}
-                    <a href="{% url 'learning_insights:goal_create' %}" class="c-btn c-btn--ghost">Clear</a>
+                    <input type="hidden" name="run_id" value="{{ ai_run.id }}">
+                    <button
+                        type="submit"
+                        name="action"
+                        value="clear"
+                        class="c-btn c-btn--ghost"
+                        formnovalidate
+                    >
+                        Clear
+                    </button>
                     <a href="{% url 'learning_insights:ai_run_detail' ai_run.id %}" class="c-btn c-btn--ghost">Open run</a>
                 {% endif %}
             </div>
