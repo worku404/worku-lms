@@ -1325,6 +1325,10 @@ body.theme-dark .c-pdf-page__text-layer *::-moz-selection {
     flex-shrink: 0;
 }
 
+.c-focus-modules__time--accent {
+  color: #2a9d66;
+}
+
 body.theme-dark .c-focus-modules__toggle {
     border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
     background: color-mix(in srgb, var(--color-surface) 86%, #0b1320);
