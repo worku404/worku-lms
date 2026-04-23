@@ -70,7 +70,10 @@ class GoalAIPlannerPersistenceTests(TestCase):
     def test_clear_deletes_unapplied_prompt_plan_run(self):
         run = self._build_prompt_plan_run()
 
-        response = self.client.post(reverse("learning_insights:goal_ai_clear", kwargs={"pk": run.id}))
+        response = self.client.post(
+            reverse("learning_insights:goal_ai_planner"),
+            {"action": "clear", "run_id": str(run.id)},
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("learning_insights:goal_create"))
@@ -81,7 +84,10 @@ class GoalAIPlannerPersistenceTests(TestCase):
         run.applied_at = timezone.now() - timedelta(minutes=1)
         run.save(update_fields=["applied_at", "updated_at"])
 
-        response = self.client.post(reverse("learning_insights:goal_ai_clear", kwargs={"pk": run.id}))
+        response = self.client.post(
+            reverse("learning_insights:goal_ai_planner"),
+            {"action": "clear", "run_id": str(run.id)},
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertIn(f"ai_run={run.id}", response.url)
