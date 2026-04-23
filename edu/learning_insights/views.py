@@ -453,23 +453,6 @@ class GoalAIPlannerView(InsightsBaseMixin, View):
         )
 
 
-class GoalAIClearView(InsightsBaseMixin, View):
-    def post(self, request, *args, **kwargs):
-        run = get_object_or_404(
-            AIPlanRun.objects.filter(user=request.user),
-            pk=kwargs.get("pk"),
-            kind=AIPlanRun.KIND_PROMPT_PLAN,
-        )
-
-        if run.applied_at is not None:
-            messages.info(request, "This plan was already applied and cannot be cleared from the planner.")
-            return HttpResponseRedirect(_with_query_param(reverse("learning_insights:goal_create"), ai_run=str(run.id)))
-
-        run.delete()
-        messages.success(request, "AI draft cleared.")
-        return HttpResponseRedirect(reverse("learning_insights:goal_create"))
-
-
 class GoalAIApplyView(InsightsBaseMixin, View):
     def post(self, request, *args, **kwargs):
         run = get_object_or_404(
