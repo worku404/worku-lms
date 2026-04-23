@@ -12,6 +12,7 @@ urlpatterns = [
     path("goals/", views.GoalListView.as_view(), name="goal_list"),
     path("goals/new/", views.GoalCreateView.as_view(), name="goal_create"),
     path("goals/ai/", views.GoalAIPlannerView.as_view(), name="goal_ai_planner"),
+    path("goals/ai/<int:pk>/clear/", views.GoalAIClearView.as_view(), name="goal_ai_clear"),
     path("goals/ai/<int:pk>/apply/", views.GoalAIApplyView.as_view(), name="goal_ai_apply"),
     path("goals/<int:pk>/edit/", views.GoalUpdateView.as_view(), name="goal_update"),
     path("goals/<int:pk>/delete/", views.GoalDeleteView.as_view(), name="goal_delete"),
