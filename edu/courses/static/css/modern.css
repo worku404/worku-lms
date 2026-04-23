@@ -283,7 +283,10 @@ body.app-body--modern .c-reader__content {
     line-height: 1.75;
     letter-spacing: 0;
 }
+body.app-body--modern .c-stack {
+    border-radius: var(--radius-lg);
 
+}
 body.app-body--modern .c-reader__content h1,
 body.app-body--modern .c-reader__content h2,
 body.app-body--modern .c-reader__content h3,
@@ -295,6 +298,17 @@ body.app-body--modern .c-reader__content h6 {
 
 body.app-body--modern .page {
     gap: var(--space-6);
+}
+
+body.app-body--modern .l-main {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+body.app-body--modern .l-main__inner {
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
 }
 
 body.app-body--modern .page-heading {
