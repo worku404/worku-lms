@@ -359,6 +359,28 @@ class GoalAIPlannerView(InsightsBaseMixin, View):
         preference = self.get_notification_preference()
         action = (request.POST.get("action") or "start").strip().lower()
 
+        if action == "clear":
+            run_id = (request.POST.get("run_id") or "").strip()
+            if run_id.isdigit():
+                run = (
+                    AIPlanRun.objects.filter(
+                        user=request.user,
+                        kind=AIPlanRun.KIND_PROMPT_PLAN,
+                        pk=int(run_id),
+                    )
+                    .order_by("-created_at", "-id")
+                    .first()
+                )
+                if run is not None:
+                    if run.applied_at is not None:
+                        messages.info(request, "This plan was already applied and cannot be cleared from the planner.")
+                        return HttpResponseRedirect(
+                            _with_query_param(reverse("learning_insights:goal_create"), ai_run=str(run.id))
+                        )
+                    run.delete()
+                    messages.success(request, "AI draft cleared.")
+            return HttpResponseRedirect(reverse("learning_insights:goal_create"))
+
         if action == "continue":
             run_id = (request.POST.get("run_id") or "").strip()
             run = get_object_or_404(
@@ -429,6 +451,23 @@ class GoalAIPlannerView(InsightsBaseMixin, View):
         return HttpResponseRedirect(
             _with_query_param(reverse("learning_insights:goal_create"), ai_run=str(new_run.id))
         )
+
+
+class GoalAIClearView(InsightsBaseMixin, View):
+    def post(self, request, *args, **kwargs):
+        run = get_object_or_404(
+            AIPlanRun.objects.filter(user=request.user),
+            pk=kwargs.get("pk"),
+            kind=AIPlanRun.KIND_PROMPT_PLAN,
+        )
+
+        if run.applied_at is not None:
+            messages.info(request, "This plan was already applied and cannot be cleared from the planner.")
+            return HttpResponseRedirect(_with_query_param(reverse("learning_insights:goal_create"), ai_run=str(run.id)))
+
+        run.delete()
+        messages.success(request, "AI draft cleared.")
+        return HttpResponseRedirect(reverse("learning_insights:goal_create"))
 
 
 class GoalAIApplyView(InsightsBaseMixin, View):
