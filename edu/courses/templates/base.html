@@ -27,7 +27,7 @@
 
 </head>
 {% with app_name=request.resolver_match.app_name|default:'' %}
-<body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}{% if app_name != 'learning_insights' and app_name != 'notes' %} app-body--modern{% endif %}">
+<body class="app-body{% if request.user.is_authenticated %} has-assistant assistant-hidden{% endif %}{% if app_name != 'notes' %} app-body--modern{% endif %}">
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <header id="header" class="topbar">
@@ -117,7 +117,7 @@
     <main class="l-shell">
         <aside class="l-rail l-rail--left" aria-label="Primary navigation">
              <nav class="c-nav">
-                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/' in request.path %} is-active{% endif %}">Dashboard</a>
+                 <a href="{% url 'course_list' %}" class="c-nav__item{% if '/course/home/' in request.path %} is-active{% endif %}">Dashboard</a>
                  <a href="{% url 'student_course_list' %}" class="c-nav__item{% if '/students/courses/' in request.path %} is-active{% endif %}">Enrolled</a>
                 {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'manage_course_list' %}" class="c-nav__item{% if '/course/mine/' in request.path %} is-active{% endif %}">Manage</a>
@@ -129,7 +129,7 @@
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
                 <h2 class="c-card__title">Today's Motto🔥</h2>
                     {% if daily_motto and daily_motto.text %}
-                    <strong style="color: #FFD166;" data-motto-text>
+                    <strong class="motto-text" data-motto-text>
                         {{ daily_motto.text }}
                     </strong>
                     <p class="c-card__meta">
@@ -153,7 +153,7 @@
                         </button>
                     </div>
                     {% else %}
-                    <strong style="color: #FFD166;" data-motto-text>
+                    <strong class="motto-text" data-motto-text>
                         Daily motto unavailable.
                     </strong>
                     <p class="c-card__meta">
@@ -208,8 +208,8 @@
                     <ul id="focus-modules-list" class="c-focus-modules__list" data-focus-list hidden>
                         {% for course in top_courses %}
                         <li class="c-focus-modules__item">
-                            <a href="{% url 'student_course_detail' course.course_id %}" style=""><span class="c-focus-modules__name"> {{ course.course__title|truncatechars:17 }}</span></a>
-                            <span class="c-focus-modules__time" style="color: #2A9D66;">{{ course.total_time|duration_format }}</span>
+                            <a href="{% url 'student_course_detail' course.course_id %}"><span class="c-focus-modules__name"> {{ course.course__title|truncatechars:17 }}</span></a>
+                            <span class="c-focus-modules__time c-focus-modules__time--accent">{{ course.total_time|duration_format }}</span>
                         </li>
                         {% endfor %}
                     </ul>
@@ -235,10 +235,10 @@
         <section id="content" class="l-main" aria-label="Learning workspace">
             <div id="main-content" class="l-main__inner">
                 {% if messages %}
-                    <div style="display:grid; gap: .75rem; margin-bottom: 1rem;">
+                    <div class="c-message-stack">
                         {% for message in messages %}
                             <div class="c-card c-alert {% if 'error' in message.tags %}c-alert--error{% elif 'warning' in message.tags %}c-alert--warn{% else %}c-alert--info{% endif %}" role="{% if 'error' in message.tags or 'warning' in message.tags %}alert{% else %}status{% endif %}">
-                                <p class="c-card__meta" style="margin:0;">{{ message }}</p>
+                                <p class="c-card__meta c-card__meta--flush">{{ message }}</p>
                             </div>
                         {% endfor %}
                     </div>
