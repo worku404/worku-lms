@@ -1120,7 +1120,7 @@ function renderHistory() {
             "X-CSRFToken": csrfToken,
           },
           credentials: "same-origin",
-          signal: activeRequestController.signal,
+          signal: activeRequestController.signal,f
           body: new URLSearchParams({ prompt: prompt }),
         });
 
@@ -1146,7 +1146,7 @@ function renderHistory() {
         if (error && error.name === "AbortError") {
           aiResponse = "Response stopped.";
         } else {
-          aiResponse = "Network error. Please try again.";
+          aiResponse = escapeHtml(error?.message || "Network error. Please try again.");
         }
       } finally {
         history[history.length - 1].response = aiResponse;
