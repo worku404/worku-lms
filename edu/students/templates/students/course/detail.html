@@ -195,6 +195,7 @@ const hasTrackableContent = textTrackElements.length > 0
     || videoTrackElements.length > 0;
 const contentProgressState = new Map();
 const contentCompletionThreshold = 95;
+let pdfLayoutRefreshTimeoutId = null;
 
 function persistModulesState(state) {
     try {
@@ -209,6 +210,23 @@ function applyModulesCollapsed(collapsed) {
     workspaceEl.classList.toggle("modules-collapsed", collapsed);
     document.body.classList.toggle("modules-sidebar-collapsed", collapsed);
     moduleSidebarEl.setAttribute("aria-hidden", String(collapsed));
+}
+
+function schedulePdfLayoutRefresh() {
+    if (!window.PdfViewer) return;
+    if (pdfLayoutRefreshTimeoutId !== null) {
+        window.clearTimeout(pdfLayoutRefreshTimeoutId);
+    }
+    pdfLayoutRefreshTimeoutId = window.setTimeout(() => {
+        pdfLayoutRefreshTimeoutId = null;
+        if (!window.PdfViewer) return;
+        if (typeof window.PdfViewer.setAutoZoomAll === "function") {
+            window.PdfViewer.setAutoZoomAll();
+        }
+        if (typeof window.PdfViewer.refreshAll === "function") {
+            window.PdfViewer.refreshAll();
+        }
+    }, 240);
 }
 
 if (workspaceEl && moduleSidebarEl) {
@@ -663,10 +681,7 @@ if (document.body && typeof MutationObserver === "function") {
     const bodyClassObserver = new MutationObserver((mutations) => {
         const changed = mutations.some((mutation) => mutation.attributeName === "class");
         if (changed && window.PdfViewer) {
-            if (typeof window.PdfViewer.setAutoZoomAll === "function") {
-                window.PdfViewer.setAutoZoomAll();
-            }
-            window.PdfViewer.refreshAll();
+            schedulePdfLayoutRefresh();
         }
     });
     bodyClassObserver.observe(document.body, {
