@@ -139,7 +139,11 @@ def generate_ai_response(input_context: dict[str, Any], system_prompt: str) -> s
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=timeout)
         except requests.RequestException as exc:
-            last_error = {"key_index": key_index, "error": str(exc)}
+            last_error = {
+                "key_index": key_index,
+                "error": str(exc),
+                "type": exc.__class__.__name__,
+            }
             continue
 
         if response.status_code == 200:
@@ -172,7 +176,12 @@ def generate_ai_response(input_context: dict[str, Any], system_prompt: str) -> s
         }
 
     error_message = "All API keys failed."
-    if last_error and last_error.get("status") == 429:
+    if last_error and last_error.get("error") and not last_error.get("status"):
+        error_message = (
+            "Network error while contacting Gemini: "
+            f"{last_error['error']}"
+        )
+    elif last_error and last_error.get("status") == 429:
         error_message = "All API keys are over quota right now."
     elif last_error and last_error.get("status") in (401, 403):
         error_message = (
