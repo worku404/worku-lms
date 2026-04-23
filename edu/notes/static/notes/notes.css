@@ -152,19 +152,16 @@ body.notes-open {
 }
 
 /* Push the main layout right so content behaves like the modules sidebar. */
-/* When notes are open and modules sidebar is collapsed, reserve module space. */
+/* When notes are open and modules sidebar is collapsed, keep main content full width. */
 body.notes-open .course-workspace.modules-collapsed {
-    /* Mimic the two-column layout of the modules sidebar. */
-    grid-template-columns: minmax(
-        var(--workspace-modules-min-current, 220px),
-        var(--workspace-modules-max-current, 280px)
-    ) minmax(0, 1fr);
+    /* Preserve single-column expansion when module sidebar is hidden. */
+    grid-template-columns: minmax(0, 1fr);
 }
 
-/* Keep the main content in the second column when modules are collapsed. */
+/* Keep the module content spanning the available width. */
 body.notes-open .course-workspace.modules-collapsed .module {
-    /* Force the module content to stay in column two. */
-    grid-column: 2 / 3;
+    /* Ensure content does not stay pinned to a narrower column. */
+    grid-column: 1 / -1;
 }
 
 /* Reveal panel when notes-open class is active. */
