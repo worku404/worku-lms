@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Load environment variables from either project root or settings directory.
 for _env_path in (BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
     if _env_path.exists():
-        load_dotenv(_env_path)
+        load_dotenv(_env_path, override=True)
 
 # Authentication behavior
 # Send authenticated users to the course home page after login.
