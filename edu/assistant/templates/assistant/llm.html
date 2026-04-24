@@ -602,6 +602,119 @@
       throwOnError: false,
     });
   };
+
+  const renderAssistantResponseMarkup = (item) => {
+    const responseMode = item?.responseMode || "html";
+    const responseText = String(item?.response || "");
+    if (responseMode === "streaming") {
+      return responseText
+        ? escapeHtml(responseText).replace(/\n/g, "<br>")
+        : waitingMarkup();
+    }
+    if (responseMode === "text") {
+      return escapeHtml(responseText).replace(/\n/g, "<br>");
+    }
+    return responseText;
+  };
+
+  const parseSseEventPayload = (eventName, dataLines) => {
+    const raw = dataLines.join("\n").trim();
+    if (!raw || raw === "[DONE]") return null;
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch (error) {
+      payload = { text: raw };
+    }
+
+    if (eventName === "error") {
+      const message = payload.error || payload.message || "Request failed.";
+      const error = new Error(message);
+      error.payload = payload;
+      throw error;
+    }
+
+    return { eventName, payload };
+  };
+
+  const readAssistantStream = async (response, { onToken, onState, onDone } = {}) => {
+    if (!response.body || typeof response.body.getReader !== "function") {
+      throw new Error("Streaming is not supported in this browser.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let eventName = "message";
+    let dataLines = [];
+
+    const flushEvent = async () => {
+      if (!dataLines.length) {
+        eventName = "message";
+        return null;
+      }
+      const parsed = parseSseEventPayload(eventName, dataLines);
+      eventName = "message";
+      dataLines = [];
+      if (!parsed) return null;
+      const { payload } = parsed;
+      if (parsed.eventName === "token") {
+        const text = String(payload.text || payload.delta || "");
+        if (text && typeof onToken === "function") {
+          onToken(text);
+        }
+        return null;
+      }
+      if (parsed.eventName === "state") {
+        if (typeof onState === "function") {
+          onState(payload);
+        }
+        return null;
+      }
+      if (parsed.eventName === "done") {
+        if (typeof onDone === "function") {
+          onDone(payload);
+        }
+        return payload;
+      }
+      return null;
+    };
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).replace(/\r$/, "");
+          buffer = buffer.slice(newlineIndex + 1);
+          if (!line) {
+            await flushEvent();
+          } else if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim() || "message";
+          } else if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5).trimStart());
+          } else if (!line.startsWith(":")) {
+            dataLines.push(line);
+          }
+          newlineIndex = buffer.indexOf("\n");
+        }
+      }
+
+      if (buffer.trim() || dataLines.length) {
+        if (buffer.trim()) {
+          dataLines.push(buffer.trim());
+        }
+        const payload = await flushEvent();
+        return payload;
+      }
+      return null;
+    } finally {
+      reader.releaseLock();
+    }
+  };
     
   const waitingMarkup = () =>
     `
@@ -947,7 +1060,9 @@ function renderHistory() {
   container.innerHTML = "";
   history.forEach((item, itemIndex) => {
     const isPendingResponse =
-      typeof item.response === "string" && item.response.includes("llm-wait__dot");
+      (item.responseMode === "streaming" && !String(item.response || "").trim()) ||
+      (typeof item.response === "string" && item.response.includes("llm-wait__dot"));
+    const responseMarkup = renderAssistantResponseMarkup(item);
     const entry = document.createElement("div");
     entry.className = "llm-chat-entry";
     entry.innerHTML = `
@@ -974,7 +1089,7 @@ function renderHistory() {
       </div>
       <div class="llm-chat-row llm-chat-row--ai">
         <div class="llm-chat-bubble llm-chat-bubble--ai">
-          <div class="llm-chat-msg">${String(item.response || "")}</div>
+          <div class="llm-chat-msg">${responseMarkup}</div>
           <div class="llm-chat-bubble__actions">
             <button
               class="llm-copy-btn llm-copy-message"
@@ -1051,10 +1166,11 @@ function renderHistory() {
   const form = document.getElementById("llm-form");
   const promptInput = document.getElementById("id_prompt");
   if (form && promptInput) {
+    const composer = form.querySelector(".llm-composer");
     const sendBtn = form.querySelector('button[type="submit"]');
     const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
     const csrfToken = csrfInput ? csrfInput.value : "";
-    const maxInputHeight = 152;
+    const maxInputHeight = 64;
     let isSubmitting = false;
     let activeRequestController = null;
 
@@ -1073,6 +1189,11 @@ function renderHistory() {
       return true;
     };
 
+    const syncComposerState = () => {
+      if (!composer) return;
+      composer.classList.toggle("is-active", document.activeElement === promptInput);
+    };
+
     const autoGrow = () => {
       promptInput.style.height = "auto";
       const next = Math.min(promptInput.scrollHeight, maxInputHeight);
@@ -1082,6 +1203,7 @@ function renderHistory() {
     };
 
     autoGrow();
+  syncComposerState();
     setSendButtonMode("send");
 
     if (sendBtn) {
@@ -1107,9 +1229,31 @@ function renderHistory() {
       openAssistantSidebar();
       setSendButtonMode("stop");
       activeRequestController = new AbortController();
-      let aiResponse = waitingMarkup();
-      history.push({ prompt: prompt, response: aiResponse });
+      const shouldStickToBottom = isHistoryNearBottom(historyContainerEl);
+      const activeItem = {
+        prompt: prompt,
+        response: "",
+        responseMode: "streaming",
+      };
+      history.push(activeItem);
       renderHistory();
+      let streamingResponseEl = historyContainerEl
+        ? historyContainerEl.querySelector(".llm-chat-entry:last-child .llm-chat-row--ai .llm-chat-msg")
+        : null;
+      let streamedText = "";
+
+      const setStreamingText = (text) => {
+        streamedText = text;
+        activeItem.response = streamedText;
+        activeItem.responseMode = "streaming";
+        if (streamingResponseEl) {
+          streamingResponseEl.textContent = streamedText;
+        }
+        if (shouldStickToBottom && historyContainerEl) {
+          historyContainerEl.scrollTop = historyContainerEl.scrollHeight;
+        }
+        updateScrollBottomVisibility();
+      };
 
       try {
         const response = await fetch("{% url 'assistant:llm_generate' %}", {
@@ -1120,37 +1264,61 @@ function renderHistory() {
             "X-CSRFToken": csrfToken,
           },
           credentials: "same-origin",
-          signal: activeRequestController.signal,f
+          signal: activeRequestController.signal,
           body: new URLSearchParams({ prompt: prompt }),
         });
 
-        let data = {};
-        try {
-          data = await response.json();
-        } catch (err) {
-          data = {};
-        }
-
         if (!response.ok) {
+          let data = {};
+          try {
+            data = await response.json();
+          } catch (err) {
+            data = {};
+          }
           const detailMessage =
             data.details && (data.details.message || data.details.error);
           const message = detailMessage
             ? `${data.error || "Request failed."} (${detailMessage})`
             : data.error || `Request failed (${response.status}).`;
-          aiResponse = escapeHtml(message);
+          activeItem.response = message;
+          activeItem.responseMode = "text";
+          renderHistory();
+          applyChatState(data);
         } else {
-          aiResponse = data.generated || escapeHtml(data.error || "Something went wrong.");
+          const data = await readAssistantStream(response, {
+            onState: (payload) => {
+              applyChatState(payload);
+            },
+            onToken: (chunkText) => {
+              setStreamingText(streamedText + chunkText);
+            },
+            onDone: (payload) => {
+              activeItem.response = payload.generated || "";
+              activeItem.responseMode = "html";
+              if (payload.chat_state) {
+                applyChatState(payload);
+              }
+            },
+          });
+
+          if (data && data.error) {
+            activeItem.response = String(data.error || "Request failed.");
+            activeItem.responseMode = "text";
+            renderHistory();
+          } else {
+            renderHistory();
+          }
         }
-        applyChatState(data);
       } catch (error) {
         if (error && error.name === "AbortError") {
-          aiResponse = "Response stopped.";
+          activeItem.response = "Response stopped.";
+          activeItem.responseMode = "text";
         } else {
-          aiResponse = escapeHtml(error?.message || "Network error. Please try again.");
+          activeItem.response = error?.message || "Network error. Please try again.";
+          activeItem.responseMode = "text";
         }
-      } finally {
-        history[history.length - 1].response = aiResponse;
         renderHistory();
+      } finally {
         activeRequestController = null;
         isSubmitting = false;
         setSendButtonMode("send");
@@ -1159,6 +1327,8 @@ function renderHistory() {
     });
 
     promptInput.addEventListener("input", autoGrow);
+    promptInput.addEventListener("focus", syncComposerState);
+    promptInput.addEventListener("blur", syncComposerState);
 
     promptInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
