@@ -127,25 +127,38 @@
             {% block motivation %}
             {% if request.user.is_authenticated %}
             <section class="c-card c-progress-card" aria-label="Progress snapshot">
-                <h2 class="c-card__title">Today's Motto🔥</h2>
+                <h2 class="c-card__title">Did You Know?</h2>
                     {% if daily_motto and daily_motto.text %}
                     <strong class="motto-text" data-motto-text>
                         {{ daily_motto.text }}
                     </strong>
-                    <p class="c-card__meta">
-                        — <span data-motto-author>{{ daily_motto.author|default:"Unknown" }}</span>
+                    <p class="c-card__meta motto-context" data-motto-context {% if not daily_motto.link %}hidden{% endif %}>
+                        Open the article for the full context.
+                        <a
+                            class="motto-link"
+                            data-motto-link
+                            href="{{ daily_motto.link|default:'' }}"
+                            {% if not daily_motto.link %}hidden{% endif %}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Link
+                        </a>
+                    </p>
+                    <p class="c-card__meta motto-source">
+                        — <span data-motto-note>{{ daily_motto.source|default:"Knowledge" }}</span>
                     </p>
                     <div class="motto-actions">
                         <button
                             type="button"
                             class="c-btn c-btn--ghost motto-refresh"
                             data-motto-refresh
-                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-label="Refresh insight"
                             data-motto-refresh-url="{% url 'motto_refresh' %}"
-                            aria-label="Refresh daily motto"
-                            title="Refresh daily motto"
+                            aria-label="Refresh insight"
+                            title="Refresh insight"
                         >
-                            <span class="u-sr-only">Refresh daily motto</span>
+                            <span class="u-sr-only">Refresh insight</span>
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
@@ -154,23 +167,35 @@
                     </div>
                     {% else %}
                     <strong class="motto-text" data-motto-text>
-                        Daily motto unavailable.
+                        Daily insight unavailable.
                     </strong>
-                    <p class="c-card__meta">
-                        — <span data-motto-author>Unknown</span>
-                        <span class="c-card__meta" data-motto-note>AI-suggested</span>
+                    <p class="c-card__meta motto-context" data-motto-context hidden>
+                        Open the article for the full context.
+                        <a
+                            class="motto-link"
+                            data-motto-link
+                            href=""
+                            hidden
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Link
+                        </a>
+                    </p>
+                    <p class="c-card__meta motto-source">
+                        — <span data-motto-note>Knowledge</span>
                     </p>
                     <div class="motto-actions">
                         <button
                             type="button"
                             class="c-btn c-btn--ghost motto-refresh"
                             data-motto-refresh
-                            data-motto-refresh-label="Refresh daily motto"
+                            data-motto-refresh-label="Refresh insight"
                             data-motto-refresh-url="{% url 'motto_refresh' %}"
-                            aria-label="Refresh daily motto"
-                            title="Refresh daily motto"
+                            aria-label="Refresh insight"
+                            title="Refresh insight"
                         >
-                            <span class="u-sr-only">Refresh daily motto</span>
+                            <span class="u-sr-only">Refresh insight</span>
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 5v6h-6"></path>
@@ -783,27 +808,22 @@
         if (!refreshBtn) return;
 
         const textEl = document.querySelector("[data-motto-text]");
-        const authorEl = document.querySelector("[data-motto-author]");
+        const contextEl = document.querySelector("[data-motto-context]");
         const noteEl = document.querySelector("[data-motto-note]");
+        const linkEl = document.querySelector("[data-motto-link]");
         const refreshUrl = refreshBtn.getAttribute("data-motto-refresh-url");
         const defaultLabel =
-            refreshBtn.getAttribute("data-motto-refresh-label") || "Refresh daily motto";
+            refreshBtn.getAttribute("data-motto-refresh-label") || "Refresh insight";
         const defaultAriaLabel = refreshBtn.getAttribute("aria-label") || defaultLabel;
         const defaultTitle = refreshBtn.getAttribute("title") || defaultLabel;
-
-        function getCookie(name) {
-            const cookie = document.cookie
-                .split("; ")
-                .find((row) => row.startsWith(name + "="));
-            return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
-        }
+        const defaultLinkLabel = linkEl ? (linkEl.textContent || "Link").trim() : "Link";
 
         function setLoading(isLoading) {
             refreshBtn.classList.toggle("is-loading", isLoading);
             refreshBtn.disabled = isLoading;
             refreshBtn.setAttribute(
                 "aria-label",
-                isLoading ? "Refreshing daily motto" : defaultAriaLabel
+                isLoading ? "Refreshing insight" : defaultAriaLabel
             );
             refreshBtn.setAttribute("title", isLoading ? "Refreshing..." : defaultTitle);
         }
@@ -813,11 +833,24 @@
             if (textEl && motto.text) {
                 textEl.textContent = motto.text;
             }
-            if (authorEl) {
-                authorEl.textContent = motto.author || "Unknown";
-            }
             if (noteEl) {
-                noteEl.textContent = motto.source_note || "AI-suggested";
+                noteEl.textContent = motto.source || "Knowledge";
+            }
+            if (contextEl) {
+                const link = (motto.link || "").trim();
+                contextEl.hidden = !link;
+            }
+            if (linkEl) {
+                const link = (motto.link || "").trim();
+                if (link) {
+                    linkEl.hidden = false;
+                    linkEl.href = link;
+                    linkEl.textContent = defaultLinkLabel;
+                    linkEl.setAttribute("title", motto.source ? `Open article on ${motto.source}` : "Open article");
+                } else {
+                    linkEl.hidden = true;
+                    linkEl.removeAttribute("href");
+                }
             }
         }
 
@@ -826,10 +859,10 @@
             setLoading(true);
             try {
                 const response = await fetch(refreshUrl, {
-                    method: "POST",
+                    method: "GET",
+                    cache: "no-store",
                     credentials: "same-origin",
                     headers: {
-                        "X-CSRFToken": getCookie("csrftoken"),
                         "X-Requested-With": "XMLHttpRequest",
                     },
                 });
