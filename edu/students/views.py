@@ -24,8 +24,9 @@ from django.urls import reverse_lazy
 from django.contrib.contenttypes.models import ContentType
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
-from django.utils.cache import patch_response_headers
+from django.utils.cache import patch_cache_control, patch_response_headers
 from django.utils import timezone
+from django.core.cache import cache
 
 # Auth helpers and login-protection mixin.
 from django.contrib.auth import authenticate, login
@@ -60,6 +61,12 @@ r = redis.Redis(
 )
 
 VIDEO_CACHE_SECONDS = 60 * 60 * 24 * 7  # 7 days
+PDF_CACHE_SECONDS = 60 * 60 * 24 * 7  # 7 days
+PDF_SEARCH_CACHE_SECONDS = 60 * 60  # 1 hour
+
+
+def _pdf_cache_key(prefix, user_id, file_id, suffix=""):
+    return f"pdf:{prefix}:u{user_id}:f{file_id}:{suffix}"
 
 def _course_progress_table_ready() -> bool:
     """
@@ -664,7 +671,7 @@ class ModuleFilePreviewView(LoginRequiredMixin, View):
 
         # Force inline rendering in browser viewers (PDF/image support).
         response["Content-Disposition"] = f'inline; filename="{filename}"'
-        patch_response_headers(response, cache_timeout=0)
+        patch_cache_control(response, private=True, max_age=PDF_CACHE_SECONDS)
         return response
 
 
@@ -684,6 +691,14 @@ class ModuleFileSearchView(LoginRequiredMixin, View):
             object_id=file_id,
             module__course__students=request.user,
         )
+        file_obj = content.item
+
+        indexed_at = getattr(file_obj, "pdf_indexed_at", None) if file_obj else None
+        cache_suffix = f"{query.lower()}:{indexed_at.isoformat() if indexed_at else 'none'}"
+        cache_key = _pdf_cache_key("search", request.user.id, file_id, cache_suffix)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return JsonResponse(cached)
 
         qs = ContentSearchEntry.objects.filter(content=content, page_number__isnull=False)
         results = list(search_content_entries(qs, query)[:500])
@@ -708,14 +723,13 @@ class ModuleFileSearchView(LoginRequiredMixin, View):
 
         matches = [page_map[key] for key in sorted(page_map.keys())]
         total_matches = sum(item["count"] for item in matches)
-
-        return JsonResponse(
-            {
-                "query": query,
-                "total_matches": total_matches,
-                "matches": matches,
-            }
-        )
+        payload = {
+            "query": query,
+            "total_matches": total_matches,
+            "matches": matches,
+        }
+        cache.set(cache_key, payload, PDF_SEARCH_CACHE_SECONDS)
+        return JsonResponse(payload)
 
 
 class ModuleFilePageTextView(LoginRequiredMixin, View):
@@ -742,13 +756,23 @@ class ModuleFilePageTextView(LoginRequiredMixin, View):
             object_id=file_id,
             module__course__students=request.user,
         )
+        file_obj = content.item
+
+        indexed_at = getattr(file_obj, "pdf_indexed_at", None) if file_obj else None
+        cache_suffix = f"{','.join(str(page) for page in pages)}:{indexed_at.isoformat() if indexed_at else 'none'}"
+        cache_key = _pdf_cache_key("page-text", request.user.id, file_id, cache_suffix)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return JsonResponse(cached)
 
         rows = (
             ContentSearchEntry.objects.filter(content=content, page_number__in=pages)
             .values_list("page_number", "document")
         )
         page_map = {int(page): (doc or "") for page, doc in rows}
-        return JsonResponse({"pages": page_map})
+        payload = {"pages": page_map}
+        cache.set(cache_key, payload, PDF_SEARCH_CACHE_SECONDS)
+        return JsonResponse(payload)
 
 
 # Online count
