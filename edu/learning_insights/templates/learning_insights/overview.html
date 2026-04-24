@@ -10,6 +10,7 @@
 
 {% block content %}
 <section class="c-card" aria-labelledby="insights-overview-title">
+    {% include "learning_insights/partials/topbar.html" %}
     <div class="li-card-head">
         <div>
             <p class="c-card__meta li-kicker">Learning Insights</p>
@@ -17,15 +18,6 @@
             <p class="c-card__meta li-subtitle">
                 Daily, weekly, and monthly summaries based on tracked module study time and site presence.
             </p>
-        </div>
-        <div class="li-card-actions">
-            <a href="{% url 'learning_insights:daily_summary' %}" class="c-btn c-btn--ghost">Daily summary</a>
-            <a href="{% url 'learning_insights:weekly_summary' %}" class="c-btn c-btn--primary">Weekly summary</a>
-            <a href="{% url 'learning_insights:monthly_summary' %}" class="c-btn c-btn--ghost">Monthly summary</a>
-            <a href="{% url 'learning_insights:goal_list' %}" class="c-btn c-btn--ghost">Goals</a>
-            <a href="{% url 'learning_insights:notification_center' %}" class="c-btn c-btn--ghost">Notifications</a>
-            <a href="{% url 'learning_insights:preferences' %}" class="c-btn c-btn--ghost">Preferences</a>
-            <a href="{% url 'learning_insights:ai_review' %}" class="c-btn c-btn--ghost">AI Review</a>
         </div>
     </div>
 </section>
