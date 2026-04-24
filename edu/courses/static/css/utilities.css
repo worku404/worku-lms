@@ -33,12 +33,18 @@
 }
 
 .motto-refresh {
-    min-height: 28px;
-    min-width: 28px;
-    padding: 0.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
     font-size: 0.7rem;
-    border-radius: 999px;
-    line-height: 1;
+    border-radius: 50%;
+    line-height: 0;
+    flex: 0 0 auto;
 }
 
 .motto-refresh.is-loading {
@@ -51,12 +57,60 @@
 }
 
 .motto-refresh.is-error {
-    border-color: color-mix(in srgb, var(--color-error) 70%, transparent);
+    border-color: var(--color-error);
     color: var(--color-error);
 }
 
 .motto-text {
-    color: #ffd166;
+    color: var(--color-text);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.45;
+}
+
+body.app-body--modern .motto-actions .motto-refresh {
+    inline-size: 2.625rem;
+    block-size: 2.625rem;
+    min-width: 2.625rem;
+    min-height: 2.625rem;
+}
+
+body.app-body--modern .motto-text {
+    color: var(--color-text);
+}
+
+.motto-context {
+    color: var(--color-text-muted);
+    line-height: 1.55;
+}
+
+body.app-body--modern .motto-context {
+    color: var(--color-text-muted);
+}
+
+.motto-source {
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+body.app-body--modern .motto-source {
+    color: var(--color-text-muted);
+}
+
+.motto-link {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.16em;
+}
+
+body.app-body--modern .motto-link {
+    color: var(--color-primary);
+}
+
+.motto-link:hover,
+.motto-link:focus-visible {
+    text-decoration-thickness: 2px;
 }
 
 .c-message-stack {
