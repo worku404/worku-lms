@@ -610,6 +610,47 @@ document.addEventListener("DOMContentLoaded", function () {
             /(?:<p>\s*(?:&nbsp;|<br\s*\/?>)\s*<\/p>\s*)+$/gi,
             ""
         );
+
+        const legacyColorMap = new Map([
+            ["rgb(255,255,255)", "var(--notes-color-contrast)"],
+            ["rgba(255,255,255,1)", "var(--notes-color-contrast)"],
+            ["#ffffff", "var(--notes-color-contrast)"],
+            ["#fff", "var(--notes-color-contrast)"],
+            ["white", "var(--notes-color-contrast)"],
+            ["rgb(46,204,113)", "var(--notes-color-green)"],
+            ["#2ecc71", "var(--notes-color-green)"],
+            ["rgb(52,152,219)", "var(--notes-color-blue)"],
+            ["#3498db", "var(--notes-color-blue)"],
+            ["rgb(241,196,15)", "var(--notes-color-yellow)"],
+            ["#f1c40f", "var(--notes-color-yellow)"],
+            ["rgb(231,76,60)", "var(--notes-color-red)"],
+            ["#e74c3c", "var(--notes-color-red)"],
+        ]);
+
+        if (typeof DOMParser !== "undefined") {
+            try {
+                const parser = new DOMParser();
+                const documentFragment = parser.parseFromString(`<div>${cleaned}</div>`, "text/html");
+                const root = documentFragment.body && documentFragment.body.firstElementChild;
+                if (root) {
+                    root.querySelectorAll("[style]").forEach((node) => {
+                        if (node.closest("pre")) return;
+                        const colorValue = String(node.style.color || "")
+                            .trim()
+                            .toLowerCase()
+                            .replace(/\s+/g, "");
+                        const replacement = legacyColorMap.get(colorValue);
+                        if (replacement) {
+                            node.style.color = replacement;
+                        }
+                    });
+                    cleaned = root.innerHTML;
+                }
+            } catch (error) {
+                // Ignore normalization failures and keep the original HTML.
+            }
+        }
+
         return cleaned;
     };
 
