@@ -232,6 +232,7 @@ python manage.py createsuperuser
 | `API2_KEY` | Optional | Gemini API key fallback #2. |
 | `API3_KEY` | Optional | Gemini API key fallback #3. |
 | `API4_KEY` | Optional | Gemini API key fallback #4. |
+| `DAILY_QUOTE_API_KEY` | Optional | Dedicated Gemini API key for the daily insight card. |
 | `DJANGO_SUPERUSER_USERNAME` | Optional | Used by custom `create_superuser` command. |
 | `DJANGO_SUPERUSER_EMAIL` | Optional | Used by custom `create_superuser` command. |
 | `DJANGO_SUPERUSER_PASSWORD` | Optional | Used by custom `create_superuser` command. |
@@ -248,6 +249,7 @@ API1_KEY=
 API2_KEY=
 API3_KEY=
 API4_KEY=
+DAILY_QUOTE_API_KEY=
 ```
 
 ## Run the Project
