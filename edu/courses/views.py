@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404, JsonResponse
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 # Auth and permission guards.
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -473,8 +473,11 @@ class ContentOrderview(CsrfExemptMixin, JsonRequestResponseMixin, View):
         return self.render_json_response({"saved": "OK"})
 
 
-@require_POST
+@require_http_methods(["GET", "POST"])
 @login_required
 def refresh_daily_motto(request):
     motto_data = get_daily_motto(force_refresh=True)
-    return JsonResponse({"motto": motto_data})
+    response = JsonResponse({"motto": motto_data})
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
