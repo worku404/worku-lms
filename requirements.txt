@@ -1,4 +1,7 @@
-﻿asgiref==3.11.1
+﻿# Pinned dependency snapshot for the current NextGen Academy website.
+# Keep these versions aligned with the codebase and deployment stack.
+
+asgiref==3.11.1
 attrs==25.4.0
 autobahn==25.12.2
 Automat==25.4.16

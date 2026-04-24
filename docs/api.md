@@ -1,6 +1,6 @@
 # NextGen Academy API Documentation
 
-This document explains the API in `edu/courses/api/` so developers can integrate quickly and correctly.
+This document explains the courses API in `edu/courses/api/` so developers can integrate quickly and correctly. The public API currently covers courses, subjects, enrollment, and course-content retrieval; assistant, notes, chat, and learning-insights features are web-app experiences rather than API resources.
 
 ## 1. API Purpose
 
@@ -27,6 +27,9 @@ Without the API, consumers would need to parse HTML pages. With the API, they ca
 Implementation references:
 - `edu/edu/urls.py`
 - `edu/courses/api/urls.py`
+- `edu/courses/api/views.py`
+- `edu/courses/api/serializers.py`
+- `edu/courses/api/permissions.py`
 
 ## 3. Authentication and Permissions
 
@@ -61,7 +64,9 @@ Implementation references:
 - `edu/courses/api/permissions.py`
 - `edu/courses/api/urls.py`
 - `edu/courses/signals.py`
-- `edu/edu/settings.py`
+- `edu/edu/settings/base.py`
+- `edu/edu/settings/local.py`
+- `edu/edu/settings/prod.py`
 
 ### Token login example (curl)
 
@@ -398,14 +403,14 @@ Apply migrations (required for `authtoken` table):
 
 ```bash
 cd edu
-python manage.py migrate
+python manage.py migrate --settings=edu.settings.local
 ```
 
 Run server:
 
 ```bash
 cd edu
-python manage.py runserver
+python manage.py runserver --settings=edu.settings.local
 ```
 
 Inspect API root:
