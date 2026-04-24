@@ -10,6 +10,7 @@
 
 {% block content %}
 <section class="c-card li-goals-hero" aria-labelledby="goals-title">
+    {% include "learning_insights/partials/topbar.html" %}
     <div class="li-card-head li-goals-hero__head">
         <div>
             <p class="c-card__meta li-kicker">Learning Insights</p>
@@ -109,7 +110,7 @@
                             </h2>
                             <div class="li-goal-card__badges">
                                 <span class="li-goal-chip">{{ goal.get_period_type_display }}</span>
-                                <span class="li-goal-chip">{{ goal.get_status_display }}</span>
+                                <span class="li-goal-chip {{ goal.get_status_display }}">{{ goal.get_status_display }}</span>
                                 {% if goal.course %}
                                     <span class="li-goal-chip">{{ goal.course.title }}</span>
                                 {% endif %}
