@@ -893,40 +893,59 @@ body.assistant-sidebar-open .llm-history {
 }
 
 .llm-composer {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    background: var(--assistant-composer-bg);
-    border: 1px solid #2A9D66;
-    border-radius: var(--assistant-radius-lg);
-    padding: var(--assistant-composer-padding);
-    box-shadow: var(--assistant-composer-shadow);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "input controls";
+    align-items: end;
+    column-gap: 0.45rem;
+    background: transparent;
+    border-radius: 14px;
+    padding: 0.28rem 0.35rem 0.28rem 0.38rem;
+    box-shadow: none;
+    border: 2px solid transparent;
+    transition: border-color 0.08s ease-in-out;
 }
-.llm-composer:focus{
-    border:  5px solid red;
-    transition: border-color var(--assistant-transition-fast), box-shadow var(--assistant-transition-fast), background var(--assistant-transition-fast);
 
+.llm-composer.is-active {
+    border-color: var(--color-primary);
 }
 .llm-input {
+    grid-area: input;
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: flex-start;
+}
+
+.llm-controls {
+    grid-area: controls;
+    align-self: end;
+    width: auto;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0;
+    gap: 0.35rem;
 }
 
 .llm--textarea {
     width: 100%;
-    min-height: 44px;
-    max-height: 152px;
+    min-height: 26px;
+    max-height: 64px;
     color: var(--assistant-text-color);
-    padding: var(--assistant-input-padding);
-    line-height: 1.45;
+    padding: 10px;
+    line-height: 1.5;
     resize: none;
     overflow: hidden;
     font-family: var(--assistant-font-family);
     font-size: var(--assistant-font-size);
     letter-spacing: var(--assistant-letter-spacing);
-    background-color: transparent;
+    background: transparent !important;
     outline: none;
-    border: transparent;
+    border: none !important;
+    box-shadow: none !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 .llm--textarea::placeholder {
@@ -967,17 +986,9 @@ body.assistant-sidebar-open .llm-history {
     background-clip: padding-box;
 }
 
-.llm-controls {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 0.1rem;
-    gap: var(--assistant-element-gap);
-}
-
 .llm-btn {
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     border: 1px solid var(--assistant-button-border);
     border-radius: 999px;
     background: var(--assistant-button-bg);
@@ -990,8 +1001,8 @@ body.assistant-sidebar-open .llm-history {
 }
 
 .llm-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 13px;
+    height: 13px;
 }
 
 .llm-send-icon {
