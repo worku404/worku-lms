@@ -1,4 +1,5 @@
 {% load static %}
+{% get_media_prefix as media_prefix %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,10 +126,10 @@
                             <span class="landing-preview-chip landing-preview-chip--soft">YouTube + PDF + local video</span>
                         </div>
                         <div class="landing-media-frame" aria-hidden="true">
-                            <div class="landing-media-frame__play"></div>
-                            <div class="landing-media-frame__timeline">
-                                <span style="width: 48%;"></span>
-                            </div>
+                            <video class="landing-media-frame__video" autoplay muted loop playsinline preload="metadata">
+                                <source src="{{ media_prefix }}videos/E-learning_Platform_UI_In_a_modern_UI_design_style_a_dashboard_displays.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
                         </div>
                         <p class="landing-preview-card__footnote">
                             Watch, annotate, and take notes without leaving the learning flow.
@@ -137,7 +138,6 @@
                 </div>
             </div>
         </section>
-
         <section class="landing-section landing-container landing-solution" aria-labelledby="problem-solution-title">
             <div class="landing-section__header">
                 <p class="landing-eyebrow">Why learners stall</p>
