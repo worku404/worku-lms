@@ -18,7 +18,7 @@
             <div class="c-pdf-toolbar" data-toolbar-state="default">
                 <div class="c-pdf-toolbar__default">
                     <div class="c-pdf-toolbar__section c-pdf-toolbar__section--icons">
-                        <button class="c-btn c-btn--ghost c-pdf-btn js-pdf-sidebar-toggle" type="button" aria-label="Toggle modules sidebar">
+                        <button class="c-btn c-btn--ghost c-pdf-btn js-pdf-outline-toggle" type="button" aria-label="Toggle document outline" aria-expanded="false">
                             ☰
                         </button>
                         <button class="c-btn c-btn--ghost c-pdf-btn js-pdf-search-toggle" type="button" aria-label="Search">
@@ -117,7 +117,20 @@
                     </button>
                 </div>
             </div>
-            <div class="c-pdf-viewer__scroll js-pdf-scroll" aria-label="{{ item.title }}"></div>
+            <div class="c-pdf-viewer__body">
+                <aside class="c-pdf-outline js-pdf-outline-panel" aria-label="Document outline" hidden>
+                    <div class="c-pdf-outline__header">
+                        <h3 class="c-pdf-outline__title">Document outline</h3>
+                        <button class="c-btn c-btn--ghost c-pdf-btn js-pdf-outline-close" type="button" aria-label="Close document outline">
+                            ✕
+                        </button>
+                    </div>
+                    <p class="c-pdf-outline__status js-pdf-outline-status" hidden></p>
+                    <p class="c-pdf-outline__empty js-pdf-outline-empty">Loading outline…</p>
+                    <ul class="c-pdf-outline__list js-pdf-outline-list"></ul>
+                </aside>
+                <div class="c-pdf-viewer__scroll js-pdf-scroll" aria-label="{{ item.title }}"></div>
+            </div>
         </div>
         <p class="c-resource-download">
             <a href="{% url 'student_file_download' item.id %}" class="c-btn c-btn--secondary" download>
