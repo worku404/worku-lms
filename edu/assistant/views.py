@@ -1,11 +1,13 @@
+import json
+
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 
 from .markdown_utils import render_llm_markdown
 from .models import AssistantChat, AssistantTurn
-from .services import GeminiError, generate_ai_response
+from .services import GeminiError, generate_ai_response, stream_ai_response
 from .utils import (
     PIN_LIMIT,
     build_chat_state,
@@ -17,21 +19,31 @@ from .utils import (
     toggle_pin,
 )
 
+def _sse_event(event_name: str, data: dict[str, object]) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 @require_POST
 @login_required
 def llm_generate(request):
     prompt = (request.POST.get("prompt") or "").strip()
-    
+
     if not prompt:
         return JsonResponse({"error": "Prompt is required."}, status=400)
 
     system_prompt = (
         "You are a helpful AI study assistant inside an e-learning platform. "
-        "Be direct and practical. When relevant, include short actionable steps, "
+        "Be direct, practical, and complete. If the user asks for detail, "
+        "give a thorough answer and do not stop early. "
+        "When relevant, include short actionable steps, "
         "and use Markdown for readability."
     )
 
     active_chat = get_active_chat(request)
+    if not active_chat:
+        active_chat = AssistantChat.objects.create(user=request.user)
+        set_active_chat(request, active_chat)
+
     max_turns = 3
     contents = []
     if active_chat:
@@ -50,40 +62,73 @@ def llm_generate(request):
                 )
     contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-    try:
-        generated = generate_ai_response({"contents": contents}, system_prompt)
-    except GeminiError as exc:
-        return JsonResponse(
-            {
-                "error": exc.message,
-                "details": exc.details,
-            },
-            status=500,
-        )
+    generation_context = {
+        "contents": contents,
+        "temperature": 0.2,
+    }
 
-    if not active_chat:
-        active_chat = AssistantChat.objects.create(user=request.user)
-        set_active_chat(request, active_chat)
+    def stream_response():
+        generated_parts: list[str] = []
+        yield _sse_event("state", {"chat_state": build_chat_state(request.user, active_chat)})
 
-    AssistantTurn.objects.create(
-        chat=active_chat,
-        prompt=prompt,
-        response=generated,
+        try:
+            for chunk_text in stream_ai_response(generation_context, system_prompt):
+                if not chunk_text:
+                    continue
+                generated_parts.append(chunk_text)
+                yield _sse_event("token", {"text": chunk_text})
+
+            generated = "".join(generated_parts).strip()
+            if not generated:
+                raise GeminiError("Gemini returned an empty response.")
+
+            AssistantTurn.objects.create(
+                chat=active_chat,
+                prompt=prompt,
+                response=generated,
+            )
+
+            if not (active_chat.title or "").strip():
+                active_chat.title = title_from_prompt(prompt)
+                active_chat.save(update_fields=["title", "updated_at"])
+            else:
+                active_chat.save(update_fields=["updated_at"])
+
+            chat_state = build_chat_state(request.user, active_chat)
+            yield _sse_event(
+                "done",
+                {
+                    "generated": render_llm_markdown(generated),
+                    "chat_state": chat_state,
+                },
+            )
+        except GeminiError as exc:
+            yield _sse_event(
+                "error",
+                {
+                    "error": exc.message,
+                    "details": exc.details,
+                    "chat_state": build_chat_state(request.user, active_chat),
+                },
+            )
+        except GeneratorExit:
+            raise
+        except Exception as exc:
+            yield _sse_event(
+                "error",
+                {
+                    "error": str(exc),
+                    "chat_state": build_chat_state(request.user, active_chat),
+                },
+            )
+
+    response = StreamingHttpResponse(
+        stream_response(),
+        content_type="text/event-stream; charset=utf-8",
     )
-
-    if not (active_chat.title or "").strip():
-        active_chat.title = title_from_prompt(prompt)
-        active_chat.save(update_fields=["title", "updated_at"])
-    else:
-        active_chat.save(update_fields=["updated_at"])
-
-    chat_state = build_chat_state(request.user, active_chat)
-    return JsonResponse(
-        {
-            "generated": render_llm_markdown(generated),
-            "chat_state": chat_state,
-        }
-    )
+    response["Cache-Control"] = "no-cache, no-transform"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @require_POST
@@ -111,7 +156,9 @@ def llm_open_chat(request, chat_id):
     target_chat = get_object_or_404(
         AssistantChat, id=chat_id, user=request.user
     )
-    if active_chat and active_chat.id != target_chat.id:
+    active_chat_id = getattr(active_chat, "id", None)
+    target_chat_id = getattr(target_chat, "id", None)
+    if active_chat_id and active_chat_id != target_chat_id:
         delete_unpinned_chat(active_chat)
     set_active_chat(request, target_chat)
 
@@ -128,6 +175,8 @@ def llm_open_chat(request, chat_id):
 def llm_toggle_pin(request, chat_id):
     chat = get_object_or_404(AssistantChat, id=chat_id, user=request.user)
     active_chat = get_active_chat(request)
+    active_chat_id = getattr(active_chat, "id", None)
+    chat_id_value = getattr(chat, "id", None)
 
     if not chat.is_pinned:
         pinned_count = AssistantChat.objects.filter(
@@ -143,7 +192,7 @@ def llm_toggle_pin(request, chat_id):
         toggle_pin(chat, True)
     else:
         toggle_pin(chat, False)
-        if not active_chat or active_chat.id != chat.id:
+        if not active_chat_id or active_chat_id != chat_id_value:
             chat.delete()
 
     active_chat = get_active_chat(request)
