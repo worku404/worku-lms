@@ -5,7 +5,8 @@
 .li-panel {
 	border: 1px solid var(--li-soft-border);
 	border-radius: 14px;
-	background: var(--li-soft-surface);
+	background: var(--li-surface-soft);
+	border-color: var(--li-border-strong);
 }
 
 .li-panel--padded {
