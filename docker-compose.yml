@@ -5,9 +5,9 @@ services:
     volumes:
       - ./data/db:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
   cache:
     image: redis:7.2.4
     restart: always
@@ -22,9 +22,12 @@ services:
       -  .:/code
     environment:
       - DJANGO_SETTINGS_MODULE=edu.settings.prod
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - REDIS_URL=${REDIS_URL:-redis://cache:6379/1}
     depends_on:
       - db
       - cache
@@ -34,6 +37,8 @@ services:
     volumes:
       - ./config/nginx:/etc/nginx/templates
       - .:/code
+    environment:
+      - SERVER_NAME=${SERVER_NAME:-educaproject.com}
     ports:
       - "80:80"
       - "443:443"
@@ -48,9 +53,12 @@ services:
       - .:/code
     environment:
       - DJANGO_SETTINGS_MODULE=edu.settings.prod
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - REDIS_URL=${REDIS_URL:-redis://cache:6379/1}
     depends_on:
       - db
       - cache
