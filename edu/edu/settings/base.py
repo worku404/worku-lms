@@ -16,12 +16,13 @@ from dotenv import load_dotenv
 REDIS_HOST = config("REDIS_HOST", default="127.0.0.1")
 REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
 REDIS_DB = config("REDIS_DB", default=0, cast=int)
+ASSISTANT_MAX_OUTPUT_TOKENS = config("ASSISTANT_MAX_OUTPUT_TOKENS", default=60000, cast=int)
 
 # Core project paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables from either project root or settings directory.
-for _env_path in (BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
+for _env_path in (BASE_DIR.parent / ".env", BASE_DIR / ".env", BASE_DIR / "edu" / ".env"):
     if _env_path.exists():
         load_dotenv(_env_path, override=True)
 
@@ -124,8 +125,8 @@ USE_TZ = True
 
 
 # Static and media files
-STATIC_URL = "static/"
-MEDIA_URL = "media/"
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 STATIC_ROOT = BASE_DIR / "static"
 
