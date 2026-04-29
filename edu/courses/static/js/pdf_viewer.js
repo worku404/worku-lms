@@ -125,6 +125,7 @@
             this.activeMatchIndex = -1;
             this.searchMode = false;
             this.destroyed = false;
+            this.initialLayoutRefreshId = null;
             this.scrollHandler = null;
             this.resizeObserver = null;
             this.bodyObserver = null;
@@ -181,6 +182,16 @@
             this._restoreInitialPosition();
             this._scheduleRenderForViewport();
             this._setTotalText(numPages);
+            this._scheduleInitialLayoutRefresh();
+        }
+
+        _scheduleInitialLayoutRefresh() {
+            if (this.initialLayoutRefreshId !== null) return;
+            this.initialLayoutRefreshId = window.setTimeout(() => {
+                this.initialLayoutRefreshId = null;
+                if (this.destroyed) return;
+                this.refreshLayout();
+            }, 120);
         }
 
         _buildPagesLayer() {
@@ -265,12 +276,16 @@
             if (!this.doc) return;
             const scale = this.store.view.scale;
             const sourceSizes = this.basePageSizes.length ? this.basePageSizes : this.pageSizes;
+            this.renderGeneration += 1;
             this.pageSizes = sourceSizes.map((size) => ({
                 width: (size.width || 0) * scale,
                 height: (size.height || 0) * scale,
             }));
             this._recomputeOffsets();
             if (this.pagesLayer) {
+                this.pagesLayer.querySelectorAll(".c-pdf-page.is-rendered").forEach((node) => {
+                    node.classList.remove("is-rendered");
+                });
                 this.pagesLayer.style.height = `${this._docHeight()}px`;
             }
             this._updateVisiblePagePositions();
@@ -624,6 +639,7 @@
             this.renderRunning = true;
             const generation = ++this.renderGeneration;
             while (this.renderQueue.length) {
+                if (generation !== this.renderGeneration) break;
                 const item = this.renderQueue.shift();
                 if (!item) continue;
                 try {
@@ -633,6 +649,9 @@
                 }
             }
             this.renderRunning = false;
+            if (this.renderQueue.length) {
+                void this._runRenderQueue();
+            }
         }
 
         async _renderPage(pageNumber, generation) {
@@ -684,6 +703,7 @@
             this._renderTextLayer(page, viewport, textLayer);
             this._renderAnnotations(page, viewport, annotationLayer);
             this._applySearchHighlightsToPage(pageNumber);
+            node.classList.add("is-rendered");
             this._updateProgress(false);
         }
 
@@ -1096,6 +1116,10 @@
         }
 
         refreshLayout() {
+            if (this.initialLayoutRefreshId !== null) {
+                window.clearTimeout(this.initialLayoutRefreshId);
+                this.initialLayoutRefreshId = null;
+            }
             const zoomMode = this.store.view.zoomMode;
             if (zoomMode === "fit-width" || zoomMode === "fit-page") {
                 void this._setFitMode(zoomMode);
@@ -1114,6 +1138,10 @@
 
         destroy() {
             this.destroyed = true;
+            if (this.initialLayoutRefreshId !== null) {
+                window.clearTimeout(this.initialLayoutRefreshId);
+                this.initialLayoutRefreshId = null;
+            }
             if (this.scrollHandler) this.scrollEl.removeEventListener("scroll", this.scrollHandler);
             if (this.resizeObserver) this.resizeObserver.disconnect();
             if (this.bodyObserver) this.bodyObserver.disconnect();
