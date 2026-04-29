@@ -796,9 +796,12 @@ body:not(.theme-dark) .course-time__value {
 }
 
 .c-pdf-outline {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.5rem;
   min-width: 0;
+  min-height: 0;
   padding: 0.75rem;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
@@ -836,6 +839,7 @@ body.theme-dark .c-pdf-outline {
   margin: 0;
   color: color-mix(in srgb, var(--color-text) 68%, var(--color-muted));
   font-size: 0.78rem;
+  flex: 0 0 auto;
 }
 
 .c-pdf-outline__list,
@@ -848,8 +852,12 @@ body.theme-dark .c-pdf-outline {
 .c-pdf-outline__list {
   display: grid;
   gap: 0.25rem;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.15rem;
+  align-content: start;
 }
 
 .c-pdf-outline__children {
