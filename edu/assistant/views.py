@@ -1,13 +1,12 @@
-import json
-
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 
 from .markdown_utils import render_llm_markdown
 from .models import AssistantChat, AssistantTurn
-from .services import GeminiError, generate_ai_response, stream_ai_response
+from .services import GeminiError, generate_ai_response
 from .utils import (
     PIN_LIMIT,
     build_chat_state,
@@ -18,9 +17,19 @@ from .utils import (
     title_from_prompt,
     toggle_pin,
 )
+DEFAULT_MAX_OUTPUT_TOKENS = getattr(settings, "ASSISTANT_MAX_OUTPUT_TOKENS", 65536)
 
-def _sse_event(event_name: str, data: dict[str, object]) -> str:
-    return f"event: {event_name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+def _gemini_error_status(details: dict[str, object] | None) -> int:
+    if isinstance(details, dict):
+        status = details.get("status")
+        try:
+            status_code = int(str(status or "").strip())
+        except (TypeError, ValueError):
+            status_code = 0
+        if 400 <= status_code <= 599:
+            return status_code
+    return 502
 
 
 @require_POST
@@ -35,6 +44,7 @@ def llm_generate(request):
         "You are a helpful AI study assistant inside an e-learning platform. "
         "Be direct, practical, and complete. If the user asks for detail, "
         "give a thorough answer and do not stop early. "
+        "keep the token less than 60000"
         "When relevant, include short actionable steps, "
         "and use Markdown for readability."
     )
@@ -65,70 +75,51 @@ def llm_generate(request):
     generation_context = {
         "contents": contents,
         "temperature": 0.2,
+        "maxOutputTokens": DEFAULT_MAX_OUTPUT_TOKENS,
     }
 
-    def stream_response():
-        generated_parts: list[str] = []
-        yield _sse_event("state", {"chat_state": build_chat_state(request.user, active_chat)})
+    try:
+        generated = generate_ai_response(generation_context, system_prompt).strip()
+        if not generated:
+            raise GeminiError("Gemini returned an empty response.", details={"status": 502})
 
-        try:
-            for chunk_text in stream_ai_response(generation_context, system_prompt):
-                if not chunk_text:
-                    continue
-                generated_parts.append(chunk_text)
-                yield _sse_event("token", {"text": chunk_text})
+        AssistantTurn.objects.create(
+            chat=active_chat,
+            prompt=prompt,
+            response=generated,
+        )
 
-            generated = "".join(generated_parts).strip()
-            if not generated:
-                raise GeminiError("Gemini returned an empty response.")
+        if not (active_chat.title or "").strip():
+            active_chat.title = title_from_prompt(prompt)
+            active_chat.save(update_fields=["title", "updated_at"])
+        else:
+            active_chat.save(update_fields=["updated_at"])
 
-            AssistantTurn.objects.create(
-                chat=active_chat,
-                prompt=prompt,
-                response=generated,
-            )
-
-            if not (active_chat.title or "").strip():
-                active_chat.title = title_from_prompt(prompt)
-                active_chat.save(update_fields=["title", "updated_at"])
-            else:
-                active_chat.save(update_fields=["updated_at"])
-
-            chat_state = build_chat_state(request.user, active_chat)
-            yield _sse_event(
-                "done",
-                {
-                    "generated": render_llm_markdown(generated),
-                    "chat_state": chat_state,
-                },
-            )
-        except GeminiError as exc:
-            yield _sse_event(
-                "error",
-                {
-                    "error": exc.message,
-                    "details": exc.details,
-                    "chat_state": build_chat_state(request.user, active_chat),
-                },
-            )
-        except GeneratorExit:
-            raise
-        except Exception as exc:
-            yield _sse_event(
-                "error",
-                {
-                    "error": str(exc),
-                    "chat_state": build_chat_state(request.user, active_chat),
-                },
-            )
-
-    response = StreamingHttpResponse(
-        stream_response(),
-        content_type="text/event-stream; charset=utf-8",
-    )
-    response["Cache-Control"] = "no-cache, no-transform"
-    response["X-Accel-Buffering"] = "no"
-    return response
+        chat_state = build_chat_state(request.user, active_chat)
+        return JsonResponse(
+            {
+                "generated": render_llm_markdown(generated),
+                "chat_state": chat_state,
+            }
+        )
+    except GeminiError as exc:
+        details = exc.details if isinstance(exc.details, dict) else None
+        return JsonResponse(
+            {
+                "error": exc.message,
+                "details": details,
+                "chat_state": build_chat_state(request.user, active_chat),
+            },
+            status=_gemini_error_status(details),
+        )
+    except Exception as exc:
+        return JsonResponse(
+            {
+                "error": str(exc),
+                "chat_state": build_chat_state(request.user, active_chat),
+            },
+            status=500,
+        )
 
 
 @require_POST
