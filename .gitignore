@@ -228,7 +228,9 @@ edu/media/
 
 # SSL Secrets
 edu/ssl/
-
+.agent.md
+edu/notes
+edu/learning_insights/
 # Runtime files
 *.sock
 *.log
