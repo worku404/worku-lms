@@ -616,105 +616,6 @@
     }
     return responseText;
   };
-
-  const parseSseEventPayload = (eventName, dataLines) => {
-    const raw = dataLines.join("\n").trim();
-    if (!raw || raw === "[DONE]") return null;
-    let payload;
-    try {
-      payload = JSON.parse(raw);
-    } catch (error) {
-      payload = { text: raw };
-    }
-
-    if (eventName === "error") {
-      const message = payload.error || payload.message || "Request failed.";
-      const error = new Error(message);
-      error.payload = payload;
-      throw error;
-    }
-
-    return { eventName, payload };
-  };
-
-  const readAssistantStream = async (response, { onToken, onState, onDone } = {}) => {
-    if (!response.body || typeof response.body.getReader !== "function") {
-      throw new Error("Streaming is not supported in this browser.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let eventName = "message";
-    let dataLines = [];
-
-    const flushEvent = async () => {
-      if (!dataLines.length) {
-        eventName = "message";
-        return null;
-      }
-      const parsed = parseSseEventPayload(eventName, dataLines);
-      eventName = "message";
-      dataLines = [];
-      if (!parsed) return null;
-      const { payload } = parsed;
-      if (parsed.eventName === "token") {
-        const text = String(payload.text || payload.delta || "");
-        if (text && typeof onToken === "function") {
-          onToken(text);
-        }
-        return null;
-      }
-      if (parsed.eventName === "state") {
-        if (typeof onState === "function") {
-          onState(payload);
-        }
-        return null;
-      }
-      if (parsed.eventName === "done") {
-        if (typeof onDone === "function") {
-          onDone(payload);
-        }
-        return payload;
-      }
-      return null;
-    };
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex = buffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex).replace(/\r$/, "");
-          buffer = buffer.slice(newlineIndex + 1);
-          if (!line) {
-            await flushEvent();
-          } else if (line.startsWith("event:")) {
-            eventName = line.slice(6).trim() || "message";
-          } else if (line.startsWith("data:")) {
-            dataLines.push(line.slice(5).trimStart());
-          } else if (!line.startsWith(":")) {
-            dataLines.push(line);
-          }
-          newlineIndex = buffer.indexOf("\n");
-        }
-      }
-
-      if (buffer.trim() || dataLines.length) {
-        if (buffer.trim()) {
-          dataLines.push(buffer.trim());
-        }
-        const payload = await flushEvent();
-        return payload;
-      }
-      return null;
-    } finally {
-      reader.releaseLock();
-    }
-  };
     
   const waitingMarkup = () =>
     `
@@ -1229,7 +1130,6 @@ function renderHistory() {
       openAssistantSidebar();
       setSendButtonMode("stop");
       activeRequestController = new AbortController();
-      const shouldStickToBottom = isHistoryNearBottom(historyContainerEl);
       const activeItem = {
         prompt: prompt,
         response: "",
@@ -1237,23 +1137,6 @@ function renderHistory() {
       };
       history.push(activeItem);
       renderHistory();
-      let streamingResponseEl = historyContainerEl
-        ? historyContainerEl.querySelector(".llm-chat-entry:last-child .llm-chat-row--ai .llm-chat-msg")
-        : null;
-      let streamedText = "";
-
-      const setStreamingText = (text) => {
-        streamedText = text;
-        activeItem.response = streamedText;
-        activeItem.responseMode = "streaming";
-        if (streamingResponseEl) {
-          streamingResponseEl.textContent = streamedText;
-        }
-        if (shouldStickToBottom && historyContainerEl) {
-          historyContainerEl.scrollTop = historyContainerEl.scrollHeight;
-        }
-        updateScrollBottomVisibility();
-      };
 
       try {
         const response = await fetch("{% url 'assistant:llm_generate' %}", {
@@ -1285,29 +1168,18 @@ function renderHistory() {
           renderHistory();
           applyChatState(data);
         } else {
-          const data = await readAssistantStream(response, {
-            onState: (payload) => {
-              applyChatState(payload);
-            },
-            onToken: (chunkText) => {
-              setStreamingText(streamedText + chunkText);
-            },
-            onDone: (payload) => {
-              activeItem.response = payload.generated || "";
-              activeItem.responseMode = "html";
-              if (payload.chat_state) {
-                applyChatState(payload);
-              }
-            },
-          });
+          const data = await response.json();
 
           if (data && data.error) {
             activeItem.response = String(data.error || "Request failed.");
             activeItem.responseMode = "text";
-            renderHistory();
           } else {
-            renderHistory();
+            activeItem.response = String(data.generated || "");
+            activeItem.responseMode = "html";
           }
+
+          renderHistory();
+          applyChatState(data);
         }
       } catch (error) {
         if (error && error.name === "AbortError") {
