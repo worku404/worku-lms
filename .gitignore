@@ -229,8 +229,6 @@ edu/media/
 # SSL Secrets
 edu/ssl/
 .agent.md
-edu/notes
-edu/learning_insights/
 # Runtime files
 *.sock
 *.log
@@ -242,5 +240,10 @@ db.sqlite3
 # Docker
 .docker_temp/
 data
-
+start.vbs
+start.ps1
+stop.vbs
+stop.ps1
+./stop.ps1
+stop.vbs
     
