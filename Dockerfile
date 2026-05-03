@@ -14,4 +14,5 @@ RUN pip install -r requirements.txt
 
 #Copy the django project
 COPY . .
+RUN sed -i 's/\r$//' /code/wait-for-it.sh && chmod +x /code/wait-for-it.sh
 
