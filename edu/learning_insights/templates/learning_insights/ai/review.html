@@ -49,8 +49,7 @@
         <p class="li-prose">{{ latest_run.summary_text }}</p>
     {% endif %}
     <div class="li-section-top li-card-actions">
-        <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}" class="c-btn c-btn--secondary">Open</a>
-        <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}#edit" class="c-btn c-btn--ghost">Edit</a>
+        <a href="{% url 'learning_insights:ai_run_detail' latest_run.id %}" class="c-btn c-btn--secondary">Open summary</a>
     </div>
 </section>
 {% endif %}
@@ -70,8 +69,7 @@
                         <p class="li-prose li-mt-md">{{ run.summary_text|truncatechars:220 }}</p>
                     {% endif %}
                     <div class="li-mt-lg li-card-actions">
-                        <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Open</a>
-                        <a href="{% url 'learning_insights:ai_run_detail' run.id %}#edit" class="c-btn c-btn--ghost">Edit</a>
+                        <a href="{% url 'learning_insights:ai_run_detail' run.id %}" class="c-btn c-btn--ghost">Open summary</a>
                     </div>
                 </article>
             {% endfor %}
