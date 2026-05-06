@@ -807,7 +807,10 @@ class AIReviewGenerateView(InsightsBaseMixin, View):
             label = "weekly"
 
         if run.status == AIPlanRun.STATUS_SUCCESS:
-            messages.success(request, f"AI {label} review generated. Review and edit before sharing.")
+            messages.success(
+                request,
+                f"AI {label} review generated and saved automatically.",
+            )
         else:
             messages.error(request, f"AI review generation failed: {run.summary_text or run.error_message}")
         return HttpResponseRedirect(reverse("learning_insights:ai_run_detail", kwargs={"pk": run.id}))
@@ -815,10 +818,70 @@ class AIReviewGenerateView(InsightsBaseMixin, View):
 
 class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
     template_name = "learning_insights/ai/run_detail.html"
+    SUMMARY_RUN_KINDS = {
+        AIPlanRun.KIND_DAILY_REVIEW,
+        AIPlanRun.KIND_WEEKLY_REVIEW,
+        AIPlanRun.KIND_IMPROVEMENT,
+        AIPlanRun.KIND_RECOVERY,
+    }
 
     def dispatch(self, request, *args, **kwargs):
         self.run = get_object_or_404(self.get_queryset(), pk=kwargs.get("pk"))
         return super().dispatch(request, *args, **kwargs)
+
+    def _is_prompt_plan(self) -> bool:
+        return self.run.kind == AIPlanRun.KIND_PROMPT_PLAN
+
+    def _is_summary_run(self) -> bool:
+        return self.run.kind in self.SUMMARY_RUN_KINDS
+
+    def _normalize_summary_items(self, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+
+        items: list[str] = []
+        for row in value[:8]:
+            text = ""
+            if isinstance(row, str):
+                text = row.strip()
+            elif isinstance(row, dict):
+                preferred_keys = (
+                    "title",
+                    "summary",
+                    "description",
+                    "reason",
+                    "why",
+                    "action",
+                    "value",
+                )
+                parts = [str(row.get(key) or "").strip() for key in preferred_keys]
+                parts = [part for part in parts if part]
+                if not parts:
+                    parts = [str(raw or "").strip() for raw in row.values()]
+                    parts = [part for part in parts if part]
+                text = " - ".join(parts[:2]).strip()
+            elif row is not None:
+                text = str(row).strip()
+
+            if text:
+                items.append(text[:400])
+
+        return items
+
+    def _build_summary_view(self) -> dict[str, Any]:
+        payload = self.run.effective_payload if isinstance(self.run.effective_payload, dict) else {}
+        risk_level = str(payload.get("risk_level") or "").strip().lower()
+        if risk_level not in {"low", "medium", "high"}:
+            risk_level = ""
+
+        return {
+            "summary": str(payload.get("summary") or self.run.summary_text or "").strip(),
+            "achievements": self._normalize_summary_items(payload.get("achievements")),
+            "missed_targets": self._normalize_summary_items(payload.get("missed_targets")),
+            "insights": self._normalize_summary_items(payload.get("insights")),
+            "suggestions": self._normalize_summary_items(payload.get("suggestions")),
+            "risk_level": risk_level,
+        }
 
     def _build_prompt_plan_formset(self, *, data=None):
         courses = self.request.user.courses_joined.order_by("title")
@@ -865,29 +928,48 @@ class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
         context["page_title"] = "AI Run"
         context["run"] = self.run
 
-        is_prompt_plan = self.run.kind == AIPlanRun.KIND_PROMPT_PLAN
+        is_prompt_plan = self._is_prompt_plan()
+        is_summary_run = self._is_summary_run()
         context["is_prompt_plan"] = is_prompt_plan
+        context["is_summary_run"] = is_summary_run
+        context["is_payload_editable"] = not is_prompt_plan and not is_summary_run
         if is_prompt_plan:
             context["plan_formset"] = self._build_prompt_plan_formset()
-        else:
+        elif context["is_payload_editable"]:
             context["form"] = AIPlanRunEditForm(
                 initial={
                     "edited_payload": self.run.effective_payload,
                 }
             )
+        if is_summary_run:
+            context["summary_view"] = self._build_summary_view()
 
-        try:
-            import json
+        if not is_summary_run:
+            try:
+                import json
 
-            context["payload_pretty"] = json.dumps(self.run.effective_payload, indent=2, ensure_ascii=False)
-        except Exception:
-            context["payload_pretty"] = str(self.run.effective_payload)
+                context["payload_pretty"] = json.dumps(
+                    self.run.effective_payload,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            except Exception:
+                context["payload_pretty"] = str(self.run.effective_payload)
 
         context["subscription"] = get_subscription_for_user(user=self.request.user)
         return context
 
     def post(self, request, *args, **kwargs):
-        if self.run.kind == AIPlanRun.KIND_PROMPT_PLAN:
+        if self._is_summary_run():
+            messages.info(
+                request,
+                "This AI summary is saved automatically and cannot be edited here.",
+            )
+            return HttpResponseRedirect(
+                reverse("learning_insights:ai_run_detail", kwargs={"pk": self.run.id})
+            )
+
+        if self._is_prompt_plan():
             formset = self._build_prompt_plan_formset(data=request.POST)
             if not formset.is_valid():
                 try:
@@ -903,6 +985,8 @@ class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
                         "page_title": "AI Run",
                         "run": self.run,
                         "is_prompt_plan": True,
+                        "is_summary_run": False,
+                        "is_payload_editable": False,
                         "plan_formset": formset,
                         "payload_pretty": payload_pretty,
                         "subscription": get_subscription_for_user(user=request.user),
@@ -982,6 +1066,8 @@ class AIRunDetailView(AIRunQuerysetMixin, TemplateView):
                     "page_title": "AI Run",
                     "run": self.run,
                     "is_prompt_plan": False,
+                    "is_summary_run": False,
+                    "is_payload_editable": True,
                     "form": form,
                     "payload_pretty": payload_pretty,
                     "subscription": get_subscription_for_user(user=request.user),
