@@ -275,6 +275,7 @@
         _relayoutForScale() {
             if (!this.doc) return;
             const scale = this.store.view.scale;
+            const anchor = this._captureScrollAnchor();
             const sourceSizes = this.basePageSizes.length ? this.basePageSizes : this.pageSizes;
             this.renderGeneration += 1;
             this.pageSizes = sourceSizes.map((size) => ({
@@ -290,7 +291,50 @@
             }
             this._updateVisiblePagePositions();
             this.renderedPages.clear();
+            this._restoreScrollAnchor(anchor);
             this._scheduleRenderForViewport();
+        }
+
+        _captureScrollAnchor() {
+            if (!this.pageOffsets.length) {
+                return { pageNumber: this._currentPage(), pageOffsetRatio: 0 };
+            }
+
+            const viewportH = this.scrollEl.clientHeight || 1;
+            const scrollTop = this.scrollEl.scrollTop || 0;
+            const anchorDocY = scrollTop + viewportH * 0.35;
+            let pageIndex = 0;
+
+            for (let i = 0; i < this.pageOffsets.length; i += 1) {
+                const pageTop = this.pageOffsets[i];
+                const pageHeight = this.pageSizes[i]?.height || 0;
+                if (anchorDocY >= pageTop && anchorDocY <= pageTop + pageHeight) {
+                    pageIndex = i;
+                    break;
+                }
+                if (pageTop <= anchorDocY) pageIndex = i;
+            }
+
+            const pageTop = this.pageOffsets[pageIndex] || 0;
+            const pageHeight = this.pageSizes[pageIndex]?.height || 1;
+            return {
+                pageNumber: pageIndex + 1,
+                pageOffsetRatio: clamp((anchorDocY - pageTop) / Math.max(1, pageHeight), 0, 1),
+            };
+        }
+
+        _restoreScrollAnchor(anchor) {
+            if (!anchor || !this.pageOffsets.length) return;
+
+            const pageIndex = clamp((Number(anchor.pageNumber) || 1) - 1, 0, Math.max(0, this.pageOffsets.length - 1));
+            const pageTop = this.pageOffsets[pageIndex] || 0;
+            const pageHeight = this.pageSizes[pageIndex]?.height || 1;
+            const viewportH = this.scrollEl.clientHeight || 1;
+            const totalHeight = this._docHeight();
+            const target = pageTop + pageHeight * clamp(Number(anchor.pageOffsetRatio) || 0, 0, 1);
+
+            this.scrollEl.scrollTop = clamp(target - viewportH * 0.35, 0, totalHeight);
+            this._updateNavigationFromScroll();
         }
 
         _restoreInitialPosition() {
@@ -622,7 +666,10 @@
 
             Array.from(this.pagesLayer.querySelectorAll(".js-pdf-page")).forEach((node) => {
                 const pageNumber = Number(node.dataset.pageNumber || 0);
-                if (!keep.has(pageNumber)) node.remove();
+                if (!keep.has(pageNumber)) {
+                    this.renderedPages.delete(pageNumber);
+                    node.remove();
+                }
             });
         }
 
@@ -699,6 +746,7 @@
             this._recomputeOffsets();
             this.pagesLayer.style.height = `${this._docHeight()}px`;
             this._updateVisiblePagePositions();
+            if (!node.isConnected) return;
             this.renderedPages.add(pageNumber);
             this._renderTextLayer(page, viewport, textLayer);
             this._renderAnnotations(page, viewport, annotationLayer);
